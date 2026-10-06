@@ -35,8 +35,18 @@
   .sun .dnum .n, .hol-day .dnum .n { color: var(--sun); }
   .sat .dnum .n { color: var(--sat); }
   .it { font-size: calc(var(--fs) * 0.88); line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
-  .it.done { text-decoration: line-through; opacity: 0.55; }
-  .it .ck { color: var(--accent); font-weight: 900; }
+  .it.done { opacity: 0.55; }
+  .it .sym { font-weight: 900; margin-right: 2px; }
+  .it.done .lb { text-decoration: line-through; }
+  .legend { display: flex; gap: 8px; font-size: calc(var(--fs) * 0.82); white-space: nowrap; margin-right: 6px; }
+  .legend b { font-weight: 900; margin-right: 1px; }
+  @media (max-width: 720px) { .legend { display: none; } }
+  .types { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 12px; }
+  .types button { border: 1.5px solid var(--line); background: transparent; color: var(--text); border-radius: 8px; padding: 6px 10px; cursor: pointer; font-family: inherit; font-size: calc(var(--fs) * 0.92); font-weight: 700; }
+  .types button.on { color: #fff; }
+  .memo-body { width: 100%; margin-top: 6px; border: 1px solid var(--line); background: rgba(127,127,127,0.12); color: var(--text); border-radius: 8px; padding: 8px 10px; font-size: var(--fs); outline: none; font-family: inherit; resize: vertical; min-height: 70px; user-select: text; }
+  .row .mb { color: var(--muted); font-size: calc(var(--fs) * 0.88); white-space: pre-line; margin-top: 4px; display: none; }
+  .row.open .mb { display: block; }
   .more { font-size: calc(var(--fs) * 0.8); color: var(--muted); }
   .grip { position: absolute; right: 2px; bottom: 2px; width: 18px; height: 18px; cursor: nwse-resize; display: none; opacity: 0.7;
     background: linear-gradient(135deg, transparent 50%, var(--muted) 50%, var(--muted) 60%, transparent 60%, transparent 70%, var(--muted) 70%, var(--muted) 80%, transparent 80%); }
@@ -76,6 +86,7 @@
     <button class="ib" id="b-today" title="이번 달로">●</button>
     <button class="ib" id="b-next" title="다음 달">›</button>
     <div class="title" id="title"></div>
+    <span class="legend" id="legend"></span>
     <span class="cloud no-drag" id="cloud"></span>
     <button class="ib" id="b-app" title="할일습관 앱 열기">📱</button>
     <button class="ib" id="b-lock" title="위치 고정 / 이동·크기 조절">🔒</button>
@@ -94,9 +105,15 @@
 (function () {
   const DB = window.DesktopBridge || null; // PC 프로그램 안에서 열렸을 때만 있음
   const DOW = ['일', '월', '화', '수', '목', '금', '토'];
-  const KEY_TASKS = 'todo_habit_tasks_v3', KEY_LOGS = 'day_logs_v1', KEY_SET = 'app_settings_v1', DESK_KEY = 'desk_settings_v1';
-  let tasks = [], dayLogs = {}, appSettings = {};
-  let desk = { alpha: 45, style: 'dark', font: 'mid', lunar: true, daily: false, weekly: true, monthly: true, todo: true, mood: true, locked: true, onTop: false, autoStart: true };
+  const KEY_TASKS = 'todo_habit_tasks_v3', KEY_LOGS = 'day_logs_v1', KEY_SET = 'app_settings_v1', KEY_NOTES = 'notes_v1', DESK_KEY = 'desk_settings_v1';
+  let tasks = [], dayLogs = {}, appSettings = {}, notes = [];
+  let desk = { alpha: 45, style: 'dark', font: 'mid', lunar: true, daily: false, weekly: true, monthly: true, todo: true, memo: true, mood: true, locked: true, onTop: false, autoStart: true };
+  // 종류별 기호·색 (폰 앱·위젯과 같아요)
+  const SYM = { daily: '●', weekly: '■', monthly: '▲', todo: '◆', memo: '✎' };
+  const COL_DARK = { daily: '#56B4E9', weekly: '#F0A830', monthly: '#2BC79A', todo: '#E7A3C7', memo: '#FF8A50' };
+  const COL_LIGHT = { daily: '#0072B2', weekly: '#C88400', monthly: '#009E73', todo: '#B8558F', memo: '#D55E00' };
+  const NAME = { daily: '매일', weekly: '매주', monthly: '매달', todo: '할일', memo: '메모' };
+  function col(k) { return (desk.style === 'light' ? COL_LIGHT : COL_DARK)[k]; }
   const now0 = new Date();
   let viewY = now0.getFullYear(), viewM = now0.getMonth();
 
@@ -107,10 +124,15 @@
     try { tasks = JSON.parse(localStorage.getItem(KEY_TASKS) || '[]') || []; } catch (e) { tasks = []; }
     try { dayLogs = JSON.parse(localStorage.getItem(KEY_LOGS) || '{}') || {}; } catch (e) { dayLogs = {}; }
     try { appSettings = JSON.parse(localStorage.getItem(KEY_SET) || '{}') || {}; } catch (e) { appSettings = {}; }
+    try { notes = JSON.parse(localStorage.getItem(KEY_NOTES) || '[]') || []; } catch (e) { notes = []; }
     try { desk = Object.assign(desk, JSON.parse(localStorage.getItem(DESK_KEY) || '{}') || {}); } catch (e) {}
   }
   function saveTasks() {
     try { localStorage.setItem(KEY_TASKS, JSON.stringify(tasks)); } catch (e) {}
+    if (window.CloudSync) window.CloudSync.schedulePush();
+  }
+  function saveNotes() {
+    try { localStorage.setItem(KEY_NOTES, JSON.stringify(notes)); } catch (e) {}
     if (window.CloudSync) window.CloudSync.schedulePush();
   }
   function saveDesk() { try { localStorage.setItem(DESK_KEY, JSON.stringify(desk)); } catch (e) {} }
@@ -121,6 +143,7 @@
   function scheduled(h, d) {
     const ds = iso(d);
     if (isPaused(h, ds)) return false;
+    if (h.startDate && ds < h.startDate) return false; // 시작일 전에는 안 보임
     if (h.frequency === 'daily') return true;
     if (h.frequency === 'monthly') return d.getDate() === Math.min(h.monthDay || 1, dim(d.getFullYear(), d.getMonth()));
     return (h.repeatDays || [0, 1, 2, 3, 4, 5, 6]).includes(d.getDay());
@@ -137,7 +160,7 @@
     const ds = iso(d), out = [];
     tasks.forEach(t => {
       if (t.type === 'todo') {
-        if (desk.todo && t.dueDate === ds) out.push({ t, kind: 'todo', done: !!t.done, label: t.title });
+        if (desk.todo && t.dueDate === ds) out.push({ t, kind: 'todo', type: 'todo', done: !!t.done, label: t.title });
         return;
       }
       if (t.type !== 'habit') return;
@@ -145,9 +168,11 @@
       if ((f === 'daily' && !desk.daily) || (f === 'weekly' && !desk.weekly) || (f === 'monthly' && !desk.monthly)) return;
       if (!scheduled(t, d)) return;
       const tg = target(t), c = count(t, ds);
-      out.push({ t, kind: 'habit', done: (t.completedDates || []).includes(ds), label: t.title + (tg > 1 ? ` ${c}/${tg}` : '') });
+      out.push({ t, kind: 'habit', type: f, done: (t.completedDates || []).includes(ds), label: t.title + (tg > 1 ? ` ${c}/${tg}` : '') });
     });
-    out.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'todo' ? -1 : 1));
+    if (desk.memo) notes.forEach(n => { if (n.date === ds) out.push({ n, kind: 'memo', type: 'memo', done: false, label: n.title || (n.body || '').split('\n')[0] || '메모' }); });
+    const order = { todo: 0, daily: 1, weekly: 2, monthly: 3, memo: 4 };
+    out.sort((a, b) => order[a.type] - order[b.type]);
     return out;
   }
   const lunarCal = window.KoreanLunarCalendar ? new window.KoreanLunarCalendar() : null;
@@ -216,7 +241,7 @@
       const label = d.getDate() === 1 ? `${d.getMonth() + 1}월 1일` : d.getDate();
       html += `<div class="${cls}" data-date="${ds}">
         <div class="dnum"><span class="n">${label}</span>${hol ? `<span class="hol">${esc(hol)}</span>` : (desk.lunar ? `<span class="lunar">${lunarText(d)}</span>` : '')}${mood}</div>
-        ${items.map(it => `<div class="it ${it.done ? 'done' : ''}">${it.done ? '<span class="ck">✓</span>' : '•'} ${it.kind === 'habit' ? '🔁' : ''}${esc(it.label)}</div>`).join('')}
+        ${items.map(it => `<div class="it ${it.done ? 'done' : ''}"><span class="sym" style="color:${col(it.type)}">${it.done ? '✓' : SYM[it.type]}</span><span class="lb">${esc(it.label)}</span></div>`).join('')}
       </div>`;
     }
     grid.innerHTML = html;
@@ -238,6 +263,7 @@
         c.appendChild(m);
       }
     });
+    document.getElementById('legend').innerHTML = ['daily', 'weekly', 'monthly', 'todo', 'memo'].map(k => `<span><b style="color:${col(k)}">${SYM[k]}</b>${NAME[k]}</span>`).join('');
     renderCloud();
   }
   function renderCloud() {
@@ -253,26 +279,45 @@
   }
 
   // ---- 날짜 누르면: 그날 목록 체크 + 할일 추가 ----
+  let addType = 'todo';
   function openDay(ds) {
     const p = document.getElementById('day-panel');
     const d = new Date(ds + 'T00:00:00');
+    const wd = DOW[d.getDay()], md = d.getDate();
+    const HINT = {
+      todo: `${d.getMonth() + 1}월 ${md}일 하루만 하는 할일이에요`,
+      daily: `${d.getMonth() + 1}월 ${md}일부터 매일 반복해요`,
+      weekly: `매주 ${wd}요일마다 반복해요 (${d.getMonth() + 1}월 ${md}일부터)`,
+      monthly: `매달 ${md}일마다 반복해요`,
+      memo: `${d.getMonth() + 1}월 ${md}일 날짜가 붙은 메모예요 (폰 메모장에도 들어가요)`
+    };
     function draw() {
       load();
       const all = [];
       tasks.forEach(t => {
-        if (t.type === 'todo' && t.dueDate === ds) all.push({ t, kind: 'todo' });
-        else if (t.type === 'habit' && scheduled(t, d)) all.push({ t, kind: 'habit' });
+        if (t.type === 'todo' && t.dueDate === ds) all.push({ t, kind: 'todo', type: 'todo' });
+        else if (t.type === 'habit' && scheduled(t, d)) all.push({ t, kind: 'habit', type: t.frequency });
       });
+      notes.forEach(n => { if (n.date === ds) all.push({ n, kind: 'memo', type: 'memo' }); });
+      const order = { todo: 0, daily: 1, weekly: 2, monthly: 3, memo: 4 };
+      all.sort((a, b) => order[a.type] - order[b.type]);
       const log = dayLogs[ds];
-      p.innerHTML = `<h3>${d.getMonth() + 1}월 ${d.getDate()}일 ${DOW[d.getDay()]}요일 <small style="font-weight:500; color:var(--muted)">${lunarText(d)} ${HOLIDAYS[ds] ? '· ' + esc(HOLIDAYS[ds]) : ''}</small></h3>
+      p.innerHTML = `<h3>${d.getMonth() + 1}월 ${md}일 ${wd}요일 <small style="font-weight:500; color:var(--muted)">${lunarText(d)} ${HOLIDAYS[ds] ? '· ' + esc(HOLIDAYS[ds]) : ''}</small></h3>
         ${log && (log.mood || log.note) ? `<div class="note" style="margin:0 0 8px;">${log.mood || ''} ${esc(log.note || '')}</div>` : ''}
         ${all.length ? all.map((x, i) => {
+          if (x.kind === 'memo') {
+            const n = x.n;
+            return `<div class="row" data-memo="${i}" style="flex-wrap:wrap;"><span class="sym" style="color:${col('memo')}; font-weight:900; width:20px; text-align:center;">✎</span><div style="flex:1; min-width:0;"><div>${esc(n.title || (n.body || '').split('\n')[0] || '메모')}</div><div class="mb">${esc(n.body || '')}</div></div><div class="sub" style="color:${col('memo')}">메모 ▾</div></div>`;
+          }
           const t = x.t, tg = x.kind === 'habit' ? target(t) : 1, c = x.kind === 'habit' ? count(t, ds) : 0;
           const done = x.kind === 'todo' ? !!t.done : (t.completedDates || []).includes(ds);
-          const sub = x.kind === 'todo' ? '할일' : ({ daily: '매일', weekly: '매주', monthly: '매달' })[t.frequency] + (tg > 1 ? ` · ${c}/${tg}` : '');
-          return `<div class="row" data-i="${i}"><div class="box ${done ? 'on' : ''}">${done ? '✓' : ''}</div><div>${esc(t.title)}</div><div class="sub">${sub}</div></div>`;
+          const sub = `<span style="color:${col(x.type)}">${SYM[x.type]} ${NAME[x.type]}</span>` + (tg > 1 ? ` · ${c}/${tg}` : '');
+          return `<div class="row" data-i="${i}"><div class="box ${done ? 'on' : ''}" style="${done ? `background:${col(x.type)}; border-color:${col(x.type)}` : `border-color:${col(x.type)}`}">${done ? '✓' : ''}</div><div>${esc(t.title)}</div><div class="sub">${sub}</div></div>`;
         }).join('') : '<div class="note">이 날은 예정된 게 없어요.</div>'}
-        <div class="addrow"><input id="add-input" placeholder="이 날짜에 할일 추가 (Enter)" maxlength="60" /><button class="btn" id="add-btn">추가</button></div>
+        <div class="types" id="types">${['todo', 'daily', 'weekly', 'monthly', 'memo'].map(k => `<button data-type="${k}" style="${addType === k ? `background:${col(k)}; border-color:${col(k)}` : `border-color:${col(k)}; color:${col(k)}`}" class="${addType === k ? 'on' : ''}">${SYM[k]} ${NAME[k] === '할일' || NAME[k] === '메모' ? NAME[k] : NAME[k] + ' 습관'}</button>`).join('')}</div>
+        <div class="note" style="margin-top:6px;">${HINT[addType]}</div>
+        <div class="addrow" style="margin-top:6px;"><input id="add-input" placeholder="${addType === 'memo' ? '메모 제목' : '이름 (예: ' + ({ todo: '우유 사기', daily: '물 마시기', weekly: '헬스장 가기', monthly: '공과금 내기' })[addType] + ')'}" maxlength="60" /><button class="btn" id="add-btn" style="background:${col(addType)}">추가</button></div>
+        ${addType === 'memo' ? '<textarea class="memo-body" id="add-body" placeholder="내용 (선택)"></textarea>' : ''}
         <div style="display:flex; justify-content:flex-end; margin-top:12px;"><button class="btn gray" id="day-close">닫기</button></div>`;
       p.querySelectorAll('[data-i]').forEach(r => r.addEventListener('click', () => {
         const x = all[parseInt(r.getAttribute('data-i'), 10)];
@@ -281,15 +326,34 @@
         else setCount(t, ds, (t.completedDates || []).includes(ds) ? 0 : target(t));
         saveTasks(); draw(); render();
       }));
+      p.querySelectorAll('[data-memo]').forEach(r => r.addEventListener('click', () => r.classList.toggle('open')));
+      p.querySelectorAll('[data-type]').forEach(b => b.addEventListener('click', () => {
+        const keep = document.getElementById('add-input').value;
+        addType = b.getAttribute('data-type'); draw();
+        const el = document.getElementById('add-input'); el.value = keep; el.focus();
+      }));
       const add = () => {
         const v = document.getElementById('add-input').value.trim(); if (!v) return;
-        tasks.unshift({ id: 't' + Date.now() + Math.random().toString(36).slice(2, 7), type: 'todo', title: v, category: null, memo: '', done: false,
-          createdAt: iso(new Date()), completedAt: null, dueDate: ds, reminderTime: null });
-        saveTasks(); draw(); render();
+        const id = 't' + Date.now() + Math.random().toString(36).slice(2, 7);
+        const today = iso(new Date());
+        if (addType === 'memo') {
+          const body = (document.getElementById('add-body') || {}).value || '';
+          notes.unshift({ id: 'n' + Date.now() + Math.random().toString(36).slice(2, 6), title: v, body, color: '', pinned: false, date: ds, createdAt: Date.now(), updatedAt: Date.now() });
+          saveNotes();
+        } else if (addType === 'todo') {
+          tasks.unshift({ id, type: 'todo', title: v, category: null, memo: '', done: false, createdAt: today, completedAt: null, dueDate: ds, reminderTime: null });
+          saveTasks();
+        } else {
+          tasks.unshift({ id, type: 'habit', frequency: addType, title: v, category: null, memo: '',
+            repeatDays: addType === 'weekly' ? [d.getDay()] : [0, 1, 2, 3, 4, 5, 6], monthDay: addType === 'monthly' ? md : 1,
+            completedDates: [], target: 1, counts: {}, pauses: [], reminderTime: null, createdAt: ds, startDate: ds });
+          saveTasks();
+        }
+        draw(); render();
         setTimeout(() => { const el = document.getElementById('add-input'); if (el) el.focus(); }, 30);
       };
       document.getElementById('add-btn').onclick = add;
-      document.getElementById('add-input').addEventListener('keydown', e => { if (e.key === 'Enter') add(); });
+      document.getElementById('add-input').addEventListener('keydown', e => { if (e.key === 'Enter' && addType !== 'memo') add(); });
       document.getElementById('day-close').onclick = () => p.classList.remove('show');
     }
     draw();
@@ -306,13 +370,15 @@
       <div class="set"><span>배경 색</span><div class="seg" data-seg="style"><button data-v="dark">어둡게 (흰 글씨)</button><button data-v="light">밝게 (검은 글씨)</button></div></div>
       <div class="set"><span>글자 크기</span><div class="seg" data-seg="font"><button data-v="small">작게</button><button data-v="mid">보통</button><button data-v="big">크게</button><button data-v="huge">아주 크게</button></div></div>
       ${tg('lunar', '음력 날짜 표시')}
-      ${tg('todo', '📌 할일 표시')}
-      ${tg('weekly', '🔁 매주 습관 표시')}
-      ${tg('monthly', '🔁 매달 습관 표시')}
-      ${tg('daily', '🔁 매일 습관 표시', '매일 나와서 칸이 꽉 찰 수 있어요')}
+      ${tg('todo', '◆ 할일 표시')}
+      ${tg('weekly', '■ 매주 습관 표시')}
+      ${tg('monthly', '▲ 매달 습관 표시')}
+      ${tg('daily', '● 매일 습관 표시', '매일 나와서 칸이 꽉 찰 수 있어요')}
+      ${tg('memo', '✎ 날짜 메모 표시')}
       ${tg('mood', '😊 하루 기분 표시')}
       ${DB ? tg('onTop', '항상 다른 창 위에 표시', '끄면 다른 창 뒤로 가요') + tg('autoStart', '윈도우 켤 때 자동 실행') : ''}
       <div class="set"><span>구글 계정</span><span>${CS && CS.user ? esc(CS.user.email || '') + ' <button class="btn gray" id="logout" style="padding:4px 9px;">로그아웃</button>' : '<button class="btn" id="login2">Google 로그인</button>'}</span></div>
+      <div class="note">기호: <b style="color:${col('daily')}">● 매일</b> · <b style="color:${col('weekly')}">■ 매주</b> · <b style="color:${col('monthly')}">▲ 매달</b> · <b style="color:${col('todo')}">◆ 할일</b> · <b style="color:${col('memo')}">✎ 메모</b> (완료하면 ✓)</div>
       <div class="note">🔒 버튼을 누르면 🔓 이동 모드가 돼요. 위쪽 막대를 끌어 위치를 옮기고, 오른쪽 아래 모서리를 끌어 크기를 바꾼 뒤 다시 🔒을 누르면 고정돼요.<br>날짜를 누르면 그날 할 일을 체크하거나 새 할일을 추가할 수 있어요.</div>
       <div style="display:flex; justify-content:flex-end; margin-top:12px;"><button class="btn" id="set-close">닫기</button></div>`;
     p.querySelectorAll('[data-seg]').forEach(seg => {
@@ -359,7 +425,7 @@
   });
   window.addEventListener('resize', () => { clearTimeout(window.__rt); window.__rt = setTimeout(render, 120); });
   // 다른 창(앱 창)에서 바꾸면 바로 반영
-  window.addEventListener('storage', (e) => { if ([KEY_TASKS, KEY_LOGS, KEY_SET].includes(e.key)) render(); });
+  window.addEventListener('storage', (e) => { if ([KEY_TASKS, KEY_LOGS, KEY_SET, KEY_NOTES].includes(e.key)) render(); });
   // 날짜가 바뀌면 자동으로 새로 그리기
   let lastDay = iso(new Date());
   setInterval(() => { const t = iso(new Date()); if (t !== lastDay) { lastDay = t; const n = new Date(); viewY = n.getFullYear(); viewM = n.getMonth(); render(); } }, 60000);

@@ -415,6 +415,7 @@
       <span><i class="lg-square" style="background:#E69F00"></i>매주</span>
       <span><i class="lg-triangle" style="border-bottom-color:#009E73"></i>매달</span>
       <span><i class="lg-diamond" style="background:#CC79A7"></i>할일</span>
+      <span><b style="color:#D55E00; font-size:11px;">✎</b>메모</span>
     </div>
   </div>
   <div class="cal-detail" id="cal-detail" style="display:none;"></div>
@@ -424,7 +425,8 @@
 <!-- 탭: 메모 -->
 <div id="tab-notes" class="tab-page" style="display:none;">
   <div class="section" style="margin-top:8px;">
-    <input class="note-search" id="note-search" placeholder="🔍 메모 검색" />
+    <input class="note-search" id="note-search" placeholder="🔍 메모 검색" autocomplete="off" />
+    <div id="note-search-info" style="display:none; margin-top:8px; font-size:12.5px; color:var(--text-muted);"></div>
     <div id="note-list"></div>
   </div>
 </div>
@@ -520,17 +522,26 @@
   <div class="settings-block native-only">
     <div class="settings-title">홈 화면 위젯</div>
     <div class="settings-card">
-      <div class="settings-row" style="padding-top:0;"><span>위젯 배경 진하기</span><b id="widget-opacity-val" style="color:var(--primary);"></b></div>
+      <div style="font-size:13.5px; padding-bottom:6px;">달력 위젯의 날짜를 누르면</div>
+      <div class="chip-row" id="calw-tap" style="margin-bottom:10px;">
+        <div class="chip" data-tap="calendar">📅 달력 (그 날짜)</div>
+        <div class="chip" data-tap="checklist">✅ 체크리스트</div>
+        <div class="chip" data-tap="notes">📝 메모장</div>
+        <div class="chip" data-tap="newnote">✎ 그 날짜에 새 메모</div>
+      </div>
+      <div class="settings-row"><span>달력 위젯에 매일 습관도 표시<br><small style="color:var(--text-muted); font-size:11.5px;">켜면 매일 칸이 꽉 찰 수 있어요</small></span><button class="toggle-switch" id="calw-daily"><span class="knob"></span></button></div>
+      <div class="settings-row"><span>위젯 배경 진하기</span><b id="widget-opacity-val" style="color:var(--primary);"></b></div>
       <input type="range" id="widget-opacity" min="0" max="100" step="5" class="picker-slider" style="background:linear-gradient(to right, transparent, var(--primary)); border:1px solid var(--border); margin-bottom:12px;" />
       <div class="hint" style="margin-top:0;">앱을 열지 않고 바탕화면에서 바로 체크할 수 있어요.<br>
       ① 폰 바탕화면의 빈 곳을 손가락으로 꾹 누르기<br>
       ② 아래쪽에 나오는 <b>위젯</b> 누르기<br>
       ③ 목록에서 <b>할일습관</b>을 찾아 원하는 위젯을 꾹 눌러서 바탕화면에 놓기<br><br>
-      <b>위젯 종류 (6가지)</b><br>
+      <b>위젯 종류 (7가지)</b><br>
       · 오늘의 체크 — 오늘 할 습관+할일 전부<br>
       · 매일 습관 / 매주 습관 / 매달 습관 — 종류별로 따로<br>
       · 할일 목록 — 남은 할일을 날짜순으로<br>
-      · 오늘 진행률 — 작은 크기, 콩콩이와 달성률<br><br>
+      · 오늘 진행률 — 작은 크기, 콩콩이와 달성률<br>
+      · 월간 달력 — 음력·공휴일·할일·습관이 한 달 단위로 (날짜를 누르면 앱에서 열려요)<br><br>
       위젯 색은 위의 <b>테마 색상</b>과 <b>다크모드</b>를 따라가요.</div>
     </div>
   </div>
@@ -554,7 +565,7 @@
     <div class="settings-card">
       <button class="settings-btn danger" id="reset-btn">전체 데이터 초기화</button>
     </div>
-    <div class="footer-note">할일습관 앱 · v1.4.1</div>
+    <div class="footer-note">할일습관 앱 · v1.6</div>
   </div>
 </div>
 
@@ -569,6 +580,7 @@
 
 <script src="firebase.js"></script>
 <script src="sync.js"></script>
+<script src="lunar.js"></script>
 <script>
 (function () {
   const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -587,7 +599,8 @@
     '#E85D75','#5C9EAD','#B08968','#6A7FDB','#48A9A6','#E0A458','#7B506F','#3F7D58',
     '#C94277','#4472CA','#E9C46A','#2A9D8F'];
   // 달력의 매일/매주/매달/할일 구분용 색 - 색약이신 분들도 서로 구분되도록 만들어진 전용 팔레트(Okabe-Ito)
-  const TYPE_COLORS = { daily: '#0072B2', weekly: '#E69F00', monthly: '#009E73', todo: '#CC79A7' };
+  const TYPE_COLORS = { daily: '#0072B2', weekly: '#E69F00', monthly: '#009E73', todo: '#CC79A7', memo: '#D55E00' };
+  const TYPE_SYMBOL = { daily: '●', weekly: '■', monthly: '▲', todo: '◆', memo: '✎' };
   const HOLIDAYS = {
     '2026-01-01': '신정', '2026-02-16': '설날 연휴', '2026-02-17': '설날', '2026-02-18': '설날 연휴',
     '2026-03-01': '삼일절', '2026-03-02': '삼일절 대체공휴일', '2026-05-01': '노동절', '2026-05-05': '어린이날',
@@ -715,6 +728,7 @@
   // 쉬는 기간이면 '예정 없음'으로 처리 (연속 기록이 끊기지 않도록)
   function isHabitScheduled(h, dateStr) { return isHabitScheduledBase(h, dateStr) && !isPaused(h, dateStr); }
   function isHabitScheduledBase(h, dateStr) {
+    if (h.startDate && dateStr < h.startDate) return false; // 시작일 전에는 예정 없음
     if (h.frequency === 'daily') return true;
     if (h.frequency === 'monthly') {
       const d = new Date(dateStr + 'T00:00:00');
@@ -775,7 +789,7 @@
   ];
   function noteBg(k) { const c = NOTE_COLORS.find(x => x.key === (k || '')); return c ? c.bg : 'var(--surface)'; }
   function loadNotes() { try { notes = JSON.parse(localStorage.getItem(NOTES_KEY) || '[]') || []; } catch (e) { notes = []; } }
-  function saveNotes() { try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes)); } catch (e) {} scheduleCloudSync(); }
+  function saveNotes() { try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes)); } catch (e) {} scheduleCloudSync(); syncAndroid(); }
   function noteDateLabel(ts) {
     const d = new Date(ts); const now = new Date();
     if (toISODate(d) === toISODate(now)) return `오늘 ${d.getHours() < 12 ? '오전' : '오후'} ${d.getHours() % 12 === 0 ? 12 : d.getHours() % 12}:${pad(d.getMinutes())}`;
@@ -786,6 +800,13 @@
     const q = (document.getElementById('note-search').value || '').trim().toLowerCase();
     let list = notes.filter(n => !q || (n.title || '').toLowerCase().includes(q) || (n.body || '').toLowerCase().includes(q));
     list.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (b.updatedAt || 0) - (a.updatedAt || 0));
+    // 검색 중이면 몇 개가 걸러졌는지 보여주고, 바로 지울 수 있게
+    const info = document.getElementById('note-search-info');
+    if (q) {
+      info.style.display = '';
+      info.innerHTML = `🔍 '${escapeHtml(q)}' 검색 결과 ${list.length}개 (전체 ${notes.length}개) · <button id="note-search-clear" style="border:none; background:var(--primary-soft); color:var(--primary-dark); border-radius:8px; padding:3px 9px; font-weight:700; cursor:pointer; font-family:inherit;">✕ 검색 지우기</button>`;
+      document.getElementById('note-search-clear').onclick = () => { document.getElementById('note-search').value = ''; renderNotes(); };
+    } else info.style.display = 'none';
     if (!list.length) {
       el.innerHTML = `<div class="empty-box" style="margin-top:12px;">${q ? '찾는 메모가 없어요.' : '오른쪽 아래 + 버튼을 눌러<br>자유롭게 메모를 남겨보세요.<br><small>예: 장보기 목록, 아이디어, 회의 메모</small>'}</div>`;
       return;
@@ -794,20 +815,22 @@
         ${n.pinned ? '<span class="npin">📌</span>' : ''}
         <div class="nt">${escapeHtml(n.title || (n.body || '').split('\n')[0] || '제목 없음')}</div>
         <div class="nb">${escapeHtml(n.title ? (n.body || '') : (n.body || '').split('\n').slice(1).join('\n'))}</div>
-        <div class="nd">${noteDateLabel(n.updatedAt || n.createdAt || Date.now())}</div>
+        <div class="nd">${n.date ? `<b style="color:${TYPE_COLORS.memo};">📅 ${parseInt(n.date.slice(5, 7), 10)}/${parseInt(n.date.slice(8), 10)}</b> · ` : ''}${noteDateLabel(n.updatedAt || n.createdAt || Date.now())}</div>
       </div>`).join('')}</div>`;
     el.querySelectorAll('[data-note]').forEach(c => c.addEventListener('click', () => openNoteEditor(c.getAttribute('data-note'))));
   }
-  function openNoteEditor(id) {
+  function openNoteEditor(id, presetDate) {
     let note = id ? notes.find(n => n.id === id) : null;
     const isNew = !note;
-    const draft = note ? Object.assign({}, note) : { id: 'n' + Date.now() + Math.random().toString(36).slice(2, 6), title: '', body: '', color: '', pinned: false, createdAt: Date.now(), updatedAt: Date.now() };
+    const draft = note ? Object.assign({}, note) : { id: 'n' + Date.now() + Math.random().toString(36).slice(2, 6), title: '', body: '', color: '', pinned: false, date: presetDate || null, createdAt: Date.now(), updatedAt: Date.now() };
     const container = document.getElementById('modal-container');
     container.innerHTML = `
       <div class="modal-overlay" id="note-overlay">
         <div class="modal-sheet" id="note-sheet" style="background:var(--surface); max-height:92vh;">
           <input class="note-editor-title" id="note-title" placeholder="제목" value="${escapeHtml(draft.title)}" maxlength="80" />
           <textarea class="note-editor-body" id="note-body" placeholder="내용을 자유롭게 적어보세요">${escapeHtml(draft.body)}</textarea>
+          <div class="inline-row" style="margin-top:8px;"><button class="tb" id="note-date" style="border:1.5px solid var(--border); background:var(--bg); color:var(--text); border-radius:10px; padding:7px 11px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit;"></button>
+            <span class="hint" style="margin:0;">날짜를 정하면 달력·위젯·PC 달력에도 ✎로 보여요</span></div>
           <div class="note-color-row" id="note-colors">${NOTE_COLORS.map(c => `<div class="note-color ${c.key === (draft.color || '') ? 'on' : ''}" data-ncolor="${c.key}" title="${c.label}" style="background:${c.key ? c.bg : 'var(--surface)'};"></div>`).join('')}</div>
           <div class="note-toolbar">
             <div style="display:flex; gap:6px;">
@@ -862,6 +885,17 @@
       document.querySelectorAll('[data-ncolor]').forEach(x => x.classList.toggle('on', x === c));
       persist();
     }));
+    // 날짜 지정
+    const dateBtn = document.getElementById('note-date');
+    function drawDate() {
+      if (draft.date) { const d = new Date(draft.date + 'T00:00:00'); dateBtn.textContent = `📅 ${d.getMonth() + 1}월 ${d.getDate()}일 (${'일월화수목금토'[d.getDay()]}) ✕`; dateBtn.style.color = TYPE_COLORS.memo; }
+      else { dateBtn.textContent = '📅 날짜 정하기 (선택)'; dateBtn.style.color = ''; }
+    }
+    drawDate();
+    dateBtn.addEventListener('click', () => {
+      if (draft.date) { draft.date = null; drawDate(); persist(); return; }
+      openDatePicker(toISODate(new Date()), (ds) => { draft.date = ds; drawDate(); persist(); });
+    });
     // 뒤로가기로 닫아도 저장되도록
     window.__noteClosePersist = () => { clearTimeout(t); persist(); renderNotes(); };
     if (isNew) setTimeout(() => titleEl.focus(), 60);
@@ -876,7 +910,7 @@
     try { dayLogs = JSON.parse(localStorage.getItem(DAYLOG_KEY) || '{}') || {}; } catch (e) { dayLogs = {}; }
     try { appSettings = Object.assign(appSettings, JSON.parse(localStorage.getItem(APPSET_KEY) || '{}') || {}); } catch (e) {}
   }
-  function saveDayLogs() { try { localStorage.setItem(DAYLOG_KEY, JSON.stringify(dayLogs)); } catch (e) {} scheduleCloudSync(); }
+  function saveDayLogs() { try { localStorage.setItem(DAYLOG_KEY, JSON.stringify(dayLogs)); } catch (e) {} scheduleCloudSync(); syncAndroid(); }
   function saveAppSettings() { try { localStorage.setItem(APPSET_KEY, JSON.stringify(appSettings)); } catch (e) {} syncAndroid(); scheduleCloudSync(); }
 
   // ---- 잠깐 쉬기 ----
@@ -1246,7 +1280,7 @@
             Object.keys(t.counts || {}).forEach(k => { if (k >= since) counts[k] = t.counts[k]; });
             return { id: t.id, type: 'habit', title: t.title, frequency: t.frequency, repeatDays: t.repeatDays, monthDay: t.monthDay || 1,
               target: habitTarget(t), counts, completedDates: t.completedDates.filter(d => d >= since), pauses: t.pauses || [],
-              reminderTime: t.reminderTime || null, streak: currentStreak(t), createdAt: t.createdAt || null };
+              reminderTime: t.reminderTime || null, streak: currentStreak(t), createdAt: t.createdAt || null, startDate: t.startDate || null };
           }
           return { id: t.id, type: 'todo', title: t.title, done: !!t.done, dueDate: t.dueDate, completedAt: t.completedAt || null, reminderTime: t.reminderTime || null };
         });
@@ -1255,12 +1289,56 @@
         window.AndroidBridge.syncData(JSON.stringify({ tasks: slim,
           settings: { summaryOn: !!appSettings.summaryOn, summaryTime: appSettings.summaryTime || '21:00',
             calendarSync: !!appSettings.calendarSync, calTodo: appSettings.calTodo !== false, calHabit: appSettings.calHabit !== false, calDaily: !!appSettings.calDaily,
-            widgetOpacity: appSettings.widgetOpacity === undefined ? 96 : appSettings.widgetOpacity,
+            widgetOpacity: appSettings.widgetOpacity === undefined ? 96 : appSettings.widgetOpacity, calWidgetDaily: !!appSettings.calWidgetDaily,
             theme: t.key, dark: document.body.classList.contains('dark'), color: t.l[0], soft: t.l[2], darkColor: t.d[0], darkSoft: t.d[2] },
-          meta: { level: lv.level, levelName: lv.name, emoji: STAGE_EMOJI[lv.stage] || '🌱' } }));
+          meta: Object.assign({ level: lv.level, levelName: lv.name, emoji: STAGE_EMOJI[lv.stage] || '🌱' }, calendarMeta()) }));
       } catch (e) {}
     }, 250);
   }
+  // 달력 위젯용: 음력 날짜·공휴일·기분 (지난달 ~ 1년 뒤)
+  let lunarCache = { key: '', map: {} };
+  function calendarMeta() {
+    const today = toISODate(new Date());
+    const n = new Date();
+    const start = new Date(n.getFullYear(), n.getMonth() - 2, 1);
+    const end = new Date(n.getFullYear() + 1, n.getMonth() + 1, 0);
+    if (lunarCache.key !== today && window.KoreanLunarCalendar) {
+      const map = {};
+      const lc = new window.KoreanLunarCalendar();
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        try {
+          lc.setSolarDate(d.getFullYear(), d.getMonth() + 1, d.getDate());
+          const l = lc.getLunarCalendar();
+          map[toISODate(d)] = '(음)' + (l.intercalation ? '윤' : '') + l.month + '.' + l.day;
+        } catch (e) {}
+      }
+      lunarCache = { key: today, map };
+    }
+    const holidays = {};
+    const s0 = toISODate(start), e0 = toISODate(end);
+    Object.keys(HOLIDAYS).forEach(k => { if (k >= s0 && k <= e0) holidays[k] = HOLIDAYS[k]; });
+    const moods = {};
+    const ms = isoAdd(today, -70);
+    Object.keys(dayLogs).forEach(k => { if (k >= ms && dayLogs[k] && dayLogs[k].mood) moods[k] = dayLogs[k].mood; });
+    const dayNotes = {};
+    notes.forEach(n => { if (n.date && n.date >= s0 && n.date <= e0) (dayNotes[n.date] = dayNotes[n.date] || []).push((n.title || (n.body || '').split('\n')[0] || '메모').slice(0, 30)); });
+    return { lunar: lunarCache.map, holidays, moods, dayNotes };
+  }
+  // 달력 위젯에서 날짜를 누르면 → 앱의 달력 탭에서 그 날짜 보여주기
+  window.__openCalendarDate = function (ds) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ds)) return;
+    closeModal();
+    const go = appSettings.calWidgetTap || 'calendar';
+    if (go === 'checklist') { switchTab('checklist'); return; }
+    if (go === 'notes') { switchTab('notes'); return; }
+    if (go === 'newnote') { switchTab('notes'); openNoteEditor(null, ds); return; }
+    switchTab('calendar');
+    const d = new Date(ds + 'T00:00:00');
+    calYear = d.getFullYear(); calMonth = d.getMonth(); calSelectedDate = ds;
+    renderCalendar();
+    setTimeout(() => { const el = document.getElementById('cal-detail'); if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 80);
+  };
+
   function pullAndroidOps() {
     if (!window.AndroidBridge || !window.AndroidBridge.consumeOps) return false;
     let ops = [];
@@ -2255,6 +2333,7 @@
       if (hasWeekly) dotsHtml += `<span class="type-dot shape-square" style="background:${TYPE_COLORS.weekly}"></span>`;
       if (hasMonthly) dotsHtml += `<span class="type-dot shape-triangle" style="border-bottom-color:${TYPE_COLORS.monthly}"></span>`;
       if (hasTodo) dotsHtml += `<span class="type-dot shape-diamond" style="background:${TYPE_COLORS.todo}"></span>`;
+      if (notes.some(n => n.date === dateStr)) dotsHtml += `<span style="color:${TYPE_COLORS.memo}; font-size:8px; line-height:6px; font-weight:900;">✎</span>`;
       const dotsRow = dotsHtml ? `<div class="type-dots">${dotsHtml}</div>` : '';
       html += `<div class="cal-cell ${isToday ? 'today-outline' : ''} ${isSelected ? 'selected-day' : ''} ${textClass}" data-date="${dateStr}" style="background:${bg};">${d}${holidayName ? '<span class="holiday-dot"></span>' : ''}${dayLogs[dateStr] && dayLogs[dateStr].mood ? `<span class="cal-mood">${dayLogs[dateStr].mood}</span>` : ''}${dotsRow}</div>`;
     }
@@ -2287,10 +2366,13 @@
       if (list.length === 0) return '';
       return `<div class="cal-group-label" style="color:${color}">${label}</div>` + rowsFor(list);
     }
-    const habitHtml = groupHtml('매일 습관', dailyList, TYPE_COLORS.daily) + groupHtml('매주 습관', weeklyList, TYPE_COLORS.weekly) + groupHtml('매달 습관', monthlyList, TYPE_COLORS.monthly);
+    const habitHtml = groupHtml('● 매일 습관', dailyList, TYPE_COLORS.daily) + groupHtml('■ 매주 습관', weeklyList, TYPE_COLORS.weekly) + groupHtml('▲ 매달 습관', monthlyList, TYPE_COLORS.monthly);
     const todoDoneParts = todosDone.map(t => `<div class="cal-detail-row"><span>${escapeHtml(t.title)}</span><span class="ok">완료</span></div>`).join('');
     const todoPendingParts = todosCreated.map(t => `<div class="cal-detail-row"><span>${escapeHtml(t.title)}</span><span>예정</span></div>`).join('');
-    const todoHtml = (todoDoneParts || todoPendingParts) ? `<div class="cal-group-label" style="color:${TYPE_COLORS.todo}">오늘 할일</div>` + todoDoneParts + todoPendingParts : '';
+    const todoHtml = (todoDoneParts || todoPendingParts) ? `<div class="cal-group-label" style="color:${TYPE_COLORS.todo}">◆ 할일</div>` + todoDoneParts + todoPendingParts : '';
+    const dayNotes = notes.filter(n => n.date === dateStr);
+    const noteHtml = dayNotes.length ? `<div class="cal-group-label" style="color:${TYPE_COLORS.memo}">✎ 메모</div>` +
+      dayNotes.map(n => `<div class="cal-detail-row" data-open-note="${n.id}" style="cursor:pointer;"><span style="color:var(--text);">${escapeHtml(n.title || (n.body || '').split('\n')[0] || '제목 없음')}</span><span>열기 ›</span></div>`).join('') : '';
     const box = document.getElementById('cal-detail');
     box.style.display = '';
     const holidayName = HOLIDAYS[dateStr];
@@ -2298,7 +2380,10 @@
     const moodHtml = dlog && (dlog.mood || dlog.note) ? `<div class="cal-detail-row" style="color:var(--text);"><span>${dlog.mood ? dlog.mood + ' ' : ''}${escapeHtml(dlog.note || '')}</span></div>` : '';
     box.innerHTML = `<div class="cal-detail-title">${dateStr}</div>` +
       (holidayName ? `<div class="cal-detail-holiday"><span class="holiday-badge">휴</span>${escapeHtml(holidayName)}</div>` : '') + moodHtml +
-      (habitHtml || todoHtml ? habitHtml + todoHtml : `<div class="cal-detail-row"><span>이 날은 예정된 게 없어요</span></div>`);
+      (habitHtml || todoHtml || noteHtml ? habitHtml + todoHtml + noteHtml : `<div class="cal-detail-row"><span>이 날은 예정된 게 없어요</span></div>`) +
+      `<button class="settings-btn" id="cal-add-note" style="margin-top:10px;">✎ 이 날짜에 메모 쓰기</button>`;
+    box.querySelectorAll('[data-open-note]').forEach(r => r.addEventListener('click', () => openNoteEditor(r.getAttribute('data-open-note'))));
+    document.getElementById('cal-add-note').onclick = () => openNoteEditor(null, dateStr);
   }
 
   /* ---------- 내것(통계) 탭 ---------- */
@@ -2586,6 +2671,14 @@
         if (id === 'cal-toggle' && !next) showToast('📅 캘린더에서 할일습관 일정을 지웠어요');
       };
     });
+    // 달력 위젯: 매일 습관 표시
+    const tapRow = document.getElementById('calw-tap');
+    const drawTap = () => tapRow.querySelectorAll('[data-tap]').forEach(c => c.classList.toggle('active-day', (appSettings.calWidgetTap || 'calendar') === c.getAttribute('data-tap')));
+    drawTap();
+    tapRow.querySelectorAll('[data-tap]').forEach(c => c.onclick = () => { appSettings.calWidgetTap = c.getAttribute('data-tap'); saveAppSettings(); drawTap(); showToast('🧩 달력 위젯을 누르면 \'' + c.textContent.trim() + '\'(으)로 가요'); });
+    const cwd = document.getElementById('calw-daily');
+    cwd.classList.toggle('on', !!appSettings.calWidgetDaily);
+    cwd.onclick = () => { appSettings.calWidgetDaily = !appSettings.calWidgetDaily; cwd.classList.toggle('on', appSettings.calWidgetDaily); saveAppSettings(); showToast('🧩 달력 위젯에 반영했어요'); };
     // 위젯 배경 진하기
     const wo = document.getElementById('widget-opacity');
     const woVal = () => (appSettings.widgetOpacity === undefined ? 96 : appSettings.widgetOpacity);
@@ -2727,6 +2820,7 @@
 
   /* ---------- 공통 ---------- */
   document.getElementById('fab-btn').addEventListener('click', () => { if (activeTab === 'notes') openNoteEditor(null); else openModal(); });
+  document.getElementById('note-search').value = ''; // 다시 열 때 예전 검색어가 남지 않도록
   document.getElementById('note-search').addEventListener('input', () => renderNotes());
   document.getElementById('open-tpl-btn').addEventListener('click', openTemplateGallery);
 
