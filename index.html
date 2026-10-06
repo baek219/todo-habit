@@ -258,6 +258,23 @@
   body.dark .ios-tip b { color: var(--nav-fg, #8CEFCB); }
   .ios-tip .close { position: absolute; top: 6px; right: 8px; border: none; background: none; font-size: 16px; color: var(--text-muted); cursor: pointer; }
   .ios-share-ic { display: inline-block; width: 16px; height: 18px; vertical-align: -3px; }
+  /* 메모장 */
+  .note-search { width: 100%; border: 1.5px solid var(--border); border-radius: 12px; padding: 11px 14px; color: var(--text); background: var(--surface); outline: none; font-family: inherit; }
+  .note-search:focus { border-color: var(--primary); }
+  .note-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .note-card { border: 1px solid var(--border); border-radius: 14px; padding: 12px; background: var(--surface); cursor: pointer; min-height: 92px; position: relative; overflow: hidden; }
+  .note-card .nt { font-size: 14px; font-weight: 800; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .note-card .nb { font-size: 12.5px; color: var(--text-muted); margin-top: 4px; white-space: pre-line; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.45; }
+  .note-card .nd { font-size: 10.5px; color: var(--text-muted); margin-top: 8px; }
+  .note-card .npin { position: absolute; top: 8px; right: 9px; font-size: 12px; }
+  .note-color-row { display: flex; gap: 8px; margin-top: 10px; }
+  .note-color { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--border); cursor: pointer; }
+  .note-color.on { border-color: var(--text); box-shadow: inset 0 0 0 2px var(--surface); }
+  .note-editor-title { width: 100%; border: none; outline: none; font-size: 19px !important; font-weight: 800; color: var(--text); background: transparent; font-family: inherit; padding: 4px 0; }
+  .note-editor-body { width: 100%; border: none; outline: none; color: var(--text); background: transparent; font-family: inherit; resize: none; min-height: 38vh; line-height: 1.6; padding: 6px 0; }
+  .note-toolbar { display: flex; gap: 6px; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 10px; margin-top: 6px; }
+  .note-toolbar .tb { border: 1.5px solid var(--border); background: var(--bg); color: var(--text); border-radius: 10px; padding: 8px 11px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; }
+  .note-toolbar .tb.on { border-color: var(--primary); background: var(--primary-soft); }
   .footer-note { text-align: center; color: var(--text-muted); font-size: 11px; margin-top: 20px; padding-bottom: 10px; }
 
   /* ===== v1.1 추가 기능 ===== */
@@ -404,6 +421,14 @@
   <div class="cal-holiday-list" id="cal-holiday-list"></div>
 </div>
 
+<!-- 탭: 메모 -->
+<div id="tab-notes" class="tab-page" style="display:none;">
+  <div class="section" style="margin-top:8px;">
+    <input class="note-search" id="note-search" placeholder="🔍 메모 검색" />
+    <div id="note-list"></div>
+  </div>
+</div>
+
 <!-- 탭3: 내것 -->
 <div id="tab-stats" class="tab-page" style="display:none;">
   <div class="stats-block">
@@ -436,8 +461,8 @@
 
 <!-- 탭4: 설정 -->
 <div id="tab-settings" class="tab-page" style="display:none;">
-  <div class="settings-block" style="display:none;">
-    <div class="settings-title">계정 (구글 로그인 연동)</div>
+  <div class="settings-block">
+    <div class="settings-title">계정 · 기기 연동 (구글 로그인)</div>
     <div class="settings-card" id="account-card"></div>
   </div>
   <div class="settings-block">
@@ -478,8 +503,25 @@
     </div>
   </div>
   <div class="settings-block native-only">
+    <div class="settings-title">삼성 캘린더 연동</div>
+    <div class="settings-card">
+      <div class="settings-row">
+        <span>캘린더에 표시하기<br><small style="color:var(--text-muted); font-size:11.5px;">삼성 캘린더에 '할일습관' 달력이 생겨요</small></span>
+        <button class="toggle-switch" id="cal-toggle"><span class="knob"></span></button>
+      </div>
+      <div id="cal-options">
+        <div class="settings-row"><span>📌 할일</span><button class="toggle-switch" id="cal-todo"><span class="knob"></span></button></div>
+        <div class="settings-row"><span>🔁 매주·매달 습관</span><button class="toggle-switch" id="cal-habit"><span class="knob"></span></button></div>
+        <div class="settings-row"><span>🔁 매일 습관 <small style="color:var(--text-muted); font-size:11.5px;">(매일 표시돼서 복잡할 수 있어요)</small></span><button class="toggle-switch" id="cal-daily"><span class="knob"></span></button></div>
+      </div>
+      <div class="hint">앱에서 바꾸면 캘린더에도 몇 초 뒤 자동으로 반영돼요. (캘린더에서 고친 내용은 앱으로 오지 않아요)<br>안 보이면 삼성 캘린더 → ☰ 메뉴 → 캘린더 관리에서 '할일습관'을 켜주세요.</div>
+    </div>
+  </div>
+  <div class="settings-block native-only">
     <div class="settings-title">홈 화면 위젯</div>
     <div class="settings-card">
+      <div class="settings-row" style="padding-top:0;"><span>위젯 배경 진하기</span><b id="widget-opacity-val" style="color:var(--primary);"></b></div>
+      <input type="range" id="widget-opacity" min="0" max="100" step="5" class="picker-slider" style="background:linear-gradient(to right, transparent, var(--primary)); border:1px solid var(--border); margin-bottom:12px;" />
       <div class="hint" style="margin-top:0;">앱을 열지 않고 바탕화면에서 바로 체크할 수 있어요.<br>
       ① 폰 바탕화면의 빈 곳을 손가락으로 꾹 누르기<br>
       ② 아래쪽에 나오는 <b>위젯</b> 누르기<br>
@@ -512,7 +554,7 @@
     <div class="settings-card">
       <button class="settings-btn danger" id="reset-btn">전체 데이터 초기화</button>
     </div>
-    <div class="footer-note">할일습관 앱 · v1.3</div>
+    <div class="footer-note">할일습관 앱 · v1.4.1</div>
   </div>
 </div>
 
@@ -525,6 +567,8 @@
 <div class="toast" id="toast"></div>
 
 
+<script src="firebase.js"></script>
+<script src="sync.js"></script>
 <script>
 (function () {
   const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -561,6 +605,7 @@
   const NAV_TABS = [
     { key: 'checklist', icon: '✅', label: '체크리스트' },
     { key: 'calendar', icon: '📅', label: '달력' },
+    { key: 'notes', icon: '📝', label: '메모' },
     { key: 'stats', icon: '📊', label: '내것' },
     { key: 'settings', icon: '⚙️', label: '설정' }
   ];
@@ -569,61 +614,73 @@
   let customCategories = [];
   let defaultColorOverrides = {};
 
-  // ---- 구글 로그인 / 클라우드 동기화 ----
-  let currentUser = null;
-  let isFirstAuthCheck = true;
-  let pendingExplicitSignIn = false;
-  let syncTimer = null;
-
-  function scheduleCloudSync() {
-    if (!currentUser || !window.firebaseSaveData) return;
-    clearTimeout(syncTimer);
-    syncTimer = setTimeout(pushLocalToCloud, 1500);
-  }
-  async function pushLocalToCloud() {
-    if (!currentUser || !window.firebaseSaveData) return;
-    await window.firebaseSaveData(currentUser.uid, { tasks, customCategories, defaultColorOverrides, updatedAt: Date.now() });
-  }
-  function applyCloudData(cloud) {
-    tasks = cloud.tasks || [];
-    customCategories = cloud.customCategories || [];
-    defaultColorOverrides = cloud.defaultColorOverrides || {};
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); } catch (e) {}
-    try { localStorage.setItem(CUSTOM_CAT_KEY, JSON.stringify(customCategories)); } catch (e) {}
-    try { localStorage.setItem(DEFAULT_COLOR_KEY, JSON.stringify(defaultColorOverrides)); } catch (e) {}
-    if (activeTab === 'checklist') renderAll();
-    if (activeTab === 'calendar') renderCalendar();
-    if (activeTab === 'stats') renderStats();
-    if (activeTab === 'settings') renderSettings();
-  }
-  function showTwoChoicePopup(title, message, leftLabel, rightLabel, onLeft, onRight) {
-    const c = document.getElementById('confirm-container');
-    c.innerHTML = `
-      <div class="modal-overlay" style="z-index:60;" id="two-choice-overlay">
-        <div class="modal-sheet">
-          <div class="modal-title">${escapeHtml(title)}</div>
-          <div class="modal-sub">${escapeHtml(message)}</div>
-          <div class="modal-actions">
-            <button class="modal-btn cancel" id="two-choice-left">${escapeHtml(leftLabel)}</button>
-            <button class="modal-btn confirm" id="two-choice-right">${escapeHtml(rightLabel)}</button>
+  // ---- 구글 로그인 / 클라우드 동기화 (sync.js 사용) ----
+  function scheduleCloudSync() { if (window.CloudSync) window.CloudSync.schedulePush(); }
+  function showChoicePopup(title, message, options) {
+    // options: [{label, value, primary}] → 누른 버튼의 value 를 돌려줌
+    return new Promise((resolve) => {
+      const c = document.getElementById('confirm-container');
+      c.innerHTML = `
+        <div class="modal-overlay" style="z-index:70;">
+          <div class="modal-sheet">
+            <div class="modal-title">${escapeHtml(title)}</div>
+            <div class="modal-sub" style="white-space:pre-line; line-height:1.6;">${escapeHtml(message)}</div>
+            ${options.map((o, i) => `<button class="${o.primary ? 'modal-btn confirm' : 'settings-btn'}" data-choice="${i}" style="width:100%; margin-top:8px;">${escapeHtml(o.label)}</button>`).join('')}
           </div>
-        </div>
-      </div>`;
-    document.getElementById('two-choice-left').addEventListener('click', () => { c.innerHTML = ''; onLeft && onLeft(); });
-    document.getElementById('two-choice-right').addEventListener('click', () => { c.innerHTML = ''; onRight && onRight(); });
+        </div>`;
+      c.querySelectorAll('[data-choice]').forEach(b => b.addEventListener('click', () => {
+        c.innerHTML = ''; resolve(options[parseInt(b.getAttribute('data-choice'), 10)].value);
+      }));
+    });
   }
-  window.onFirebaseAuthChange = async function (user) {
-    currentUser = user;
-    if (activeTab === 'settings') renderSettings();
-    if (!user) { isFirstAuthCheck = false; return; }
-    if (isFirstAuthCheck) {
-      isFirstAuthCheck = false;
-      // 앱을 열 때 이미 로그인되어 있던 경우 (조용히 클라우드 데이터로 맞춤)
-      const cloud = await window.firebaseLoadData(user.uid);
-      if (cloud) applyCloudData(cloud);
-      else await pushLocalToCloud();
+  function setupCloud() {
+    const CS = window.CloudSync;
+    if (!CS) return;
+    CS.chooseOnFirstLogin = () => showChoicePopup('기록을 어떻게 맞출까요?',
+      '이 기기와 구글 계정(클라우드)에 각각 저장된 기록이 있어요.\n\n잘 모르겠으면 \'합치기\'를 고르세요. 양쪽 기록이 모두 남아요.',
+      [{ label: '🔀 합치기 (추천)', value: 'merge', primary: true },
+       { label: '☁️ 클라우드 기록으로 바꾸기', value: 'cloud' },
+       { label: '📱 이 기기 기록으로 덮어쓰기', value: 'local' }]);
+    CS.onRemoteApplied = reloadFromStorage;
+    let wasUser = null;
+    CS.onStatus = (st) => {
+      if (activeTab === 'settings') renderAccountCard();
+      const email = st.user && st.user.email;
+      if (email && wasUser !== email && st.status === 'synced') { showToast('☁️ ' + email + ' 계정과 동기화됐어요'); wasUser = email; }
+      if (!st.user) wasUser = null;
+    };
+    CS.init();
+  }
+  // 저장된 기록을 다시 읽어서 화면 새로고침 (클라우드에서 받았을 때 / PC의 다른 창에서 바꿨을 때)
+  function reloadFromStorage() {
+      loadAll();
+      applyTheme();
+      syncAndroid();
+      setHeaderDate();
+      if (activeTab === 'checklist') renderAll();
+      if (activeTab === 'calendar') renderCalendar();
+      if (activeTab === 'stats') renderStats();
+      if (activeTab === 'notes') renderNotes();
+      if (activeTab === 'settings') renderSettings();
+  }
+  window.addEventListener('storage', (e) => {
+    if (['todo_habit_tasks_v3', 'notes_v1', 'day_logs_v1', 'app_settings_v1', 'custom_categories_v1'].includes(e.key)) {
+      clearTimeout(window.__reloadT); window.__reloadT = setTimeout(reloadFromStorage, 150);
     }
-  };
+  });
+  function startLogin() {
+    const CS = window.CloudSync;
+    if (!CS || !CS.ready) { alert('인터넷 연결을 확인한 뒤 다시 시도해주세요.'); return; }
+    if (window.AndroidBridge && window.AndroidBridge.startGoogleLogin) {
+      window.AndroidBridge.startGoogleLogin(CS.LOGIN_PAGE + '?return=android');
+      showToast('🌐 브라우저에서 로그인한 뒤 앱으로 돌아와요');
+    } else if (window.DesktopBridge && window.DesktopBridge.startGoogleLogin) {
+      window.DesktopBridge.startGoogleLogin();
+      showToast('🌐 브라우저에서 로그인하면 자동으로 연결돼요');
+    } else {
+      CS.signInHere();
+    }
+  }
   let activeTab = 'checklist';
   let activeFilter = null;
   let modalType = 'todo';
@@ -705,6 +762,111 @@
     if (window.AndroidBridge && window.AndroidBridge.setStatusBar) { try { window.AndroidBridge.setStatusBar(dark ? bg : p, dark); } catch (e) {} }
   }
 
+  /* ===================== v1.4: 메모장 ===================== */
+  const NOTES_KEY = 'notes_v1';
+  let notes = [];
+  const NOTE_COLORS = [
+    { key: '', label: '기본', bg: 'var(--surface)' },
+    { key: 'yellow', label: '노랑', bg: 'rgba(255, 214, 102, 0.28)' },
+    { key: 'green', label: '초록', bg: 'rgba(110, 200, 150, 0.25)' },
+    { key: 'blue', label: '파랑', bg: 'rgba(110, 160, 230, 0.25)' },
+    { key: 'pink', label: '분홍', bg: 'rgba(240, 130, 170, 0.25)' },
+    { key: 'purple', label: '보라', bg: 'rgba(160, 130, 220, 0.25)' }
+  ];
+  function noteBg(k) { const c = NOTE_COLORS.find(x => x.key === (k || '')); return c ? c.bg : 'var(--surface)'; }
+  function loadNotes() { try { notes = JSON.parse(localStorage.getItem(NOTES_KEY) || '[]') || []; } catch (e) { notes = []; } }
+  function saveNotes() { try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes)); } catch (e) {} scheduleCloudSync(); }
+  function noteDateLabel(ts) {
+    const d = new Date(ts); const now = new Date();
+    if (toISODate(d) === toISODate(now)) return `오늘 ${d.getHours() < 12 ? '오전' : '오후'} ${d.getHours() % 12 === 0 ? 12 : d.getHours() % 12}:${pad(d.getMinutes())}`;
+    return `${d.getFullYear() !== now.getFullYear() ? d.getFullYear() + '. ' : ''}${d.getMonth() + 1}. ${d.getDate()}.`;
+  }
+  function renderNotes() {
+    const el = document.getElementById('note-list'); if (!el) return;
+    const q = (document.getElementById('note-search').value || '').trim().toLowerCase();
+    let list = notes.filter(n => !q || (n.title || '').toLowerCase().includes(q) || (n.body || '').toLowerCase().includes(q));
+    list.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (b.updatedAt || 0) - (a.updatedAt || 0));
+    if (!list.length) {
+      el.innerHTML = `<div class="empty-box" style="margin-top:12px;">${q ? '찾는 메모가 없어요.' : '오른쪽 아래 + 버튼을 눌러<br>자유롭게 메모를 남겨보세요.<br><small>예: 장보기 목록, 아이디어, 회의 메모</small>'}</div>`;
+      return;
+    }
+    el.innerHTML = `<div class="note-grid">${list.map(n => `<div class="note-card" data-note="${n.id}" style="background:${noteBg(n.color)};">
+        ${n.pinned ? '<span class="npin">📌</span>' : ''}
+        <div class="nt">${escapeHtml(n.title || (n.body || '').split('\n')[0] || '제목 없음')}</div>
+        <div class="nb">${escapeHtml(n.title ? (n.body || '') : (n.body || '').split('\n').slice(1).join('\n'))}</div>
+        <div class="nd">${noteDateLabel(n.updatedAt || n.createdAt || Date.now())}</div>
+      </div>`).join('')}</div>`;
+    el.querySelectorAll('[data-note]').forEach(c => c.addEventListener('click', () => openNoteEditor(c.getAttribute('data-note'))));
+  }
+  function openNoteEditor(id) {
+    let note = id ? notes.find(n => n.id === id) : null;
+    const isNew = !note;
+    const draft = note ? Object.assign({}, note) : { id: 'n' + Date.now() + Math.random().toString(36).slice(2, 6), title: '', body: '', color: '', pinned: false, createdAt: Date.now(), updatedAt: Date.now() };
+    const container = document.getElementById('modal-container');
+    container.innerHTML = `
+      <div class="modal-overlay" id="note-overlay">
+        <div class="modal-sheet" id="note-sheet" style="background:var(--surface); max-height:92vh;">
+          <input class="note-editor-title" id="note-title" placeholder="제목" value="${escapeHtml(draft.title)}" maxlength="80" />
+          <textarea class="note-editor-body" id="note-body" placeholder="내용을 자유롭게 적어보세요">${escapeHtml(draft.body)}</textarea>
+          <div class="note-color-row" id="note-colors">${NOTE_COLORS.map(c => `<div class="note-color ${c.key === (draft.color || '') ? 'on' : ''}" data-ncolor="${c.key}" title="${c.label}" style="background:${c.key ? c.bg : 'var(--surface)'};"></div>`).join('')}</div>
+          <div class="note-toolbar">
+            <div style="display:flex; gap:6px;">
+              <button class="tb ${draft.pinned ? 'on' : ''}" id="note-pin">📌 ${draft.pinned ? '고정됨' : '고정'}</button>
+              <button class="tb" id="note-share">📤 공유</button>
+              ${isNew ? '' : '<button class="tb" id="note-del" style="color:#C1543D;">🗑 삭제</button>'}
+            </div>
+            <button class="tb on" id="note-done">완료</button>
+          </div>
+          <div class="hint" id="note-saved" style="text-align:right;">${isNew ? '' : '마지막 수정: ' + noteDateLabel(draft.updatedAt)}</div>
+        </div>
+      </div>`;
+    const titleEl = document.getElementById('note-title');
+    const bodyEl = document.getElementById('note-body');
+    function persist() {
+      draft.title = titleEl.value.trim();
+      draft.body = bodyEl.value;
+      if (!draft.title && !draft.body.trim()) return false; // 빈 메모는 저장 안 함
+      draft.updatedAt = Date.now();
+      const i = notes.findIndex(n => n.id === draft.id);
+      if (i >= 0) notes[i] = Object.assign({}, draft); else notes.unshift(Object.assign({}, draft));
+      saveNotes();
+      document.getElementById('note-saved').textContent = '저장됨 ✓';
+      return true;
+    }
+    let t = null;
+    const later = () => { clearTimeout(t); t = setTimeout(persist, 700); };
+    titleEl.addEventListener('input', later);
+    bodyEl.addEventListener('input', later);
+    function close() { clearTimeout(t); persist(); closeModal(); renderNotes(); }
+    document.getElementById('note-done').addEventListener('click', close);
+    document.getElementById('note-overlay').addEventListener('click', (e) => { if (e.target.id === 'note-overlay') close(); });
+    document.getElementById('note-pin').addEventListener('click', (e) => {
+      draft.pinned = !draft.pinned;
+      e.currentTarget.classList.toggle('on', draft.pinned);
+      e.currentTarget.textContent = '📌 ' + (draft.pinned ? '고정됨' : '고정');
+      persist();
+    });
+    document.getElementById('note-share').addEventListener('click', () => {
+      const text = (titleEl.value.trim() ? titleEl.value.trim() + '\n\n' : '') + bodyEl.value;
+      if (text.trim()) shareText(text);
+    });
+    const del = document.getElementById('note-del');
+    if (del) del.addEventListener('click', () => {
+      if (!confirm('이 메모를 삭제할까요?')) return;
+      notes = notes.filter(n => n.id !== draft.id);
+      saveNotes(); closeModal(); renderNotes();
+      showToast('🗑 메모를 삭제했어요');
+    });
+    document.querySelectorAll('[data-ncolor]').forEach(c => c.addEventListener('click', () => {
+      draft.color = c.getAttribute('data-ncolor');
+      document.querySelectorAll('[data-ncolor]').forEach(x => x.classList.toggle('on', x === c));
+      persist();
+    }));
+    // 뒤로가기로 닫아도 저장되도록
+    window.__noteClosePersist = () => { clearTimeout(t); persist(); renderNotes(); };
+    if (isNew) setTimeout(() => titleEl.focus(), 60);
+  }
+
   /* ===================== v1.1 추가 기능 ===================== */
   const DAYLOG_KEY = 'day_logs_v1';
   const APPSET_KEY = 'app_settings_v1';
@@ -714,8 +876,8 @@
     try { dayLogs = JSON.parse(localStorage.getItem(DAYLOG_KEY) || '{}') || {}; } catch (e) { dayLogs = {}; }
     try { appSettings = Object.assign(appSettings, JSON.parse(localStorage.getItem(APPSET_KEY) || '{}') || {}); } catch (e) {}
   }
-  function saveDayLogs() { try { localStorage.setItem(DAYLOG_KEY, JSON.stringify(dayLogs)); } catch (e) {} }
-  function saveAppSettings() { try { localStorage.setItem(APPSET_KEY, JSON.stringify(appSettings)); } catch (e) {} syncAndroid(); }
+  function saveDayLogs() { try { localStorage.setItem(DAYLOG_KEY, JSON.stringify(dayLogs)); } catch (e) {} scheduleCloudSync(); }
+  function saveAppSettings() { try { localStorage.setItem(APPSET_KEY, JSON.stringify(appSettings)); } catch (e) {} syncAndroid(); scheduleCloudSync(); }
 
   // ---- 잠깐 쉬기 ----
   function isPaused(h, dateStr) { return (h.pauses || []).some(p => p.start <= dateStr && dateStr <= p.end); }
@@ -1084,7 +1246,7 @@
             Object.keys(t.counts || {}).forEach(k => { if (k >= since) counts[k] = t.counts[k]; });
             return { id: t.id, type: 'habit', title: t.title, frequency: t.frequency, repeatDays: t.repeatDays, monthDay: t.monthDay || 1,
               target: habitTarget(t), counts, completedDates: t.completedDates.filter(d => d >= since), pauses: t.pauses || [],
-              reminderTime: t.reminderTime || null, streak: currentStreak(t) };
+              reminderTime: t.reminderTime || null, streak: currentStreak(t), createdAt: t.createdAt || null };
           }
           return { id: t.id, type: 'todo', title: t.title, done: !!t.done, dueDate: t.dueDate, completedAt: t.completedAt || null, reminderTime: t.reminderTime || null };
         });
@@ -1092,6 +1254,8 @@
         const t = currentTheme();
         window.AndroidBridge.syncData(JSON.stringify({ tasks: slim,
           settings: { summaryOn: !!appSettings.summaryOn, summaryTime: appSettings.summaryTime || '21:00',
+            calendarSync: !!appSettings.calendarSync, calTodo: appSettings.calTodo !== false, calHabit: appSettings.calHabit !== false, calDaily: !!appSettings.calDaily,
+            widgetOpacity: appSettings.widgetOpacity === undefined ? 96 : appSettings.widgetOpacity,
             theme: t.key, dark: document.body.classList.contains('dark'), color: t.l[0], soft: t.l[2], darkColor: t.d[0], darkSoft: t.d[2] },
           meta: { level: lv.level, levelName: lv.name, emoji: STAGE_EMOJI[lv.stage] || '🌱' } }));
       } catch (e) {}
@@ -1236,6 +1400,7 @@
 
   function loadAll() {
     loadExtra();
+    loadNotes();
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       tasks = raw ? JSON.parse(raw) : [];
@@ -1316,8 +1481,8 @@
     document.querySelectorAll('.tab-page').forEach(p => p.style.display = 'none');
     document.getElementById('tab-' + tab).style.display = '';
     document.getElementById('filter-row').style.display = tab === 'checklist' ? 'flex' : 'none';
-    document.getElementById('fab-wrap').style.display = tab === 'checklist' ? '' : 'none';
-    const titles = { checklist: '오늘도 할 일을 하나씩', calendar: '한눈에 보는 달력', stats: '내 기록', settings: '설정' };
+    document.getElementById('fab-wrap').style.display = (tab === 'checklist' || tab === 'notes') ? '' : 'none';
+    const titles = { checklist: '오늘도 할 일을 하나씩', calendar: '한눈에 보는 달력', notes: '메모장', stats: '내 기록', settings: '설정' };
     document.getElementById('header-title').textContent = titles[tab];
     renderNav();
     renderTodayCard();
@@ -1329,6 +1494,7 @@
     }
     if (tab === 'stats') renderStats();
     if (tab === 'settings') renderSettings();
+    if (tab === 'notes') renderNotes();
   }
 
   /* ---------- 체크리스트 탭 ---------- */
@@ -2332,50 +2498,33 @@
   /* ---------- 설정 탭 ---------- */
   function renderAccountCard() {
     const card = document.getElementById('account-card');
-    if (currentUser) {
+    const CS = window.CloudSync;
+    if (!CS) { card.innerHTML = '<div class="hint" style="margin:0;">이 버전에서는 로그인을 쓸 수 없어요.</div>'; return; }
+    const st = CS.status;
+    const err = CS.error ? `<div class="hint" style="color:#C1543D;">${escapeHtml(CS.error)}</div>` : '';
+    if (CS.user) {
+      const when = CS.lastSyncAt ? noteDateLabel(CS.lastSyncAt) : '';
+      const label = st === 'syncing' ? '🔄 동기화 중…' : st === 'error' ? '⚠️ 동기화 문제' : `✅ 동기화됨${when ? ' · ' + when : ''}`;
       card.innerHTML = `
-        <div class="settings-row">
-          <span>${escapeHtml(currentUser.email || '로그인됨')}</span>
-        </div>
+        <div class="settings-row"><span style="word-break:break-all;">👤 ${escapeHtml(CS.user.email || '로그인됨')}</span></div>
+        <div class="settings-row"><span>${label}</span></div>
+        ${err}
+        <button class="settings-btn" id="cloud-sync-now">🔄 지금 동기화</button>
         <button class="settings-btn" id="google-logout-btn">로그아웃</button>
-        <div class="footer-note" style="margin-top:8px;">같은 구글 계정으로 다른 폰에서 로그인하면 자동으로 데이터가 불러와져요.</div>`;
-      document.getElementById('google-logout-btn').addEventListener('click', async () => {
-        if (window.firebaseSignOut) await window.firebaseSignOut();
-      });
+        <div class="hint">같은 구글 계정으로 로그인한 폰·아이폰·PC 달력 프로그램에 자동으로 똑같이 맞춰져요.</div>`;
+      document.getElementById('cloud-sync-now').onclick = () => { CS.pushNow(); showToast('🔄 동기화했어요'); };
+      document.getElementById('google-logout-btn').onclick = async () => {
+        if (!confirm('로그아웃할까요? 이 기기의 기록은 그대로 남아요.')) return;
+        await CS.signOut(); renderAccountCard();
+      };
     } else {
-      const debugLine = window.__lastAuthDebug ? `<div class="footer-note" style="margin-top:6px; color:#C1543D;">진단: ${escapeHtml(window.__lastAuthDebug)}</div>` : '';
       card.innerHTML = `
-        <button class="settings-btn" id="google-login-btn">Google로 로그인</button>
-        <div class="footer-note" style="margin-top:8px;">로그인하면 데이터가 클라우드에 저장되고, 같은 계정으로 다른 폰에서도 자동으로 이어져요.</div>
-        ${debugLine}`;
-      const loginBtn = document.getElementById('google-login-btn');
-      loginBtn.addEventListener('click', async () => {
-        if (loginBtn.disabled) return; // 중복 클릭으로 로그인창이 두 번 뜨는 것 방지
-        loginBtn.disabled = true;
-        loginBtn.textContent = '로그인 중...';
-        try {
-          if (!window.firebaseSignIn) { alert('아직 연결 준비 중이에요. 잠시 후 다시 시도해주세요.'); return; }
-          const res = await window.firebaseSignIn();
-          if (!res.ok) {
-            if ((res.error || '').includes('cancelled-popup-request') || (res.error || '').includes('popup-closed-by-user')) return; // 중복 클릭으로 인한 취소는 조용히 무시
-            alert('로그인에 실패했어요: ' + res.error);
-            return;
-          }
-          isFirstAuthCheck = false; // 이미 여기서 직접 처리하므로, 이후 onAuthStateChanged의 '조용한 처리'는 건너뜀
-          const cloud = await window.firebaseLoadData(res.user.uid);
-          if (cloud) {
-            showTwoChoicePopup('데이터를 선택하세요', '이 구글 계정에 이미 저장된 데이터가 있어요. 어떤 걸 쓸까요?',
-              '이 폰 데이터로 덮어쓰기', '클라우드 데이터 사용',
-              () => pushLocalToCloud(),
-              () => applyCloudData(cloud));
-          } else {
-            await pushLocalToCloud();
-            showInfoPopup('연동 완료', '처음 로그인하셔서, 지금 폰에 있던 데이터를 클라우드에 저장했어요.\n앞으로 같은 구글 계정으로 로그인하면 자동으로 불러와져요.');
-          }
-        } finally {
-          if (loginBtn.isConnected) { loginBtn.disabled = false; loginBtn.textContent = 'Google로 로그인'; }
-        }
-      });
+        <button class="settings-btn" id="google-login-btn" style="margin-top:0; background:var(--surface); display:flex; align-items:center; justify-content:center; gap:8px;">
+          <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+          ${st === 'signing' ? '로그인 중…' : 'Google로 로그인'}</button>
+        ${err}
+        <div class="hint">로그인하면 기록이 구글 계정에 저장되고, 같은 계정으로 로그인한 폰·PC에 실시간으로 맞춰져요.${window.AndroidBridge ? '<br>버튼을 누르면 브라우저가 잠깐 열려요. 로그인 후 \'앱으로 돌아가기\'를 눌러주세요.' : ''}</div>`;
+      document.getElementById('google-login-btn').onclick = startLogin;
     }
   }
 
@@ -2412,6 +2561,38 @@
       if (window.AndroidBridge && window.AndroidBridge.testNotification) window.AndroidBridge.testNotification();
       else alert('알림은 안드로이드 앱에서만 동작해요.');
     };
+    // 삼성 캘린더 연동
+    const calKeys = { 'cal-toggle': ['calendarSync', false], 'cal-todo': ['calTodo', true], 'cal-habit': ['calHabit', true], 'cal-daily': ['calDaily', false] };
+    function calVal(id) { const [k, d] = calKeys[id]; return appSettings[k] === undefined ? d : !!appSettings[k]; }
+    function drawCal() {
+      Object.keys(calKeys).forEach(id => document.getElementById(id).classList.toggle('on', calVal(id)));
+      document.getElementById('cal-options').style.display = calVal('cal-toggle') ? '' : 'none';
+    }
+    drawCal();
+    Object.keys(calKeys).forEach(id => {
+      document.getElementById(id).onclick = () => {
+        const k = calKeys[id][0];
+        const next = !calVal(id);
+        if (id === 'cal-toggle' && next && window.AndroidBridge && window.AndroidBridge.requestCalendarPermission) {
+          window.__onCalendarPermission = (ok) => {
+            if (!ok) { alert('캘린더 권한을 허용해야 연동할 수 있어요.'); return; }
+            appSettings.calendarSync = true; saveAppSettings(); drawCal();
+            showToast('📅 삼성 캘린더에 반영하고 있어요');
+          };
+          window.AndroidBridge.requestCalendarPermission();
+          return;
+        }
+        appSettings[k] = next; saveAppSettings(); drawCal();
+        if (id === 'cal-toggle' && !next) showToast('📅 캘린더에서 할일습관 일정을 지웠어요');
+      };
+    });
+    // 위젯 배경 진하기
+    const wo = document.getElementById('widget-opacity');
+    const woVal = () => (appSettings.widgetOpacity === undefined ? 96 : appSettings.widgetOpacity);
+    wo.value = woVal();
+    document.getElementById('widget-opacity-val').textContent = woVal() + '%';
+    wo.oninput = () => { document.getElementById('widget-opacity-val').textContent = wo.value + '%'; };
+    wo.onchange = () => { appSettings.widgetOpacity = parseInt(wo.value, 10); saveAppSettings(); showToast('🧩 위젯에 반영했어요'); };
     // 같이 하기
     document.getElementById('share-today-btn').onclick = () => shareText(buildTodayShareText());
     document.getElementById('share-routine-btn').onclick = () => {
@@ -2502,7 +2683,7 @@
 
     document.getElementById('export-btn').onclick = () => {
       const area = document.getElementById('export-area');
-      area.value = JSON.stringify({ tasks, customCategories, defaultColorOverrides, dayLogs, bonusXP: appSettings.bonusXP || 0 });
+      area.value = JSON.stringify({ tasks, customCategories, defaultColorOverrides, dayLogs, notes, bonusXP: appSettings.bonusXP || 0 });
       area.style.display = 'block';
       document.getElementById('copy-export-btn').style.display = 'block';
     };
@@ -2528,6 +2709,7 @@
         customCategories = parsed.customCategories || [];
         defaultColorOverrides = parsed.defaultColorOverrides || {};
         if (parsed.dayLogs) { dayLogs = parsed.dayLogs; saveDayLogs(); }
+        if (Array.isArray(parsed.notes)) { notes = parsed.notes; saveNotes(); }
         if (parsed.bonusXP !== undefined) { appSettings.bonusXP = parsed.bonusXP; saveAppSettings(); }
         tasks.forEach(t => { if (t.type === 'habit') { if (!t.pauses) t.pauses = []; if (!t.target) t.target = 1; if (!t.counts) t.counts = {}; } });
         saveTasks(); saveCustomCats(); saveDefaultColorOverrides();
@@ -2544,7 +2726,8 @@
   }
 
   /* ---------- 공통 ---------- */
-  document.getElementById('fab-btn').addEventListener('click', () => openModal());
+  document.getElementById('fab-btn').addEventListener('click', () => { if (activeTab === 'notes') openNoteEditor(null); else openModal(); });
+  document.getElementById('note-search').addEventListener('input', () => renderNotes());
   document.getElementById('open-tpl-btn').addEventListener('click', openTemplateGallery);
 
   let deferredPrompt = null;
@@ -2597,7 +2780,10 @@
     const cc = document.getElementById('confirm-container');
     if (cc && cc.innerHTML.trim()) { cc.innerHTML = ''; return true; }
     const mc = document.getElementById('modal-container');
-    if (mc && mc.innerHTML.trim()) { mc.innerHTML = ''; return true; }
+    if (mc && mc.innerHTML.trim()) {
+      if (document.getElementById('note-overlay') && window.__noteClosePersist) window.__noteClosePersist();
+      mc.innerHTML = ''; return true;
+    }
     if (activeTab !== 'checklist') { const b = document.querySelector('[data-tab="checklist"]'); if (b) { b.click(); return true; } }
     return false;
   };
@@ -2606,6 +2792,7 @@
   loadAll();
   pullAndroidOps();
   syncAndroid();
+  setupCloud();
   const n = new Date(); calYear = n.getFullYear(); calMonth = n.getMonth();
   renderNav();
   renderAll();

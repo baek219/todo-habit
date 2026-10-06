@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>할일습관 · 구글 로그인</title>
+<link rel="icon" href="icon-192.png" />
+<style>
+  :root { --p: #2F6F5E; --bg: #EFF4F1; --t: #223028; --m: #728075; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); color: var(--t);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", sans-serif; padding: 20px; }
+  .card { background: #fff; border-radius: 22px; padding: 28px 22px; max-width: 380px; width: 100%; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.06); }
+  img { width: 64px; height: 64px; border-radius: 16px; }
+  h1 { font-size: 20px; margin: 12px 0 6px; }
+  p { color: var(--m); font-size: 14px; line-height: 1.6; margin: 6px 0 18px; }
+  .btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 14px; border-radius: 14px; font-size: 16px; font-weight: 800;
+    border: 1.5px solid #dadce0; background: #fff; color: #3c4043; cursor: pointer; text-decoration: none; font-family: inherit; }
+  .btn.primary { background: var(--p); border-color: var(--p); color: #fff; margin-top: 10px; }
+  .g { width: 20px; height: 20px; }
+  .err { color: #C1543D; font-size: 13px; margin-top: 12px; word-break: break-all; }
+  .ok { font-size: 40px; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="card">
+  <img src="icon-192.png" alt="" />
+  <div id="step-login">
+    <h1>할일습관 구글 로그인</h1>
+    <p id="who-text">아래 버튼을 눌러 구글 계정으로 로그인하세요.<br>로그인하면 폰·PC의 기록이 자동으로 맞춰져요.</p>
+    <button class="btn" id="login-btn">
+      <svg class="g" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+      Google 계정으로 로그인
+    </button>
+    <div class="err" id="err"></div>
+  </div>
+  <div id="step-done" class="hidden">
+    <div class="ok">✅</div>
+    <h1>로그인 성공!</h1>
+    <p id="done-text"></p>
+    <a class="btn primary" id="back-btn" href="#">앱으로 돌아가기</a>
+  </div>
+</div>
+<script src="firebase.js"></script>
+<script>
+(function () {
+  const K = window.FirebaseKit;
+  const q = new URLSearchParams(location.search);
+  const ret = q.get('return');            // android | desktop
+  const port = parseInt(q.get('port') || '0', 10);
+  const app = K.initializeApp({
+    apiKey: "AIzaSyBP1hzU28GlOlL9SIR6Sqd345youZJLrH0",
+    authDomain: "checklist-3164e.firebaseapp.com",
+    projectId: "checklist-3164e",
+    storageBucket: "checklist-3164e.firebasestorage.app",
+    messagingSenderId: "603098787728",
+    appId: "1:603098787728:web:46b3c4a11f41c0c99e4d15"
+  });
+  const auth = K.initializeAuth(app, { persistence: [K.browserLocalPersistence], popupRedirectResolver: K.browserPopupRedirectResolver });
+  const err = document.getElementById('err');
+  if (ret === 'desktop') document.getElementById('who-text').innerHTML = '아래 버튼을 눌러 구글 계정으로 로그인하세요.<br>로그인하면 PC 바탕화면 달력에 폰 기록이 나타나요.';
+
+  function backUrl(token) {
+    if (ret === 'android') return 'intent://auth?t=' + encodeURIComponent(token) + '#Intent;scheme=todohabit;package=com.kokbu.todohabit;end';
+    if (ret === 'desktop' && port > 1024 && port < 65536) return 'http://127.0.0.1:' + port + '/cb?t=' + encodeURIComponent(token);
+    return null;
+  }
+
+  document.getElementById('login-btn').addEventListener('click', async () => {
+    err.textContent = '';
+    const provider = new K.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    try {
+      const res = await K.signInWithPopup(auth, provider);
+      const cred = K.GoogleAuthProvider.credentialFromResult(res);
+      const token = cred && cred.idToken;
+      if (!token) throw new Error('확인증을 받지 못했어요. 다시 시도해주세요.');
+      const url = backUrl(token);
+      document.getElementById('step-login').classList.add('hidden');
+      document.getElementById('step-done').classList.remove('hidden');
+      document.getElementById('done-text').textContent = (res.user.email || '') + ' 계정으로 로그인했어요.';
+      K.signOut(auth).catch(() => {}); // 이 브라우저에는 로그인 정보를 남기지 않음
+      if (!url) {
+        document.getElementById('done-text').textContent += ' 이제 앱(웹앱)에서 로그인 버튼을 눌러주세요.';
+        document.getElementById('back-btn').classList.add('hidden');
+        return;
+      }
+      const back = document.getElementById('back-btn');
+      back.href = url;
+      if (ret === 'desktop') {
+        back.textContent = 'PC 프로그램으로 보내기';
+        document.getElementById('done-text').textContent += ' 자동으로 PC 프로그램에 전달돼요. 안 되면 아래 버튼을 눌러주세요.';
+      } else {
+        document.getElementById('done-text').textContent += ' 아래 버튼을 눌러 앱으로 돌아가세요.';
+      }
+      setTimeout(() => { location.href = url; }, 400);
+    } catch (e) {
+      const code = e.code || '';
+      if (code.includes('popup-closed') || code.includes('cancelled')) return;
+      if (code.includes('unauthorized-domain')) err.textContent = 'Firebase 설정에서 이 주소(' + location.hostname + ')를 허용 도메인에 추가해야 해요.';
+      else if (code.includes('popup-blocked')) err.textContent = '팝업이 막혔어요. 브라우저 설정에서 팝업을 허용하고 다시 눌러주세요.';
+      else err.textContent = '로그인 실패: ' + (code || e.message);
+    }
+  });
+})();
+</script>
+</body>
+</html>
