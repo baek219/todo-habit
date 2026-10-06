@@ -27,6 +27,14 @@
   .cell:nth-child(7n+1) { border-left: none; }
   .cell:hover { background: var(--cell-hover); }
   .cell.other { opacity: 0.42; }
+  .cell.imp { background: rgba(255,200,61,0.16); }
+  body.light .cell.imp { background: rgba(242,182,0,0.16); }
+  .cell.imp .dnum .n { color: #FFC83D; }
+  body.light .cell.imp .dnum .n { color: #C88400; }
+  .it.imp .lb { font-weight: 900; }
+  .impb { display:inline-block; font-size: 0.8em; font-weight: 800; color: #fff; background: #E6A100; border-radius: 5px; padding: 0 5px; margin-right: 4px; }
+  .imp-tg { border: 1px solid var(--line); background: rgba(127,127,127,0.12); color: var(--text); border-radius: 8px; padding: 6px 10px; cursor: pointer; font-weight: 700; font-family: inherit; }
+  .imp-tg.on { background: #E6A100; border-color: #E6A100; color: #fff; }
   .cell.today { box-shadow: inset 0 0 0 2px var(--accent); background: rgba(255,255,255,0.06); border-radius: 4px; }
   .dnum { font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .dnum .lunar { font-weight: 600; color: var(--muted); margin-left: 3px; font-size: calc(var(--fs) * 0.9); }
@@ -37,6 +45,7 @@
   .it { font-size: calc(var(--fs) * 0.88); line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
   .it.done { opacity: 0.55; }
   .it .sym { font-weight: 900; margin-right: 2px; }
+  .it.rng { margin: 1px -5px 0 -5px; padding: 0 5px; font-weight: 700; border-radius: 0; }
   .it.done .lb { text-decoration: line-through; }
   .legend { display: flex; gap: 8px; font-size: calc(var(--fs) * 0.82); white-space: nowrap; margin-right: 6px; }
   .legend b { font-weight: 900; margin-right: 1px; }
@@ -88,6 +97,7 @@
     <div class="title" id="title"></div>
     <span class="legend" id="legend"></span>
     <span class="cloud no-drag" id="cloud"></span>
+    <button class="ib" id="b-quick" title="빠른 추가 (예: 내일 오후 3시 치과)">⚡</button>
     <button class="ib" id="b-app" title="할일습관 앱 열기">📱</button>
     <button class="ib" id="b-lock" title="위치 고정 / 이동·크기 조절">🔒</button>
     <button class="ib" id="b-set" title="설정">⚙</button>
@@ -101,6 +111,8 @@
 <script src="firebase.js"></script>
 <script src="sync.js"></script>
 <script src="lunar.js"></script>
+<script src="repeat.js"></script>
+<script src="quick.js"></script>
 <script>
 (function () {
   const DB = window.DesktopBridge || null; // PC 프로그램 안에서 열렸을 때만 있음
@@ -109,11 +121,24 @@
   let tasks = [], dayLogs = {}, appSettings = {}, notes = [];
   let desk = { alpha: 45, style: 'dark', font: 'mid', lunar: true, daily: false, weekly: true, monthly: true, todo: true, memo: true, mood: true, locked: true, onTop: false, autoStart: true };
   // 종류별 기호·색 (폰 앱·위젯과 같아요)
-  const SYM = { daily: '●', weekly: '■', monthly: '▲', todo: '◆', memo: '✎' };
-  const COL_DARK = { daily: '#56B4E9', weekly: '#F0A830', monthly: '#2BC79A', todo: '#E7A3C7', memo: '#FF8A50' };
-  const COL_LIGHT = { daily: '#0072B2', weekly: '#C88400', monthly: '#009E73', todo: '#B8558F', memo: '#D55E00' };
-  const NAME = { daily: '매일', weekly: '매주', monthly: '매달', todo: '할일', memo: '메모' };
+  const SYM = { daily: '●', weekly: '■', monthly: '▲', todo: '◆', memo: '✎', shift: '◎' };
+  const COL_DARK = { daily: '#56B4E9', weekly: '#F0A830', monthly: '#2BC79A', todo: '#E7A3C7', memo: '#FF8A50', shift: '#9EA3FF' };
+  const COL_LIGHT = { daily: '#0072B2', weekly: '#C88400', monthly: '#009E73', todo: '#B8558F', memo: '#D55E00', shift: '#5B5FC7' };
+  const NAME = { daily: '매일', weekly: '매주', monthly: '매달', todo: '할일', memo: '메모', shift: '교대' };
+  function shortTime(hhmm) { if (!hhmm) return ''; const [h, m] = hhmm.split(':'); return parseInt(h, 10) + ':' + m; }
+  function shifts() { return Array.isArray(appSettings.shifts) ? appSettings.shifts : []; }
   function col(k) { return (desk.style === 'light' ? COL_LIGHT : COL_DARK)[k]; }
+  // 기간 (시작일 ~ 끝나는 날)
+  function inRange(start, end, ds) { return !!start && start <= ds && ds <= (end && end > start ? end : start); }
+  // 반복(매주·매달·매년, 양력·음력) 포함: 그날 걸리는 회차 시작일
+  const RP = window.Repeat;
+  function isRep(x) { return !!(RP && RP.isRepeat(x.repeat)); }
+  function occOf(start, end, x, ds) { return isRep(x) ? RP.occStartOn(start, end, x.repeat, !!x.lunar, ds) : (inRange(start, end, ds) ? start : null); }
+  function spanOf(start, end) { return RP ? RP.span(start, end) : 0; }
+  function addD(ds, n) { const d = new Date(ds + 'T00:00:00'); d.setDate(d.getDate() + n); return iso(d); }
+  function todoDone(t, ds) { if (!isRep(t)) return !!t.done; const o = occOf(t.dueDate, t.endDate, t, ds); return !!o && (t.doneDates || []).includes(o); }
+  function md(ds) { return parseInt(ds.slice(5, 7), 10) + '/' + parseInt(ds.slice(8, 10), 10); }
+  function rangeLabel(a, b) { return b && b > a ? md(a) + '~' + md(b) : md(a); }
   const now0 = new Date();
   let viewY = now0.getFullYear(), viewM = now0.getMonth();
 
@@ -160,7 +185,8 @@
     const ds = iso(d), out = [];
     tasks.forEach(t => {
       if (t.type === 'todo') {
-        if (desk.todo && t.dueDate === ds) out.push({ t, kind: 'todo', type: 'todo', done: !!t.done, label: t.title });
+        const o = desk.todo ? occOf(t.dueDate, t.endDate, t, ds) : null;
+        if (o) out.push({ t, kind: 'todo', type: 'todo', done: todoDone(t, ds), label: t.title, time: t.time || '', rs: o, re: addD(o, spanOf(t.dueDate, t.endDate)) });
         return;
       }
       if (t.type !== 'habit') return;
@@ -170,9 +196,13 @@
       const tg = target(t), c = count(t, ds);
       out.push({ t, kind: 'habit', type: f, done: (t.completedDates || []).includes(ds), label: t.title + (tg > 1 ? ` ${c}/${tg}` : '') });
     });
-    if (desk.memo) notes.forEach(n => { if (n.date === ds) out.push({ n, kind: 'memo', type: 'memo', done: false, label: n.title || (n.body || '').split('\n')[0] || '메모' }); });
-    const order = { todo: 0, daily: 1, weekly: 2, monthly: 3, memo: 4 };
-    out.sort((a, b) => order[a.type] - order[b.type]);
+    if (desk.memo) notes.forEach(n => { const o = occOf(n.date, n.endDate, n, ds); if (o) out.push({ n, kind: 'memo', type: 'memo', done: false, label: n.title || (n.body || '').split('\n')[0] || '메모', rs: o, re: addD(o, spanOf(n.date, n.endDate)) }); });
+    // 교대근무
+    if (RP && RP.shiftItem) shifts().forEach(sh => { const it = RP.shiftItem(sh, ds); if (it) out.push({ t: { id: 'shift_' + sh.id, title: it.label }, kind: 'shift', type: 'shift', done: false, label: it.label, rs: it.s, re: it.e }); });
+    const order = { shift: -1, todo: 0, daily: 1, weekly: 2, monthly: 3, memo: 4 };
+    const isR = x => !!(x.rs && x.re && x.re > x.rs);
+    out.forEach(x => { x.imp = !!((x.t || x.n || {}).important); x.time = x.time || ''; });
+    out.sort((a, b) => (isR(b) - isR(a)) || ((b.imp ? 1 : 0) - (a.imp ? 1 : 0)) || ((a.time ? 0 : 1) - (b.time ? 0 : 1)) || (a.time < b.time ? -1 : a.time > b.time ? 1 : 0) || (order[a.type] - order[b.type]));
     return out;
   }
   const lunarCal = window.KoreanLunarCalendar ? new window.KoreanLunarCalendar() : null;
@@ -218,12 +248,45 @@
     document.getElementById('b-lock').textContent = desk.locked ? '🔒' : '🔓';
     document.getElementById('b-lock').classList.toggle('on', !desk.locked);
   }
+  // 한 주 안의 기간 띠 줄 자리 정하기 (칸이 바뀌어도 같은 높이로 이어지게)
+  function weekLanes(itemsList) {
+    const isR = x => !!(x.rs && x.re && x.re > x.rs);
+    const keyOf = x => (x.n ? 'n' + x.n.id : 't' + x.t.id) + '@' + x.rs;
+    const ranges = {};
+    itemsList.forEach((items, k) => items.forEach(x => {
+      if (!isR(x)) return;
+      const key = keyOf(x);
+      if (!ranges[key]) ranges[key] = { key, from: k, to: k, rs: x.rs, re: x.re }; else ranges[key].to = k;
+    }));
+    const list = Object.values(ranges).sort((a, b) => (a.rs < b.rs ? -1 : a.rs > b.rs ? 1 : 0) || (b.re > a.re ? 1 : b.re < a.re ? -1 : 0) || (a.key < b.key ? -1 : 1));
+    const laneEnd = [];
+    list.forEach(r => { let L = 0; while (L < laneEnd.length && laneEnd[L] >= r.from) L++; laneEnd[L] = r.to; r.lane = L; });
+    return itemsList.map(items => {
+      const slots = [];
+      items.forEach(x => { if (isR(x)) slots[ranges[keyOf(x)].lane] = x; });
+      const out = [];
+      for (let i = 0; i < slots.length; i++) out.push(slots[i] || { blank: true });
+      items.forEach(x => { if (!isR(x)) out.push(x); });
+      return out;
+    });
+  }
+  // ⭐ 다가오는 중요한 날 (제목줄에 'D-11')
+  function ddayText() {
+    const tds = iso(new Date()); let best = null;
+    const consider = (title, o) => { if (!o) return; const dn = Math.round((new Date(o + 'T00:00:00') - new Date(tds + 'T00:00:00')) / 86400000); if (dn > 400) return; if (!best || dn < best.dn) best = { title, dn }; };
+    tasks.forEach(t => { if (t.type !== 'todo' || !t.important || !t.dueDate) return;
+      const o = isRep(t) ? RP.nextOcc(t.dueDate, t.endDate, t.repeat, !!t.lunar, tds) : ((t.endDate || t.dueDate) >= tds && !t.done ? t.dueDate : null);
+      if (o && isRep(t) && (t.doneDates || []).includes(o)) return; consider(t.title, o); });
+    notes.forEach(n => { if (!n.important || !n.date) return;
+      consider(n.title || '메모', isRep(n) ? RP.nextOcc(n.date, n.endDate, n.repeat, !!n.lunar, tds) : ((n.endDate || n.date) >= tds ? n.date : null)); });
+    return best ? `  ·  ⭐ ${best.title} ${best.dn === 0 ? 'D-DAY' : best.dn < 0 ? '진행 중' : 'D-' + best.dn}` : '';
+  }
   function render() {
     load(); applyLook();
     const today = new Date(), tds = iso(today);
     document.getElementById('title').textContent = (viewY === today.getFullYear() && viewM === today.getMonth())
-      ? `오늘은 ${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일 ${DOW[today.getDay()]}요일 ${desk.lunar ? lunarText(today) : ''}`
-      : `${viewY}년 ${viewM + 1}월`;
+      ? `오늘은 ${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일 ${DOW[today.getDay()]}요일 ${desk.lunar ? lunarText(today) : ''}${ddayText()}`
+      : `${viewY}년 ${viewM + 1}월${ddayText()}`;
     document.getElementById('dow').innerHTML = DOW.map((w, i) => `<div style="color:${i === 0 ? 'var(--sun)' : i === 6 ? 'var(--sat)' : 'inherit'}">${w}요일</div>`).join('');
     const first = new Date(viewY, viewM, 1);
     const start = new Date(viewY, viewM, 1 - first.getDay());
@@ -231,17 +294,29 @@
     const grid = document.getElementById('grid');
     grid.style.gridTemplateRows = `repeat(${weeks}, 1fr)`;
     let html = '';
+    const allItems = [], lines = [];
+    for (let i = 0; i < weeks * 7; i++) allItems.push(itemsFor(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i)));
+    for (let w = 0; w < weeks; w++) weekLanes(allItems.slice(w * 7, w * 7 + 7)).forEach(r => lines.push(r));
     for (let i = 0; i < weeks * 7; i++) {
       const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
       const ds = iso(d);
       const hol = HOLIDAYS[ds];
-      const items = itemsFor(d);
+      const items = lines[i];
       const mood = desk.mood && dayLogs[ds] && dayLogs[ds].mood ? `<span class="mood">${dayLogs[ds].mood}</span>` : '';
-      const cls = ['cell', d.getMonth() !== viewM ? 'other' : '', ds === tds ? 'today' : '', d.getDay() === 0 ? 'sun' : d.getDay() === 6 ? 'sat' : '', hol ? 'hol-day' : ''].join(' ');
+      const cls = ['cell', allItems[i].some(x => x.imp) ? 'imp' : '', d.getMonth() !== viewM ? 'other' : '', ds === tds ? 'today' : '', d.getDay() === 0 ? 'sun' : d.getDay() === 6 ? 'sat' : '', hol ? 'hol-day' : ''].join(' ');
       const label = d.getDate() === 1 ? `${d.getMonth() + 1}월 1일` : d.getDate();
       html += `<div class="${cls}" data-date="${ds}">
         <div class="dnum"><span class="n">${label}</span>${hol ? `<span class="hol">${esc(hol)}</span>` : (desk.lunar ? `<span class="lunar">${lunarText(d)}</span>` : '')}${mood}</div>
-        ${items.map(it => `<div class="it ${it.done ? 'done' : ''}"><span class="sym" style="color:${col(it.type)}">${it.done ? '✓' : SYM[it.type]}</span><span class="lb">${esc(it.label)}</span></div>`).join('')}
+        ${items.map(it => {
+          if (it.blank) return `<div class="it blank">&nbsp;</div>`;
+          if (it.rs && it.re && it.re > it.rs) {
+            const first = ds === it.rs || d.getDay() === 0;
+            const ic = it.imp ? '#E6A100' : col(it.type);
+            return `<div class="it rng ${it.done ? 'done' : ''} ${it.imp ? 'imp' : ''}" style="background:${ic}40; border-left:${ds === it.rs ? '3px solid ' + ic : '0'};"><span class="lb">${first ? (it.imp ? '★' : '') + esc(it.label) + ' <small style="opacity:.7">' + rangeLabel(it.rs, it.re) + '</small>' : '&nbsp;'}</span></div>`;
+          }
+          const rp = (it.t && isRep(it.t)) || (it.n && isRep(it.n));
+          return `<div class="it ${it.done ? 'done' : ''} ${it.imp ? 'imp' : ''}"><span class="sym" style="color:${it.imp ? '#E6A100' : col(it.type)}">${it.done ? '✓' : it.imp ? '★' : SYM[it.type]}</span><span class="lb">${it.time ? `<b style="opacity:.75">${shortTime(it.time)}</b> ` : ''}${esc(it.label)}${rp ? ' <small style="opacity:.6">🔁</small>' : ''}</span></div>`;
+        }).join('')}
       </div>`;
     }
     grid.innerHTML = html;
@@ -252,18 +327,20 @@
       if (!its.length) return;
       const limit = c.clientHeight;
       let hidden = 0;
+      const real = el => !el.classList.contains('blank');
       for (let k = its.length - 1; k >= 0; k--) {
         if (its[k].offsetTop + its[k].offsetHeight <= limit - 2) break;
-        its[k].remove(); hidden++;
+        if (real(its[k])) hidden++; its[k].remove();
       }
       if (hidden) {
-        const last = c.querySelector('.it:last-of-type');
-        if (last) { last.remove(); hidden++; }
+        const rest = c.querySelectorAll('.it');
+        const last = rest[rest.length - 1];
+        if (last) { if (real(last)) hidden++; last.remove(); }
         const m = document.createElement('div'); m.className = 'more'; m.textContent = `+${hidden}개 더`;
         c.appendChild(m);
       }
     });
-    document.getElementById('legend').innerHTML = ['daily', 'weekly', 'monthly', 'todo', 'memo'].map(k => `<span><b style="color:${col(k)}">${SYM[k]}</b>${NAME[k]}</span>`).join('');
+    document.getElementById('legend').innerHTML = ['daily', 'weekly', 'monthly', 'todo', 'memo'].concat(shifts().length ? ['shift'] : []).map(k => `<span><b style="color:${col(k)}">${SYM[k]}</b>${NAME[k]}</span>`).join('');
     renderCloud();
   }
   function renderCloud() {
@@ -278,51 +355,101 @@
     else if (window.CloudSync) window.CloudSync.signInHere();
   }
 
+  // ---- ⚡ 빠른 추가 ----
+  function openQuick() {
+    const p = document.getElementById('day-panel');
+    const W = DOW;
+    const lab = x => { const d = new Date(x + 'T00:00:00'); return `${d.getMonth() + 1}/${d.getDate()} (${W[d.getDay()]})`; };
+    p.innerHTML = `<h3>⚡ 빠른 추가</h3>
+      <div class="note" style="margin:0 0 8px;">말하듯이 쓰면 날짜·시간·반복을 알아서 넣어요. 예: <b>다음주 금요일 9시 병원</b> · <b>10/20~10/23 제주도 여행</b> · <b>매달 말일 카드값 정리</b> · <b>엄마 생신 음력 9월 3일 매년 중요</b></div>
+      <div class="addrow"><input id="q-in" placeholder="예: 내일 오후 3시 치과" autocomplete="off" /><button class="btn" id="q-ok">추가</button></div>
+      <div class="note" id="q-prev" style="font-weight:700;"></div>
+      <div class="note" id="q-done"></div>
+      <div style="display:flex; justify-content:flex-end; margin-top:12px;"><button class="btn gray" id="q-close">닫기</button></div>`;
+    const inp = document.getElementById('q-in');
+    let cur = null;
+    const upd = () => {
+      const v = inp.value.trim(); cur = v && window.QuickParse ? window.QuickParse.parse(v) : null;
+      document.getElementById('q-prev').innerHTML = cur ? [`◆ ${esc(cur.title || '(이름)')}`, `📅 ${cur.endDate ? lab(cur.date) + ' → ' + lab(cur.endDate) : lab(cur.date)}`, cur.time ? `🕘 ${shortTime(cur.time)}` : '', cur.repeat ? `🔁 ${RP.describe(cur.date, cur.repeat, cur.lunar)}` : '', cur.important ? '⭐ 중요' : ''].filter(Boolean).join(' &nbsp;·&nbsp; ') : '';
+    };
+    const add = () => {
+      if (!cur || !cur.title) return;
+      load();
+      tasks.unshift({ id: 't' + Date.now() + Math.random().toString(36).slice(2, 7), type: 'todo', title: cur.title.slice(0, 60), category: null, memo: '', done: false, createdAt: iso(new Date()), completedAt: null,
+        dueDate: cur.date, endDate: cur.endDate || null, repeat: cur.repeat || null, lunar: !!cur.repeat && !!cur.lunar, doneDates: [], time: cur.time || null, remindBefore: cur.time ? 0 : null, reminderTime: cur.time || null, important: !!cur.important });
+      saveTasks(); render();
+      document.getElementById('q-done').textContent = `✅ '${cur.title}' 추가했어요 (${lab(cur.date)}${cur.time ? ' ' + shortTime(cur.time) : ''})`;
+      inp.value = ''; upd(); inp.focus();
+    };
+    inp.addEventListener('input', upd);
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') add(); });
+    document.getElementById('q-ok').onclick = add;
+    document.getElementById('q-close').onclick = () => p.classList.remove('show');
+    p.classList.add('show');
+    setTimeout(() => inp.focus(), 50);
+  }
+
   // ---- 날짜 누르면: 그날 목록 체크 + 할일 추가 ----
-  let addType = 'todo';
+  let addType = 'todo', addImp = false;
   function openDay(ds) {
     const p = document.getElementById('day-panel');
     const d = new Date(ds + 'T00:00:00');
     const wd = DOW[d.getDay()], md = d.getDate();
     const HINT = {
-      todo: `${d.getMonth() + 1}월 ${md}일 하루만 하는 할일이에요`,
+      todo: `${d.getMonth() + 1}월 ${md}일 할일이에요. 끝나는 날을 고르면 기간 할일이 돼요 (예: 여행)`,
       daily: `${d.getMonth() + 1}월 ${md}일부터 매일 반복해요`,
       weekly: `매주 ${wd}요일마다 반복해요 (${d.getMonth() + 1}월 ${md}일부터)`,
       monthly: `매달 ${md}일마다 반복해요`,
-      memo: `${d.getMonth() + 1}월 ${md}일 날짜가 붙은 메모예요 (폰 메모장에도 들어가요)`
+      memo: `${d.getMonth() + 1}월 ${md}일 날짜가 붙은 메모예요. 끝나는 날을 고르면 기간 메모가 돼요 (폰 메모장에도 들어가요)`
     };
     function draw() {
       load();
       const all = [];
       tasks.forEach(t => {
-        if (t.type === 'todo' && t.dueDate === ds) all.push({ t, kind: 'todo', type: 'todo' });
+        if (t.type === 'todo') { const o = occOf(t.dueDate, t.endDate, t, ds); if (o) all.push({ t, kind: 'todo', type: 'todo', occ: o }); }
         else if (t.type === 'habit' && scheduled(t, d)) all.push({ t, kind: 'habit', type: t.frequency });
       });
-      notes.forEach(n => { if (n.date === ds) all.push({ n, kind: 'memo', type: 'memo' }); });
-      const order = { todo: 0, daily: 1, weekly: 2, monthly: 3, memo: 4 };
-      all.sort((a, b) => order[a.type] - order[b.type]);
+      notes.forEach(n => { const o = occOf(n.date, n.endDate, n, ds); if (o) all.push({ n, kind: 'memo', type: 'memo', occ: o }); });
+      if (RP && RP.shiftItem) shifts().forEach(sh => { const it = RP.shiftItem(sh, ds); if (it) all.push({ kind: 'shift', type: 'shift', label: it.label, s: it.s, e: it.e, code: RP.shiftCode(sh, ds) }); });
+      const order = { shift: -1, todo: 0, daily: 1, weekly: 2, monthly: 3, memo: 4 };
+      const tm = x => (x.kind === 'todo' && x.t.time) || '~';
+      all.sort((a, b) => (order[a.type] - order[b.type]) || (tm(a) < tm(b) ? -1 : tm(a) > tm(b) ? 1 : 0));
       const log = dayLogs[ds];
       p.innerHTML = `<h3>${d.getMonth() + 1}월 ${md}일 ${wd}요일 <small style="font-weight:500; color:var(--muted)">${lunarText(d)} ${HOLIDAYS[ds] ? '· ' + esc(HOLIDAYS[ds]) : ''}</small></h3>
         ${log && (log.mood || log.note) ? `<div class="note" style="margin:0 0 8px;">${log.mood || ''} ${esc(log.note || '')}</div>` : ''}
         ${all.length ? all.map((x, i) => {
+          if (x.kind === 'shift') return `<div class="row"><span class="sym" style="color:${col('shift')}; font-weight:900; width:20px; text-align:center;">◎</span><div style="flex:1;">${esc(x.label)} <small style="color:var(--muted)">${x.e > x.s ? rangeLabel(x.s, x.e) + ' · ' : ''}${RP.SHIFT_NAMES[x.code] || ''}</small></div><div class="sub" style="color:${col('shift')}">교대 (폰 설정에서 바꿔요)</div></div>`;
           if (x.kind === 'memo') {
             const n = x.n;
-            return `<div class="row" data-memo="${i}" style="flex-wrap:wrap;"><span class="sym" style="color:${col('memo')}; font-weight:900; width:20px; text-align:center;">✎</span><div style="flex:1; min-width:0;"><div>${esc(n.title || (n.body || '').split('\n')[0] || '메모')}</div><div class="mb">${esc(n.body || '')}</div></div><div class="sub" style="color:${col('memo')}">메모 ▾</div></div>`;
+            return `<div class="row" data-memo="${i}" style="flex-wrap:wrap;"><span class="sym" style="color:${col('memo')}; font-weight:900; width:20px; text-align:center;">✎</span><div style="flex:1; min-width:0;"><div>${n.important ? '<span class="impb">⭐</span>' : ''}${esc(n.title || (n.body || '').split('\n')[0] || '메모')}${spanOf(n.date, n.endDate) ? ` <small style="color:${col('memo')}">↔ ${rangeLabel(x.occ, addD(x.occ, spanOf(n.date, n.endDate)))}</small>` : ''}${isRep(n) ? ` <small style="color:var(--muted)">🔁 ${RP.describe(n.date, n.repeat, !!n.lunar)}</small>` : ''}</div><div class="mb">${esc(n.body || '')}</div></div><div class="sub" style="color:${col('memo')}">메모 ▾</div></div>`;
           }
           const t = x.t, tg = x.kind === 'habit' ? target(t) : 1, c = x.kind === 'habit' ? count(t, ds) : 0;
-          const done = x.kind === 'todo' ? !!t.done : (t.completedDates || []).includes(ds);
+          const done = x.kind === 'todo' ? todoDone(t, ds) : (t.completedDates || []).includes(ds);
           const sub = `<span style="color:${col(x.type)}">${SYM[x.type]} ${NAME[x.type]}</span>` + (tg > 1 ? ` · ${c}/${tg}` : '');
-          return `<div class="row" data-i="${i}"><div class="box ${done ? 'on' : ''}" style="${done ? `background:${col(x.type)}; border-color:${col(x.type)}` : `border-color:${col(x.type)}`}">${done ? '✓' : ''}</div><div>${esc(t.title)}</div><div class="sub">${sub}</div></div>`;
+          const rg = (x.kind === 'todo' && spanOf(t.dueDate, t.endDate) ? ` <small style="color:${col('todo')}">↔ ${rangeLabel(x.occ, addD(x.occ, spanOf(t.dueDate, t.endDate)))}</small>` : '') +
+            (x.kind === 'todo' && isRep(t) ? ` <small style="color:var(--muted)">🔁 ${RP.describe(t.dueDate, t.repeat, !!t.lunar)}</small>` : '');
+          return `<div class="row" data-i="${i}"><div class="box ${done ? 'on' : ''}" style="${done ? `background:${col(x.type)}; border-color:${col(x.type)}` : `border-color:${col(x.type)}`}">${done ? '✓' : ''}</div><div>${t.important ? '<span class="impb">⭐</span>' : ''}${x.kind === 'todo' && t.time ? `<b>${shortTime(t.time)}</b> ` : ''}${esc(t.title)}${rg}</div><div class="sub">${sub}</div></div>`;
         }).join('') : '<div class="note">이 날은 예정된 게 없어요.</div>'}
         <div class="types" id="types">${['todo', 'daily', 'weekly', 'monthly', 'memo'].map(k => `<button data-type="${k}" style="${addType === k ? `background:${col(k)}; border-color:${col(k)}` : `border-color:${col(k)}; color:${col(k)}`}" class="${addType === k ? 'on' : ''}">${SYM[k]} ${NAME[k] === '할일' || NAME[k] === '메모' ? NAME[k] : NAME[k] + ' 습관'}</button>`).join('')}</div>
         <div class="note" style="margin-top:6px;">${HINT[addType]}</div>
         <div class="addrow" style="margin-top:6px;"><input id="add-input" placeholder="${addType === 'memo' ? '메모 제목' : '이름 (예: ' + ({ todo: '우유 사기', daily: '물 마시기', weekly: '헬스장 가기', monthly: '공과금 내기' })[addType] + ')'}" maxlength="60" /><button class="btn" id="add-btn" style="background:${col(addType)}">추가</button></div>
+        ${addType === 'todo' || addType === 'memo' ? `<div class="addrow" style="margin-top:6px; align-items:center;"><span class="note" style="margin:0;">시작 <b>${+ds.slice(5,7)}/${+ds.slice(8,10)}</b> → 끝</span><input type="date" id="add-end" min="${ds}" style="flex:none; width:auto;" /><span class="note" style="margin:0; opacity:.7;">(여러 날일 때만)</span></div>
+          <div class="addrow" style="margin-top:6px; align-items:center;"><span class="note" style="margin:0;">🔁 반복:</span>
+            <select id="add-rep" style="flex:none; width:auto; background:rgba(127,127,127,0.12); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:6px;">
+              <option value="none">안 함</option><option value="weekly">매주 ${wd}요일</option><option value="monthly">매달 ${md}일</option><option value="monthEnd">매달 말일</option><option value="yearly">매년 ${d.getMonth() + 1}월 ${md}일 (생일·기념일)</option></select>
+            <select id="add-lunar" style="flex:none; width:auto; background:rgba(127,127,127,0.12); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:6px;">
+              <option value="0">☀️ 양력</option><option value="1">🌙 음력 (${lunarText(d).replace('(음)', '')})</option></select>
+</div>
+          <div class="note" id="add-rep-desc" style="margin:4px 0 0; font-weight:700;"></div>` : ''}
+        ${addType === 'todo' ? `<div class="addrow" style="margin-top:6px; align-items:center;"><span class="note" style="margin:0;">🕘 시간 (선택):</span><input type="time" id="add-time" style="flex:none; width:auto;" /><span class="note" style="margin:0; opacity:.7;">폰에서 그 시간에 알림이 와요</span></div>` : ''}
+        ${addType === 'todo' || addType === 'memo' ? `<div class="addrow" style="margin-top:6px; align-items:center;"><button class="imp-tg ${addImp ? 'on' : ''}" id="add-imp">${addImp ? '⭐ 중요한 날 (켜짐)' : '☆ 중요한 날로 강조'}</button><span class="note" style="margin:0;">달력에 노란색 ★로 눈에 띄게 보여요</span></div>` : ''}
         ${addType === 'memo' ? '<textarea class="memo-body" id="add-body" placeholder="내용 (선택)"></textarea>' : ''}
         <div style="display:flex; justify-content:flex-end; margin-top:12px;"><button class="btn gray" id="day-close">닫기</button></div>`;
       p.querySelectorAll('[data-i]').forEach(r => r.addEventListener('click', () => {
         const x = all[parseInt(r.getAttribute('data-i'), 10)];
         const t = tasks.find(y => y.id === x.t.id); if (!t) return;
-        if (x.kind === 'todo') { t.done = !t.done; t.completedAt = t.done ? iso(new Date()) : null; }
+        if (x.kind === 'todo' && isRep(t)) { t.doneDates = t.doneDates || []; const i = t.doneDates.indexOf(x.occ); if (i >= 0) t.doneDates.splice(i, 1); else t.doneDates.push(x.occ); }
+        else if (x.kind === 'todo') { t.done = !t.done; t.completedAt = t.done ? iso(new Date()) : null; }
         else setCount(t, ds, (t.completedDates || []).includes(ds) ? 0 : target(t));
         saveTasks(); draw(); render();
       }));
@@ -336,12 +463,18 @@
         const v = document.getElementById('add-input').value.trim(); if (!v) return;
         const id = 't' + Date.now() + Math.random().toString(36).slice(2, 7);
         const today = iso(new Date());
+        const endEl = document.getElementById('add-end');
+        const end = endEl && endEl.value && endEl.value > ds ? endEl.value : null;
+        const repEl = document.getElementById('add-rep'), lunEl = document.getElementById('add-lunar');
+        const rep = repEl && repEl.value !== 'none' ? repEl.value : null;
+        const lunar = !!rep && rep !== 'weekly' && rep !== 'monthEnd' && lunEl && lunEl.value === '1';
+        const tEl = document.getElementById('add-time'); const time = tEl && tEl.value ? tEl.value : null;
         if (addType === 'memo') {
           const body = (document.getElementById('add-body') || {}).value || '';
-          notes.unshift({ id: 'n' + Date.now() + Math.random().toString(36).slice(2, 6), title: v, body, color: '', pinned: false, date: ds, createdAt: Date.now(), updatedAt: Date.now() });
+          notes.unshift({ id: 'n' + Date.now() + Math.random().toString(36).slice(2, 6), title: v, body, color: '', pinned: false, date: ds, endDate: end, repeat: rep, lunar, important: !!addImp, createdAt: Date.now(), updatedAt: Date.now() });
           saveNotes();
         } else if (addType === 'todo') {
-          tasks.unshift({ id, type: 'todo', title: v, category: null, memo: '', done: false, createdAt: today, completedAt: null, dueDate: ds, reminderTime: null });
+          tasks.unshift({ id, type: 'todo', title: v, category: null, memo: '', done: false, createdAt: today, completedAt: null, dueDate: ds, endDate: end, repeat: rep, lunar, doneDates: [], time, remindBefore: time ? 0 : null, reminderTime: time, important: !!addImp });
           saveTasks();
         } else {
           tasks.unshift({ id, type: 'habit', frequency: addType, title: v, category: null, memo: '',
@@ -349,10 +482,45 @@
             completedDates: [], target: 1, counts: {}, pauses: [], reminderTime: null, createdAt: ds, startDate: ds });
           saveTasks();
         }
+        addImp = false;
         draw(); render();
         setTimeout(() => { const el = document.getElementById('add-input'); if (el) el.focus(); }, 30);
       };
       document.getElementById('add-btn').onclick = add;
+      const impBtn = document.getElementById('add-imp');
+      if (impBtn) impBtn.onclick = () => {
+        const keep = document.getElementById('add-input').value;
+        const ev = document.getElementById('add-end'), rv = document.getElementById('add-rep'), lv = document.getElementById('add-lunar');
+        const st = [ev && ev.value, rv && rv.value, lv && lv.value];
+        const tv = document.getElementById('add-time'), tval = tv && tv.value;
+        addImp = !addImp; draw();
+        document.getElementById('add-input').value = keep;
+        if (st[0]) document.getElementById('add-end').value = st[0];
+        if (tval && document.getElementById('add-time')) document.getElementById('add-time').value = tval;
+        if (st[1]) { document.getElementById('add-rep').value = st[1]; document.getElementById('add-lunar').value = st[2]; document.getElementById('add-rep').onchange(); }
+      };
+      const repEl = document.getElementById('add-rep'), lunEl = document.getElementById('add-lunar');
+      if (repEl) {
+        const lt = lunarText(d).replace('(음)', '').replace('윤', ''); // 예: '9.3'
+        const lm = lt.split('.')[0], ldd = lt.split('.')[1];
+        const desc = () => {
+          lunEl.style.display = repEl.value === 'monthly' || repEl.value === 'yearly' ? '' : 'none';
+          const r = repEl.value, lu = lunEl.value === '1' && r !== 'weekly';
+          // 고른 칸 안에도 날짜가 바로 보이게 (양력/음력에 맞춰 바뀜)
+          if (r === 'monthEnd') lunEl.style.display = 'none';
+          repEl.querySelector('[value="monthly"]').textContent = lu && ldd ? `매달 음력 ${ldd}일` : `매달 ${md}일`;
+          repEl.querySelector('[value="yearly"]').textContent = (lu && ldd ? `매년 음력 ${lm}월 ${ldd}일` : `매년 ${d.getMonth() + 1}월 ${md}일`) + ' (생일·기념일)';
+          let txt = '';
+          if (r !== 'none') {
+            try { txt = RP.describe(ds, r, lu); } catch (e) {}
+            if (!txt) txt = r === 'monthEnd' ? '매달 말일' : r === 'weekly' ? `매주 ${wd}요일` : r === 'monthly' ? (lu ? `매달 음력 ${ldd}일` : `매달 ${md}일`) : (lu ? `매년 음력 ${lm}월 ${ldd}일` : `매년 ${d.getMonth() + 1}월 ${md}일`);
+          }
+          const el = document.getElementById('add-rep-desc');
+          el.textContent = txt ? '🔁 ' + txt + '마다 반복돼요' : '';
+          el.style.color = txt ? col(addType) : '';
+        };
+        repEl.onchange = desc; lunEl.onchange = desc; desc();
+      }
       document.getElementById('add-input').addEventListener('keydown', e => { if (e.key === 'Enter' && addType !== 'memo') add(); });
       document.getElementById('day-close').onclick = () => p.classList.remove('show');
     }
@@ -405,6 +573,7 @@
 
   // ---- 버튼 ----
   document.getElementById('b-prev').onclick = () => { viewM--; if (viewM < 0) { viewM = 11; viewY--; } render(); };
+  document.getElementById('b-quick').onclick = openQuick;
   document.getElementById('b-next').onclick = () => { viewM++; if (viewM > 11) { viewM = 0; viewY++; } render(); };
   document.getElementById('b-today').onclick = () => { const n = new Date(); viewY = n.getFullYear(); viewM = n.getMonth(); render(); };
   document.getElementById('b-set').onclick = openSettings;
