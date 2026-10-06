@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>할일습관 바탕화면 달력</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; user-select: none; -webkit-user-select: none;
+    font-family: "Malgun Gothic", "Apple SD Gothic Neo", -apple-system, "Segoe UI", sans-serif; }
+  body { --fs: 13px; --glass: 20,28,25; --alpha: 0.45; --text: #F3F7F5; --muted: rgba(243,247,245,0.62); --line: rgba(255,255,255,0.14);
+    --accent: #4CA98A; --sun: #FF7A7A; --sat: #8FB8FF; --cell-hover: rgba(255,255,255,0.08); }
+  body.light { --glass: 255,255,255; --text: #1F2A25; --muted: rgba(31,42,37,0.6); --line: rgba(0,0,0,0.1); --sun: #D64545; --sat: #2F64B5; --cell-hover: rgba(0,0,0,0.05); }
+  .wrap { position: absolute; inset: 0; border-radius: 12px; background: rgba(var(--glass), var(--alpha)); color: var(--text);
+    display: flex; flex-direction: column; overflow: hidden; font-size: var(--fs); }
+  .bar { display: flex; align-items: center; gap: 4px; padding: 8px 10px; flex: none; }
+  body.unlocked .bar { -webkit-app-region: drag; cursor: move; }
+  .bar button, .bar .no-drag { -webkit-app-region: no-drag; }
+  .bar .title { flex: 1; text-align: center; font-weight: 700; font-size: calc(var(--fs) * 1.1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ib { border: none; background: transparent; color: var(--text); font-size: calc(var(--fs) * 1.15); width: 30px; height: 28px; border-radius: 8px; cursor: pointer; opacity: 0.85; }
+  .ib:hover { background: var(--cell-hover); opacity: 1; }
+  .ib.on { color: var(--accent); opacity: 1; }
+  .dow { display: grid; grid-template-columns: repeat(7, 1fr); flex: none; border-top: 1px solid var(--line); }
+  .dow div { text-align: center; padding: 6px 0; font-weight: 700; font-size: calc(var(--fs) * 0.95); }
+  .grid { flex: 1; display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 1fr; min-height: 0; }
+  .cell { border-top: 1px solid var(--line); border-left: 1px solid var(--line); padding: 4px 5px; overflow: hidden; cursor: pointer; position: relative; min-height: 0; }
+  .cell:nth-child(7n+1) { border-left: none; }
+  .cell:hover { background: var(--cell-hover); }
+  .cell.other { opacity: 0.42; }
+  .cell.today { box-shadow: inset 0 0 0 2px var(--accent); background: rgba(255,255,255,0.06); border-radius: 4px; }
+  .dnum { font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dnum .lunar { font-weight: 600; color: var(--muted); margin-left: 3px; font-size: calc(var(--fs) * 0.9); }
+  .dnum .hol { color: var(--sun); margin-left: 3px; font-size: calc(var(--fs) * 0.9); }
+  .dnum .mood { margin-left: 2px; }
+  .sun .dnum .n, .hol-day .dnum .n { color: var(--sun); }
+  .sat .dnum .n { color: var(--sat); }
+  .it { font-size: calc(var(--fs) * 0.88); line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+  .it.done { text-decoration: line-through; opacity: 0.55; }
+  .it .ck { color: var(--accent); font-weight: 900; }
+  .more { font-size: calc(var(--fs) * 0.8); color: var(--muted); }
+  .grip { position: absolute; right: 2px; bottom: 2px; width: 18px; height: 18px; cursor: nwse-resize; display: none; opacity: 0.7;
+    background: linear-gradient(135deg, transparent 50%, var(--muted) 50%, var(--muted) 60%, transparent 60%, transparent 70%, var(--muted) 70%, var(--muted) 80%, transparent 80%); }
+  body.unlocked .grip { display: block; }
+  body.unlocked .wrap { outline: 2px dashed var(--accent); outline-offset: -2px; }
+  /* 날짜 눌렀을 때 / 설정 창 */
+  .panel { position: absolute; inset: 10px; background: rgba(var(--glass), 0.96); border-radius: 12px; padding: 14px; overflow-y: auto; display: none;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35); color: var(--text); z-index: 5; }
+  body:not(.light) .panel { background: rgba(28,36,33,0.97); }
+  .panel.show { display: block; }
+  .panel h3 { margin: 0 0 10px; font-size: calc(var(--fs) * 1.25); }
+  .row { display: flex; align-items: center; gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .box { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--muted); flex: none; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 900; color: #fff; }
+  .box.on { background: var(--accent); border-color: var(--accent); }
+  .row .sub { color: var(--muted); font-size: calc(var(--fs) * 0.85); margin-left: auto; white-space: nowrap; }
+  .addrow { display: flex; gap: 6px; margin-top: 12px; }
+  .addrow input { flex: 1; border: 1px solid var(--line); background: rgba(127,127,127,0.12); color: var(--text); border-radius: 8px; padding: 8px 10px; font-size: var(--fs); outline: none; font-family: inherit; user-select: text; }
+  .btn { border: none; background: var(--accent); color: #fff; border-radius: 8px; padding: 8px 12px; font-weight: 700; cursor: pointer; font-size: var(--fs); font-family: inherit; }
+  .btn.gray { background: rgba(127,127,127,0.25); color: var(--text); }
+  .set { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--line); gap: 10px; }
+  .set input[type=range] { width: 160px; accent-color: var(--accent); }
+  .seg { display: flex; gap: 4px; }
+  .seg button { border: 1px solid var(--line); background: transparent; color: var(--text); border-radius: 7px; padding: 5px 9px; cursor: pointer; font-family: inherit; font-size: calc(var(--fs) * 0.9); }
+  .seg button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .tg { width: 40px; height: 22px; border-radius: 12px; border: none; background: rgba(127,127,127,0.4); position: relative; cursor: pointer; flex: none; }
+  .tg::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left .15s; }
+  .tg.on { background: var(--accent); }
+  .tg.on::after { left: 20px; }
+  .note { color: var(--muted); font-size: calc(var(--fs) * 0.85); line-height: 1.5; margin-top: 8px; }
+  .cloud { font-size: calc(var(--fs) * 0.85); color: var(--muted); white-space: nowrap; }
+</style>
+</head>
+<body class="">
+<div class="wrap" id="wrap">
+  <div class="bar">
+    <button class="ib" id="b-prev" title="이전 달">‹</button>
+    <button class="ib" id="b-today" title="이번 달로">●</button>
+    <button class="ib" id="b-next" title="다음 달">›</button>
+    <div class="title" id="title"></div>
+    <span class="cloud no-drag" id="cloud"></span>
+    <button class="ib" id="b-app" title="할일습관 앱 열기">📱</button>
+    <button class="ib" id="b-lock" title="위치 고정 / 이동·크기 조절">🔒</button>
+    <button class="ib" id="b-set" title="설정">⚙</button>
+  </div>
+  <div class="dow" id="dow"></div>
+  <div class="grid" id="grid"></div>
+  <div class="grip" id="grip" title="끌어서 크기 조절"></div>
+</div>
+<div class="panel" id="day-panel"></div>
+<div class="panel" id="set-panel"></div>
+<script src="firebase.js"></script>
+<script src="sync.js"></script>
+<script src="lunar.js"></script>
+<script>
+(function () {
+  const DB = window.DesktopBridge || null; // PC 프로그램 안에서 열렸을 때만 있음
+  const DOW = ['일', '월', '화', '수', '목', '금', '토'];
+  const KEY_TASKS = 'todo_habit_tasks_v3', KEY_LOGS = 'day_logs_v1', KEY_SET = 'app_settings_v1', DESK_KEY = 'desk_settings_v1';
+  let tasks = [], dayLogs = {}, appSettings = {};
+  let desk = { alpha: 45, style: 'dark', font: 'mid', lunar: true, daily: false, weekly: true, monthly: true, todo: true, mood: true, locked: true, onTop: false, autoStart: true };
+  const now0 = new Date();
+  let viewY = now0.getFullYear(), viewM = now0.getMonth();
+
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function iso(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+  function load() {
+    try { tasks = JSON.parse(localStorage.getItem(KEY_TASKS) || '[]') || []; } catch (e) { tasks = []; }
+    try { dayLogs = JSON.parse(localStorage.getItem(KEY_LOGS) || '{}') || {}; } catch (e) { dayLogs = {}; }
+    try { appSettings = JSON.parse(localStorage.getItem(KEY_SET) || '{}') || {}; } catch (e) { appSettings = {}; }
+    try { desk = Object.assign(desk, JSON.parse(localStorage.getItem(DESK_KEY) || '{}') || {}); } catch (e) {}
+  }
+  function saveTasks() {
+    try { localStorage.setItem(KEY_TASKS, JSON.stringify(tasks)); } catch (e) {}
+    if (window.CloudSync) window.CloudSync.schedulePush();
+  }
+  function saveDesk() { try { localStorage.setItem(DESK_KEY, JSON.stringify(desk)); } catch (e) {} }
+
+  // ---- 습관 판정 (앱과 같은 규칙) ----
+  function dim(y, m) { return new Date(y, m + 1, 0).getDate(); }
+  function isPaused(h, ds) { return (h.pauses || []).some(p => p.start <= ds && ds <= p.end); }
+  function scheduled(h, d) {
+    const ds = iso(d);
+    if (isPaused(h, ds)) return false;
+    if (h.frequency === 'daily') return true;
+    if (h.frequency === 'monthly') return d.getDate() === Math.min(h.monthDay || 1, dim(d.getFullYear(), d.getMonth()));
+    return (h.repeatDays || [0, 1, 2, 3, 4, 5, 6]).includes(d.getDay());
+  }
+  function target(h) { return Math.max(1, parseInt(h.target, 10) || 1); }
+  function count(h, ds) { return target(h) === 1 ? ((h.completedDates || []).includes(ds) ? 1 : 0) : ((h.counts || {})[ds] || 0); }
+  function setCount(h, ds, n) {
+    const t = target(h); n = Math.max(0, Math.min(99, n));
+    if (t > 1) { h.counts = h.counts || {}; if (n > 0) h.counts[ds] = n; else delete h.counts[ds]; }
+    h.completedDates = (h.completedDates || []).filter(x => x !== ds);
+    if (n >= t) h.completedDates.push(ds);
+  }
+  function itemsFor(d) {
+    const ds = iso(d), out = [];
+    tasks.forEach(t => {
+      if (t.type === 'todo') {
+        if (desk.todo && t.dueDate === ds) out.push({ t, kind: 'todo', done: !!t.done, label: t.title });
+        return;
+      }
+      if (t.type !== 'habit') return;
+      const f = t.frequency;
+      if ((f === 'daily' && !desk.daily) || (f === 'weekly' && !desk.weekly) || (f === 'monthly' && !desk.monthly)) return;
+      if (!scheduled(t, d)) return;
+      const tg = target(t), c = count(t, ds);
+      out.push({ t, kind: 'habit', done: (t.completedDates || []).includes(ds), label: t.title + (tg > 1 ? ` ${c}/${tg}` : '') });
+    });
+    out.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'todo' ? -1 : 1));
+    return out;
+  }
+  const lunarCal = window.KoreanLunarCalendar ? new window.KoreanLunarCalendar() : null;
+  function lunarText(d) {
+    if (!lunarCal) return '';
+    try {
+      lunarCal.setSolarDate(d.getFullYear(), d.getMonth() + 1, d.getDate());
+      const l = lunarCal.getLunarCalendar();
+      return '(음)' + (l.intercalation ? '윤' : '') + l.month + '.' + l.day;
+    } catch (e) { return ''; }
+  }
+  const HOLIDAYS = {
+    '2026-01-01': '신정', '2026-02-16': '설날 연휴', '2026-02-17': '설날', '2026-02-18': '설날 연휴',
+    '2026-03-01': '삼일절', '2026-03-02': '삼일절 대체공휴일', '2026-05-01': '노동절', '2026-05-05': '어린이날',
+    '2026-05-24': '부처님오신날', '2026-05-25': '부처님오신날 대체공휴일', '2026-06-06': '현충일',
+    '2026-07-17': '제헌절', '2026-08-15': '광복절', '2026-08-17': '광복절 대체공휴일',
+    '2026-09-24': '추석 연휴', '2026-09-25': '추석', '2026-09-26': '추석 연휴',
+    '2026-10-03': '개천절', '2026-10-05': '개천절 대체공휴일', '2026-10-09': '한글날', '2026-12-25': '크리스마스',
+    '2027-01-01': '신정', '2027-02-06': '설날 연휴', '2027-02-07': '설날', '2027-02-08': '설날 연휴', '2027-02-09': '설날 대체공휴일',
+    '2027-03-01': '삼일절', '2027-05-01': '노동절', '2027-05-03': '노동절 대체공휴일', '2027-05-05': '어린이날',
+    '2027-05-13': '부처님오신날', '2027-06-06': '현충일', '2027-07-17': '제헌절', '2027-07-19': '제헌절 대체공휴일',
+    '2027-08-15': '광복절', '2027-08-16': '광복절 대체공휴일', '2027-09-14': '추석 연휴', '2027-09-15': '추석', '2027-09-16': '추석 연휴',
+    '2027-10-03': '개천절', '2027-10-04': '개천절 대체공휴일', '2027-10-09': '한글날', '2027-10-11': '한글날 대체공휴일',
+    '2027-12-25': '크리스마스', '2027-12-27': '크리스마스 대체공휴일'
+  };  const THEMES = [
+    { key: 'forest',   name: '숲',     l: ['#2F6F5E', '#23574A', '#DCEAE4', '#EFF4F1'], d: ['#4CA98A', '#3A8A70', '#24352D', '#17201C', '#1F2B25', '#8CEFCB'] },
+    { key: 'ocean',    name: '바다',   l: ['#2F5F8F', '#244B72', '#DCE7F2', '#EEF3F8'], d: ['#5B9BD5', '#467FB3', '#22303F', '#151C24', '#1C2632', '#A9D2FF'] },
+    { key: 'lavender', name: '라벤더', l: ['#6B4FA0', '#553E82', '#E8E0F4', '#F4F1F9'], d: ['#A58BD6', '#8A70BD', '#2E2640', '#1A1722', '#231F2E', '#D9C8FF'] },
+    { key: 'cherry',   name: '벚꽃',   l: ['#C2577F', '#A04366', '#F7DFE8', '#FBF1F5'], d: ['#E88AAE', '#CC7096', '#3D2530', '#201519', '#2C1E24', '#FFC4DA'] },
+    { key: 'coral',    name: '노을',   l: ['#C8553D', '#A54430', '#F8E1DA', '#FBF2EF'], d: ['#EE8A6F', '#D27257', '#3D2722', '#201816', '#2B201D', '#FFC2B0'] },
+    { key: 'honey',    name: '꿀',     l: ['#B07E1E', '#8F6517', '#F5EAD2', '#FAF6EC'], d: ['#E0B04F', '#C4963B', '#3A3020', '#1D1A14', '#29241B', '#FFE09A'] },
+    { key: 'mono',     name: '모노',   l: ['#3F4448', '#2C3033', '#E3E5E7', '#F2F3F4'], d: ['#B8BEC4', '#9AA1A8', '#2C3034', '#141617', '#1E2124', '#E8ECEF'] }
+  ];
+  // ---- 화면 그리기 ----
+  function applyLook() {
+    const b = document.body;
+    b.classList.toggle('light', desk.style === 'light');
+    b.style.setProperty('--alpha', (Math.max(0, Math.min(100, desk.alpha)) / 100).toFixed(2));
+    b.style.setProperty('--fs', ({ small: '12px', mid: '13px', big: '15px', huge: '17px' })[desk.font] || '13px');
+    const th = THEMES.find(t => t.key === appSettings.theme) || THEMES[0];
+    b.style.setProperty('--accent', desk.style === 'light' ? th.l[0] : th.d[0]);
+    b.classList.toggle('unlocked', !desk.locked);
+    document.getElementById('b-lock').textContent = desk.locked ? '🔒' : '🔓';
+    document.getElementById('b-lock').classList.toggle('on', !desk.locked);
+  }
+  function render() {
+    load(); applyLook();
+    const today = new Date(), tds = iso(today);
+    document.getElementById('title').textContent = (viewY === today.getFullYear() && viewM === today.getMonth())
+      ? `오늘은 ${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일 ${DOW[today.getDay()]}요일 ${desk.lunar ? lunarText(today) : ''}`
+      : `${viewY}년 ${viewM + 1}월`;
+    document.getElementById('dow').innerHTML = DOW.map((w, i) => `<div style="color:${i === 0 ? 'var(--sun)' : i === 6 ? 'var(--sat)' : 'inherit'}">${w}요일</div>`).join('');
+    const first = new Date(viewY, viewM, 1);
+    const start = new Date(viewY, viewM, 1 - first.getDay());
+    const weeks = Math.ceil((first.getDay() + dim(viewY, viewM)) / 7);
+    const grid = document.getElementById('grid');
+    grid.style.gridTemplateRows = `repeat(${weeks}, 1fr)`;
+    let html = '';
+    for (let i = 0; i < weeks * 7; i++) {
+      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+      const ds = iso(d);
+      const hol = HOLIDAYS[ds];
+      const items = itemsFor(d);
+      const mood = desk.mood && dayLogs[ds] && dayLogs[ds].mood ? `<span class="mood">${dayLogs[ds].mood}</span>` : '';
+      const cls = ['cell', d.getMonth() !== viewM ? 'other' : '', ds === tds ? 'today' : '', d.getDay() === 0 ? 'sun' : d.getDay() === 6 ? 'sat' : '', hol ? 'hol-day' : ''].join(' ');
+      const label = d.getDate() === 1 ? `${d.getMonth() + 1}월 1일` : d.getDate();
+      html += `<div class="${cls}" data-date="${ds}">
+        <div class="dnum"><span class="n">${label}</span>${hol ? `<span class="hol">${esc(hol)}</span>` : (desk.lunar ? `<span class="lunar">${lunarText(d)}</span>` : '')}${mood}</div>
+        ${items.map(it => `<div class="it ${it.done ? 'done' : ''}">${it.done ? '<span class="ck">✓</span>' : '•'} ${it.kind === 'habit' ? '🔁' : ''}${esc(it.label)}</div>`).join('')}
+      </div>`;
+    }
+    grid.innerHTML = html;
+    grid.querySelectorAll('.cell').forEach(c => c.addEventListener('click', () => openDay(c.getAttribute('data-date'))));
+    // 칸에 다 안 들어가는 항목은 '+N개'로
+    grid.querySelectorAll('.cell').forEach(c => {
+      const its = [...c.querySelectorAll('.it')];
+      if (!its.length) return;
+      const limit = c.clientHeight;
+      let hidden = 0;
+      for (let k = its.length - 1; k >= 0; k--) {
+        if (its[k].offsetTop + its[k].offsetHeight <= limit - 2) break;
+        its[k].remove(); hidden++;
+      }
+      if (hidden) {
+        const last = c.querySelector('.it:last-of-type');
+        if (last) { last.remove(); hidden++; }
+        const m = document.createElement('div'); m.className = 'more'; m.textContent = `+${hidden}개 더`;
+        c.appendChild(m);
+      }
+    });
+    renderCloud();
+  }
+  function renderCloud() {
+    const CS = window.CloudSync, el = document.getElementById('cloud');
+    if (!CS || !CS.ready) { el.textContent = ''; return; }
+    if (!CS.user) { el.innerHTML = '<button class="btn" id="b-login" style="padding:4px 9px;">Google 로그인</button>'; document.getElementById('b-login').onclick = startLogin; return; }
+    el.textContent = CS.status === 'syncing' ? '🔄' : CS.status === 'error' ? '⚠️' : '☁️';
+    el.title = (CS.user.email || '') + (CS.error ? '\n' + CS.error : '');
+  }
+  function startLogin() {
+    if (DB && DB.startGoogleLogin) DB.startGoogleLogin();
+    else if (window.CloudSync) window.CloudSync.signInHere();
+  }
+
+  // ---- 날짜 누르면: 그날 목록 체크 + 할일 추가 ----
+  function openDay(ds) {
+    const p = document.getElementById('day-panel');
+    const d = new Date(ds + 'T00:00:00');
+    function draw() {
+      load();
+      const all = [];
+      tasks.forEach(t => {
+        if (t.type === 'todo' && t.dueDate === ds) all.push({ t, kind: 'todo' });
+        else if (t.type === 'habit' && scheduled(t, d)) all.push({ t, kind: 'habit' });
+      });
+      const log = dayLogs[ds];
+      p.innerHTML = `<h3>${d.getMonth() + 1}월 ${d.getDate()}일 ${DOW[d.getDay()]}요일 <small style="font-weight:500; color:var(--muted)">${lunarText(d)} ${HOLIDAYS[ds] ? '· ' + esc(HOLIDAYS[ds]) : ''}</small></h3>
+        ${log && (log.mood || log.note) ? `<div class="note" style="margin:0 0 8px;">${log.mood || ''} ${esc(log.note || '')}</div>` : ''}
+        ${all.length ? all.map((x, i) => {
+          const t = x.t, tg = x.kind === 'habit' ? target(t) : 1, c = x.kind === 'habit' ? count(t, ds) : 0;
+          const done = x.kind === 'todo' ? !!t.done : (t.completedDates || []).includes(ds);
+          const sub = x.kind === 'todo' ? '할일' : ({ daily: '매일', weekly: '매주', monthly: '매달' })[t.frequency] + (tg > 1 ? ` · ${c}/${tg}` : '');
+          return `<div class="row" data-i="${i}"><div class="box ${done ? 'on' : ''}">${done ? '✓' : ''}</div><div>${esc(t.title)}</div><div class="sub">${sub}</div></div>`;
+        }).join('') : '<div class="note">이 날은 예정된 게 없어요.</div>'}
+        <div class="addrow"><input id="add-input" placeholder="이 날짜에 할일 추가 (Enter)" maxlength="60" /><button class="btn" id="add-btn">추가</button></div>
+        <div style="display:flex; justify-content:flex-end; margin-top:12px;"><button class="btn gray" id="day-close">닫기</button></div>`;
+      p.querySelectorAll('[data-i]').forEach(r => r.addEventListener('click', () => {
+        const x = all[parseInt(r.getAttribute('data-i'), 10)];
+        const t = tasks.find(y => y.id === x.t.id); if (!t) return;
+        if (x.kind === 'todo') { t.done = !t.done; t.completedAt = t.done ? iso(new Date()) : null; }
+        else setCount(t, ds, (t.completedDates || []).includes(ds) ? 0 : target(t));
+        saveTasks(); draw(); render();
+      }));
+      const add = () => {
+        const v = document.getElementById('add-input').value.trim(); if (!v) return;
+        tasks.unshift({ id: 't' + Date.now() + Math.random().toString(36).slice(2, 7), type: 'todo', title: v, category: null, memo: '', done: false,
+          createdAt: iso(new Date()), completedAt: null, dueDate: ds, reminderTime: null });
+        saveTasks(); draw(); render();
+        setTimeout(() => { const el = document.getElementById('add-input'); if (el) el.focus(); }, 30);
+      };
+      document.getElementById('add-btn').onclick = add;
+      document.getElementById('add-input').addEventListener('keydown', e => { if (e.key === 'Enter') add(); });
+      document.getElementById('day-close').onclick = () => p.classList.remove('show');
+    }
+    draw();
+    p.classList.add('show');
+  }
+
+  // ---- 설정 ----
+  function openSettings() {
+    const p = document.getElementById('set-panel');
+    const CS = window.CloudSync;
+    const tg = (k, label, sub) => `<div class="set"><span>${label}${sub ? `<br><small style="color:var(--muted)">${sub}</small>` : ''}</span><button class="tg ${desk[k] ? 'on' : ''}" data-k="${k}"></button></div>`;
+    p.innerHTML = `<h3>⚙ 바탕화면 달력 설정</h3>
+      <div class="set"><span>배경 진하기 <b id="alpha-val">${desk.alpha}%</b><br><small style="color:var(--muted)">0%면 완전 투명</small></span><input type="range" min="0" max="100" step="5" id="alpha" value="${desk.alpha}" /></div>
+      <div class="set"><span>배경 색</span><div class="seg" data-seg="style"><button data-v="dark">어둡게 (흰 글씨)</button><button data-v="light">밝게 (검은 글씨)</button></div></div>
+      <div class="set"><span>글자 크기</span><div class="seg" data-seg="font"><button data-v="small">작게</button><button data-v="mid">보통</button><button data-v="big">크게</button><button data-v="huge">아주 크게</button></div></div>
+      ${tg('lunar', '음력 날짜 표시')}
+      ${tg('todo', '📌 할일 표시')}
+      ${tg('weekly', '🔁 매주 습관 표시')}
+      ${tg('monthly', '🔁 매달 습관 표시')}
+      ${tg('daily', '🔁 매일 습관 표시', '매일 나와서 칸이 꽉 찰 수 있어요')}
+      ${tg('mood', '😊 하루 기분 표시')}
+      ${DB ? tg('onTop', '항상 다른 창 위에 표시', '끄면 다른 창 뒤로 가요') + tg('autoStart', '윈도우 켤 때 자동 실행') : ''}
+      <div class="set"><span>구글 계정</span><span>${CS && CS.user ? esc(CS.user.email || '') + ' <button class="btn gray" id="logout" style="padding:4px 9px;">로그아웃</button>' : '<button class="btn" id="login2">Google 로그인</button>'}</span></div>
+      <div class="note">🔒 버튼을 누르면 🔓 이동 모드가 돼요. 위쪽 막대를 끌어 위치를 옮기고, 오른쪽 아래 모서리를 끌어 크기를 바꾼 뒤 다시 🔒을 누르면 고정돼요.<br>날짜를 누르면 그날 할 일을 체크하거나 새 할일을 추가할 수 있어요.</div>
+      <div style="display:flex; justify-content:flex-end; margin-top:12px;"><button class="btn" id="set-close">닫기</button></div>`;
+    p.querySelectorAll('[data-seg]').forEach(seg => {
+      const k = seg.getAttribute('data-seg');
+      seg.querySelectorAll('button').forEach(b => {
+        b.classList.toggle('on', desk[k] === b.getAttribute('data-v'));
+        b.onclick = () => { desk[k] = b.getAttribute('data-v'); saveDesk(); render(); openSettings(); };
+      });
+    });
+    p.querySelectorAll('[data-k]').forEach(b => b.onclick = () => {
+      const k = b.getAttribute('data-k'); desk[k] = !desk[k]; saveDesk();
+      if (k === 'onTop' && DB) DB.setAlwaysOnTop(desk.onTop);
+      if (k === 'autoStart' && DB) DB.setAutoStart(desk.autoStart);
+      render(); openSettings();
+    });
+    const a = document.getElementById('alpha');
+    a.oninput = () => { desk.alpha = parseInt(a.value, 10); document.getElementById('alpha-val').textContent = desk.alpha + '%'; applyLook(); };
+    a.onchange = () => saveDesk();
+    const lo = document.getElementById('logout'); if (lo) lo.onclick = async () => { await CS.signOut(); openSettings(); render(); };
+    const li = document.getElementById('login2'); if (li) li.onclick = startLogin;
+    document.getElementById('set-close').onclick = () => p.classList.remove('show');
+    p.classList.add('show');
+  }
+
+  // ---- 버튼 ----
+  document.getElementById('b-prev').onclick = () => { viewM--; if (viewM < 0) { viewM = 11; viewY--; } render(); };
+  document.getElementById('b-next').onclick = () => { viewM++; if (viewM > 11) { viewM = 0; viewY++; } render(); };
+  document.getElementById('b-today').onclick = () => { const n = new Date(); viewY = n.getFullYear(); viewM = n.getMonth(); render(); };
+  document.getElementById('b-set').onclick = openSettings;
+  document.getElementById('b-app').onclick = () => { if (DB && DB.openApp) DB.openApp(); else window.open('index.html', '_blank'); };
+  document.getElementById('b-lock').onclick = () => {
+    desk.locked = !desk.locked; saveDesk(); applyLook();
+    if (DB && DB.setLocked) DB.setLocked(desk.locked);
+  };
+  // 크기 조절 손잡이 (이동 모드에서만)
+  const grip = document.getElementById('grip');
+  grip.addEventListener('pointerdown', (e) => {
+    if (desk.locked || !DB || !DB.resizeBy) return;
+    e.preventDefault(); grip.setPointerCapture(e.pointerId);
+    let lx = e.screenX, ly = e.screenY;
+    const mv = (ev) => { const dx = ev.screenX - lx, dy = ev.screenY - ly; lx = ev.screenX; ly = ev.screenY; if (dx || dy) DB.resizeBy(dx, dy); };
+    const up = () => { grip.removeEventListener('pointermove', mv); grip.removeEventListener('pointerup', up); setTimeout(render, 50); };
+    grip.addEventListener('pointermove', mv); grip.addEventListener('pointerup', up);
+  });
+  window.addEventListener('resize', () => { clearTimeout(window.__rt); window.__rt = setTimeout(render, 120); });
+  // 다른 창(앱 창)에서 바꾸면 바로 반영
+  window.addEventListener('storage', (e) => { if ([KEY_TASKS, KEY_LOGS, KEY_SET].includes(e.key)) render(); });
+  // 날짜가 바뀌면 자동으로 새로 그리기
+  let lastDay = iso(new Date());
+  setInterval(() => { const t = iso(new Date()); if (t !== lastDay) { lastDay = t; const n = new Date(); viewY = n.getFullYear(); viewM = n.getMonth(); render(); } }, 60000);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') document.querySelectorAll('.panel').forEach(p => p.classList.remove('show')); });
+
+  // ---- 클라우드 ----
+  if (window.CloudSync) {
+    const CS = window.CloudSync;
+    CS.chooseOnFirstLogin = () => Promise.resolve('merge');
+    CS.onRemoteApplied = () => render();
+    CS.onStatus = () => renderCloud();
+    CS.init();
+  }
+  load();
+  if (DB) { DB.setLocked(desk.locked); DB.setAlwaysOnTop(desk.onTop); if (DB.ready) DB.ready(desk); }
+  render();
+})();
+</script>
+</body>
+</html>
