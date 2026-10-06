@@ -275,6 +275,38 @@
   .note-toolbar { display: flex; gap: 6px; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 10px; margin-top: 6px; }
   .note-toolbar .tb { border: 1.5px solid var(--border); background: var(--bg); color: var(--text); border-radius: 10px; padding: 8px 11px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; }
   .note-toolbar .tb.on { border-color: var(--primary); background: var(--primary-soft); }
+  /* 월간 달력 (칸마다 항목 보이기) */
+  .mcal { margin: 12px 12px 0; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+  .mcal-dow { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 11px; font-weight: 800; color: var(--text-muted); padding: 7px 0 5px; border-bottom: 1px solid var(--border); }
+  .mcal-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+  .mcell { min-height: 86px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 3px 2px 2px 3px; overflow: hidden; cursor: pointer; position: relative; min-width: 0; }
+  .mcell:nth-child(7n) { border-right: none; }
+  .mcell.other { opacity: 0.38; }
+  .mcell.sel { background: var(--primary-soft); }
+  .mcell.today .dn .n { background: var(--primary); color: #fff !important; border-radius: 9px; padding: 0 5px; }
+  .mcell .dn { display: flex; align-items: baseline; gap: 2px; white-space: nowrap; overflow: hidden; }
+  .mcell .dn .n { font-size: 12px; font-weight: 800; }
+  .mcell .dn .lu { font-size: 8.5px; color: var(--text-muted); font-weight: 600; }
+  .mcell .dn .ho { font-size: 8.5px; color: #D64545; font-weight: 800; overflow: hidden; text-overflow: ellipsis; }
+  .mcell .dn .mo { font-size: 9px; margin-left: auto; }
+  .mcell.sun .dn .n, .mcell.hol .dn .n { color: #D64545; }
+  .mcell.sat .dn .n { color: #3B6EA8; }
+  .mcell .ln { font-size: 9.5px; line-height: 1.32; white-space: nowrap; overflow: hidden; letter-spacing: -0.2px; }
+  .mcell .ln .s { font-weight: 900; margin-right: 1px; }
+  .mcell .ln.done { opacity: 0.5; }
+  .mcell .ln.done .t { text-decoration: line-through; }
+  .mcell .more { font-size: 9px; color: var(--text-muted); font-weight: 700; }
+  .mcal-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; justify-content: center; font-size: 11px; color: var(--text-muted); margin: 10px 12px 0; }
+  .mcal-legend b { font-weight: 900; margin-right: 2px; }
+  .mcal-legend .chip { padding: 4px 9px; font-size: 11px; }
+  .dd-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .dd-row .bx { width: 22px; height: 22px; min-width: 22px; border-radius: 50%; border: 2px solid; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; font-weight: 900; }
+  .dd-row .tt { flex: 1; min-width: 0; font-size: 14px; word-break: break-word; }
+  .dd-row .tt.done { text-decoration: line-through; color: var(--text-muted); }
+  .dd-row .ty { font-size: 11px; font-weight: 800; white-space: nowrap; }
+  .dd-types { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
+  .dd-types button { border: 1.5px solid; background: transparent; border-radius: 10px; padding: 6px 9px; font-size: 12px; font-weight: 800; cursor: pointer; font-family: inherit; }
+  .dd-types button.on { color: #fff !important; }
   .footer-note { text-align: center; color: var(--text-muted); font-size: 11px; margin-top: 20px; padding-bottom: 10px; }
 
   /* ===== v1.1 추가 기능 ===== */
@@ -407,17 +439,11 @@
     <div class="cal-title" id="cal-title"></div>
     <button class="cal-nav-btn" id="cal-next">›</button>
   </div>
-  <div class="cal-grid-wrap">
-    <div class="cal-dow-row"><span class="dow-sun">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span class="dow-sat">토</span></div>
-    <div class="cal-grid" id="cal-grid"></div>
-    <div class="cal-legend">
-      <span><i class="lg-circle" style="background:#0072B2"></i>매일</span>
-      <span><i class="lg-square" style="background:#E69F00"></i>매주</span>
-      <span><i class="lg-triangle" style="border-bottom-color:#009E73"></i>매달</span>
-      <span><i class="lg-diamond" style="background:#CC79A7"></i>할일</span>
-      <span><b style="color:#D55E00; font-size:11px;">✎</b>메모</span>
-    </div>
+  <div class="mcal">
+    <div class="mcal-dow"><span style="color:#D64545">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span style="color:#3B6EA8">토</span></div>
+    <div class="mcal-grid" id="cal-grid"></div>
   </div>
+  <div class="mcal-legend" id="cal-legend"></div>
   <div class="cal-detail" id="cal-detail" style="display:none;"></div>
   <div class="cal-holiday-list" id="cal-holiday-list"></div>
 </div>
@@ -472,6 +498,12 @@
     <div class="settings-card">
       <div style="font-size:13.5px; margin-bottom:6px;">테마 색상 <small style="color:var(--text-muted); font-size:11.5px;">(앱과 위젯에 함께 적용돼요)</small></div>
       <div class="theme-row" id="theme-row"></div>
+      <div style="border-top:1px solid var(--border); margin-top:8px; padding-top:10px; font-size:13.5px;">앱을 켜면 처음 보일 화면</div>
+      <div class="chip-row" id="start-tab-row" style="margin:8px 0 4px;">
+        <div class="chip" data-start="checklist">✅ 체크리스트</div>
+        <div class="chip" data-start="calendar">📅 달력</div>
+        <div class="chip" data-start="notes">📝 메모</div>
+      </div>
       <div class="settings-row" style="border-top:1px solid var(--border); margin-top:8px;">
         <span>다크모드</span>
         <button class="toggle-switch" id="dark-toggle"><span class="knob"></span></button>
@@ -565,7 +597,7 @@
     <div class="settings-card">
       <button class="settings-btn danger" id="reset-btn">전체 데이터 초기화</button>
     </div>
-    <div class="footer-note">할일습관 앱 · v1.6</div>
+    <div class="footer-note">할일습관 앱 · v1.7</div>
   </div>
 </div>
 
@@ -761,6 +793,9 @@
   function applyTheme() {
     const t = currentTheme();
     const dark = document.body.classList.contains('dark');
+    Object.assign(TYPE_COLORS, dark
+      ? { daily: '#56B4E9', weekly: '#F0A830', monthly: '#2BC79A', todo: '#E7A3C7', memo: '#FF8A50' }
+      : { daily: '#0072B2', weekly: '#C88400', monthly: '#009E73', todo: '#B8558F', memo: '#D55E00' });
     const st = document.body.style;
     const [p, pd, ps, bg] = dark ? t.d : t.l;
     st.setProperty('--primary', p);
@@ -2302,88 +2337,143 @@
     return 'var(--primary)';
   }
 
+  // ---- 월간 달력: 칸마다 그날 항목을 기호·색과 함께 보여줌 ----
+  const lunarMemo = {};
+  function lunarShort(ds) {
+    if (lunarMemo[ds] !== undefined) return lunarMemo[ds];
+    let out = '';
+    try {
+      if (window.KoreanLunarCalendar) {
+        const lc = new window.KoreanLunarCalendar(); const d = new Date(ds + 'T00:00:00');
+        lc.setSolarDate(d.getFullYear(), d.getMonth() + 1, d.getDate());
+        const l = lc.getLunarCalendar(); out = (l.intercalation ? '윤' : '') + l.month + '.' + l.day;
+      }
+    } catch (e) {}
+    return (lunarMemo[ds] = out);
+  }
+  function calItemsFor(ds, withDaily) {
+    const out = [];
+    tasks.forEach(t => {
+      if (t.type === 'todo') { if (t.dueDate === ds) out.push({ t, type: 'todo', done: !!t.done }); return; }
+      if (t.type !== 'habit' || !isHabitScheduled(t, ds)) return;
+      if (t.frequency === 'daily' && !withDaily) return;
+      out.push({ t, type: t.frequency, done: t.completedDates.includes(ds) });
+    });
+    notes.forEach(n => { if (n.date === ds) out.push({ n, type: 'memo', done: false }); });
+    const order = { todo: 0, daily: 1, weekly: 2, monthly: 3, memo: 4 };
+    return out.sort((x, y) => order[x.type] - order[y.type]);
+  }
+  function itemTitle(x) { return x.type === 'memo' ? (x.n.title || (x.n.body || '').split('\n')[0] || '메모') : x.t.title; }
+
   function renderCalendar() {
     if (calYear === undefined) { const n = new Date(); calYear = n.getFullYear(); calMonth = n.getMonth(); }
     document.getElementById('cal-title').textContent = `${calYear}년 ${calMonth + 1}월`;
-    const blanks = firstWeekdayMonIndex(calYear, calMonth);
-    const total = daysInMonth(calYear, calMonth);
+    const showDaily = !!appSettings.calShowDaily;
+    const first = new Date(calYear, calMonth, 1);
+    const weeks = Math.ceil((first.getDay() + daysInMonth(calYear, calMonth)) / 7);
     const todayISO = toISODate(new Date());
-    let html = '';
-    for (let i = 0; i < blanks; i++) html += `<div class="cal-cell empty"></div>`;
     const monthHolidays = [];
-    for (let d = 1; d <= total; d++) {
-      const dateStr = `${calYear}-${pad(calMonth + 1)}-${pad(d)}`;
-      const wd = weekdayMonIndex(dateStr); // 0=일 ... 6=토
-      const bg = colorForDate(dateStr);
-      const isToday = dateStr === todayISO;
-      const holidayName = HOLIDAYS[dateStr];
-      if (holidayName) monthHolidays.push({ dateStr, name: holidayName, day: d });
-      let textClass = '';
-      if (holidayName) textClass = 'holiday-text';
-      else if (wd === 0) textClass = 'sun-text';
-      else if (wd === 6) textClass = 'sat-text';
-      const isSelected = dateStr === calSelectedDate;
-      const { scheduled: schedForDots, todosDone: tdDone, todosCreated: tdCreated } = completionForDate(dateStr);
-      const hasDaily = schedForDots.some(h => h.frequency === 'daily');
-      const hasWeekly = schedForDots.some(h => h.frequency === 'weekly');
-      const hasMonthly = schedForDots.some(h => h.frequency === 'monthly');
-      const hasTodo = (tdDone.length + tdCreated.length) > 0;
-      let dotsHtml = '';
-      if (hasDaily) dotsHtml += `<span class="type-dot shape-circle" style="background:${TYPE_COLORS.daily}"></span>`;
-      if (hasWeekly) dotsHtml += `<span class="type-dot shape-square" style="background:${TYPE_COLORS.weekly}"></span>`;
-      if (hasMonthly) dotsHtml += `<span class="type-dot shape-triangle" style="border-bottom-color:${TYPE_COLORS.monthly}"></span>`;
-      if (hasTodo) dotsHtml += `<span class="type-dot shape-diamond" style="background:${TYPE_COLORS.todo}"></span>`;
-      if (notes.some(n => n.date === dateStr)) dotsHtml += `<span style="color:${TYPE_COLORS.memo}; font-size:8px; line-height:6px; font-weight:900;">✎</span>`;
-      const dotsRow = dotsHtml ? `<div class="type-dots">${dotsHtml}</div>` : '';
-      html += `<div class="cal-cell ${isToday ? 'today-outline' : ''} ${isSelected ? 'selected-day' : ''} ${textClass}" data-date="${dateStr}" style="background:${bg};">${d}${holidayName ? '<span class="holiday-dot"></span>' : ''}${dayLogs[dateStr] && dayLogs[dateStr].mood ? `<span class="cal-mood">${dayLogs[dateStr].mood}</span>` : ''}${dotsRow}</div>`;
+    let html = '';
+    for (let i = 0; i < weeks * 7; i++) {
+      const d = new Date(calYear, calMonth, 1 - first.getDay() + i);
+      const ds = toISODate(d);
+      const other = d.getMonth() !== calMonth;
+      const hol = HOLIDAYS[ds];
+      if (hol && !other) monthHolidays.push({ name: hol, day: d.getDate() });
+      const items = calItemsFor(ds, showDaily);
+      const MAX = 4;
+      const shown = items.length > MAX ? items.slice(0, MAX - 1) : items;
+      const mood = dayLogs[ds] && dayLogs[ds].mood ? `<span class="mo">${dayLogs[ds].mood}</span>` : '';
+      const cls = ['mcell', other ? 'other' : '', ds === todayISO ? 'today' : '', ds === calSelectedDate ? 'sel' : '', d.getDay() === 0 ? 'sun' : d.getDay() === 6 ? 'sat' : '', hol ? 'hol' : ''].join(' ');
+      html += `<div class="${cls}" data-date="${ds}">
+        <div class="dn"><span class="n">${d.getDate()}</span>${hol ? `<span class="ho">${escapeHtml(hol.replace(' 대체공휴일', '(대체)').replace(' 연휴', ''))}</span>` : `<span class="lu">${lunarShort(ds)}</span>`}${mood}</div>
+        ${shown.map(x => `<div class="ln ${x.done ? 'done' : ''}"><span class="s" style="color:${TYPE_COLORS[x.type]}">${x.done ? '✓' : TYPE_SYMBOL[x.type]}</span><span class="t">${escapeHtml(itemTitle(x))}</span></div>`).join('')}
+        ${items.length > shown.length ? `<div class="more">+${items.length - shown.length}개</div>` : ''}
+      </div>`;
     }
-    document.getElementById('cal-grid').innerHTML = html;
-    document.querySelectorAll('#cal-grid [data-date]').forEach(cell => {
-      cell.addEventListener('click', () => { calSelectedDate = cell.getAttribute('data-date'); renderCalendar(); });
-    });
+    const grid = document.getElementById('cal-grid');
+    grid.innerHTML = html;
+    grid.querySelectorAll('[data-date]').forEach(cell => cell.addEventListener('click', () => {
+      calSelectedDate = cell.getAttribute('data-date'); renderCalendar();
+      setTimeout(() => { const el = document.getElementById('cal-detail'); if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, 50);
+    }));
+    // 기호 설명 + 매일 습관 보이기 토글
+    const lg = document.getElementById('cal-legend');
+    lg.innerHTML = ['daily', 'weekly', 'monthly', 'todo', 'memo'].map(k => `<span><b style="color:${TYPE_COLORS[k]}">${TYPE_SYMBOL[k]}</b>${({ daily: '매일', weekly: '매주', monthly: '매달', todo: '할일', memo: '메모' })[k]}</span>`).join('') +
+      `<span class="chip ${showDaily ? 'active-day' : ''}" id="cal-daily-toggle">${showDaily ? '● 매일 습관 숨기기' : '● 매일 습관도 보기'}</span>`;
+    document.getElementById('cal-daily-toggle').onclick = () => { appSettings.calShowDaily = !showDaily; saveAppSettings(); renderCalendar(); };
     if (calSelectedDate) renderCalDetail(); else document.getElementById('cal-detail').style.display = 'none';
-
     const holidayListEl = document.getElementById('cal-holiday-list');
-    if (monthHolidays.length === 0) {
-      holidayListEl.innerHTML = '';
-    } else {
-      holidayListEl.innerHTML = `<div class="section-title" style="margin-bottom:8px;">이번 달 공휴일</div>` +
-        monthHolidays.map(h => `<div class="cal-holiday-item"><span>${h.day}일</span><span class="hname">${escapeHtml(h.name)}</span></div>`).join('');
-    }
+    holidayListEl.innerHTML = monthHolidays.length ? `<div class="section-title" style="margin-bottom:8px;">이번 달 공휴일</div>` +
+      monthHolidays.map(h => `<div class="cal-holiday-item"><span>${h.day}일</span><span class="hname">${escapeHtml(h.name)}</span></div>`).join('') : '';
   }
 
+  // ---- 날짜를 누르면: 그날 항목 체크 + 그 날짜 기준으로 추가 ----
+  let calAddType = 'todo';
   function renderCalDetail() {
-    const dateStr = calSelectedDate;
-    const { scheduled, done, todosDone, todosCreated } = completionForDate(dateStr);
-    const doneIds = new Set(done.map(h => h.id));
-    function rowsFor(list) {
-      return list.map(h => `<div class="cal-detail-row"><span>${escapeHtml(h.title)}</span><span class="${doneIds.has(h.id) ? 'ok' : ''}">${doneIds.has(h.id) ? '완료' : '미완료'}</span></div>`).join('');
-    }
-    const dailyList = scheduled.filter(h => h.frequency === 'daily');
-    const weeklyList = scheduled.filter(h => h.frequency === 'weekly');
-    const monthlyList = scheduled.filter(h => h.frequency === 'monthly');
-    function groupHtml(label, list, color) {
-      if (list.length === 0) return '';
-      return `<div class="cal-group-label" style="color:${color}">${label}</div>` + rowsFor(list);
-    }
-    const habitHtml = groupHtml('● 매일 습관', dailyList, TYPE_COLORS.daily) + groupHtml('■ 매주 습관', weeklyList, TYPE_COLORS.weekly) + groupHtml('▲ 매달 습관', monthlyList, TYPE_COLORS.monthly);
-    const todoDoneParts = todosDone.map(t => `<div class="cal-detail-row"><span>${escapeHtml(t.title)}</span><span class="ok">완료</span></div>`).join('');
-    const todoPendingParts = todosCreated.map(t => `<div class="cal-detail-row"><span>${escapeHtml(t.title)}</span><span>예정</span></div>`).join('');
-    const todoHtml = (todoDoneParts || todoPendingParts) ? `<div class="cal-group-label" style="color:${TYPE_COLORS.todo}">◆ 할일</div>` + todoDoneParts + todoPendingParts : '';
-    const dayNotes = notes.filter(n => n.date === dateStr);
-    const noteHtml = dayNotes.length ? `<div class="cal-group-label" style="color:${TYPE_COLORS.memo}">✎ 메모</div>` +
-      dayNotes.map(n => `<div class="cal-detail-row" data-open-note="${n.id}" style="cursor:pointer;"><span style="color:var(--text);">${escapeHtml(n.title || (n.body || '').split('\n')[0] || '제목 없음')}</span><span>열기 ›</span></div>`).join('') : '';
+    const ds = calSelectedDate;
+    const d = new Date(ds + 'T00:00:00');
+    const wd = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()], md = d.getDate(), mo = d.getMonth() + 1;
+    const items = calItemsFor(ds, true);
+    const NAME = { daily: '매일', weekly: '매주', monthly: '매달', todo: '할일', memo: '메모' };
+    const HINT = {
+      todo: `${mo}월 ${md}일 하루만 하는 할일`, daily: `${mo}월 ${md}일부터 매일 반복`,
+      weekly: `매주 ${wd}요일마다 반복 (${mo}월 ${md}일부터)`, monthly: `매달 ${md}일마다 반복`, memo: `${mo}월 ${md}일 날짜가 붙은 메모`
+    };
+    const holidayName = HOLIDAYS[ds];
+    const dlog = dayLogs[ds];
     const box = document.getElementById('cal-detail');
     box.style.display = '';
-    const holidayName = HOLIDAYS[dateStr];
-    const dlog = dayLogs[dateStr];
-    const moodHtml = dlog && (dlog.mood || dlog.note) ? `<div class="cal-detail-row" style="color:var(--text);"><span>${dlog.mood ? dlog.mood + ' ' : ''}${escapeHtml(dlog.note || '')}</span></div>` : '';
-    box.innerHTML = `<div class="cal-detail-title">${dateStr}</div>` +
-      (holidayName ? `<div class="cal-detail-holiday"><span class="holiday-badge">휴</span>${escapeHtml(holidayName)}</div>` : '') + moodHtml +
-      (habitHtml || todoHtml || noteHtml ? habitHtml + todoHtml + noteHtml : `<div class="cal-detail-row"><span>이 날은 예정된 게 없어요</span></div>`) +
-      `<button class="settings-btn" id="cal-add-note" style="margin-top:10px;">✎ 이 날짜에 메모 쓰기</button>`;
-    box.querySelectorAll('[data-open-note]').forEach(r => r.addEventListener('click', () => openNoteEditor(r.getAttribute('data-open-note'))));
-    document.getElementById('cal-add-note').onclick = () => openNoteEditor(null, dateStr);
+    box.innerHTML = `<div class="cal-detail-title" style="font-size:15px;">${mo}월 ${md}일 ${wd}요일 <small style="color:var(--text-muted); font-weight:600;">(음)${lunarShort(ds)}</small></div>
+      ${holidayName ? `<div class="cal-detail-holiday"><span class="holiday-badge">휴</span>${escapeHtml(holidayName)}</div>` : ''}
+      ${dlog && (dlog.mood || dlog.note) ? `<div class="cal-detail-row" style="color:var(--text);"><span>${dlog.mood ? dlog.mood + ' ' : ''}${escapeHtml(dlog.note || '')}</span></div>` : ''}
+      ${items.length ? items.map((x, i) => {
+        const c = TYPE_COLORS[x.type];
+        if (x.type === 'memo') return `<div class="dd-row" data-dd="${i}"><div class="bx" style="border-color:${c}; color:${c};">✎</div><div class="tt">${escapeHtml(itemTitle(x))}</div><div class="ty" style="color:${c}">메모 ›</div></div>`;
+        const tg = x.type === 'todo' ? 1 : habitTarget(x.t), cnt = x.type === 'todo' ? 0 : habitCount(x.t, ds);
+        return `<div class="dd-row" data-dd="${i}"><div class="bx" style="border-color:${c}; ${x.done ? `background:${c};` : ''}">${x.done ? '✓' : ''}</div>
+          <div class="tt ${x.done ? 'done' : ''}">${escapeHtml(x.t.title)}${tg > 1 ? ` <small style="color:var(--text-muted)">${cnt}/${tg}</small>` : ''}</div>
+          <div class="ty" style="color:${c}">${TYPE_SYMBOL[x.type]} ${NAME[x.type]}</div></div>`;
+      }).join('') : `<div class="cal-detail-row"><span>이 날은 예정된 게 없어요</span></div>`}
+      <div style="font-size:12.5px; font-weight:800; margin-top:14px;">＋ 이 날짜에 추가</div>
+      <div class="dd-types">${['todo', 'daily', 'weekly', 'monthly', 'memo'].map(k => `<button data-addtype="${k}" class="${calAddType === k ? 'on' : ''}" style="border-color:${TYPE_COLORS[k]}; ${calAddType === k ? `background:${TYPE_COLORS[k]};` : `color:${TYPE_COLORS[k]};`}">${TYPE_SYMBOL[k]} ${NAME[k]}</button>`).join('')}</div>
+      <div class="hint">${HINT[calAddType]}</div>
+      ${calAddType === 'memo'
+        ? `<button class="settings-btn" id="cal-add-note" style="border-color:${TYPE_COLORS.memo}; color:${TYPE_COLORS.memo};">✎ 이 날짜에 메모 쓰기</button>`
+        : `<div class="inline-row" style="margin-top:8px; flex-wrap:nowrap;"><input class="modal-input" id="cal-add-input" placeholder="${({ todo: '예: 우유 사기', daily: '예: 물 마시기', weekly: '예: 헬스장 가기', monthly: '예: 공과금 내기' })[calAddType]}" maxlength="60" style="padding:10px 12px;" />
+           <button class="modal-btn confirm" id="cal-add-btn" style="flex:none; padding:11px 16px; background:${TYPE_COLORS[calAddType]};">추가</button></div>`}`;
+    box.querySelectorAll('[data-dd]').forEach(r => r.addEventListener('click', () => {
+      const x = items[parseInt(r.getAttribute('data-dd'), 10)];
+      if (x.type === 'memo') { openNoteEditor(x.n.id); return; }
+      const t = tasks.find(y => y.id === x.t.id); if (!t) return;
+      const levelBefore = levelInfo().level;
+      const wasDone = x.done;
+      if (t.type === 'todo') { t.done = !t.done; t.completedAt = t.done ? toISODate(new Date()) : null; }
+      else setHabitCount(t, ds, wasDone ? 0 : habitTarget(t));
+      saveTasks(); renderCalendar();
+      celebrateAfter(t, ds, levelBefore, wasDone);
+    }));
+    box.querySelectorAll('[data-addtype]').forEach(b => b.addEventListener('click', () => {
+      const keep = (document.getElementById('cal-add-input') || {}).value || '';
+      calAddType = b.getAttribute('data-addtype'); renderCalDetail();
+      const el = document.getElementById('cal-add-input'); if (el) { el.value = keep; }
+    }));
+    const noteBtn = document.getElementById('cal-add-note');
+    if (noteBtn) noteBtn.onclick = () => openNoteEditor(null, ds);
+    const addBtn = document.getElementById('cal-add-btn');
+    if (addBtn) {
+      const add = () => {
+        const v = document.getElementById('cal-add-input').value.trim(); if (!v) return;
+        const base = { id: uid(), title: v, category: null, memo: '', reminderTime: null };
+        if (calAddType === 'todo') tasks.unshift(Object.assign(base, { type: 'todo', done: false, createdAt: toISODate(new Date()), completedAt: null, dueDate: ds }));
+        else tasks.unshift(Object.assign(base, { type: 'habit', frequency: calAddType, repeatDays: calAddType === 'weekly' ? [d.getDay()] : [0, 1, 2, 3, 4, 5, 6],
+          monthDay: calAddType === 'monthly' ? md : 1, completedDates: [], target: 1, counts: {}, pauses: [], createdAt: ds, startDate: ds }));
+        saveTasks(); renderCalendar();
+        showToast(`${TYPE_SYMBOL[calAddType]} '${v}' 추가했어요`);
+      };
+      addBtn.onclick = add;
+      document.getElementById('cal-add-input').addEventListener('keydown', e => { if (e.key === 'Enter') add(); });
+    }
   }
 
   /* ---------- 내것(통계) 탭 ---------- */
@@ -2628,6 +2718,14 @@
       }));
     }
     drawThemes();
+    // 시작 화면
+    const startRow = document.getElementById('start-tab-row');
+    const drawStart = () => startRow.querySelectorAll('[data-start]').forEach(c => c.classList.toggle('active-day', (appSettings.startTab || 'checklist') === c.getAttribute('data-start')));
+    drawStart();
+    startRow.querySelectorAll('[data-start]').forEach(c => c.onclick = () => {
+      appSettings.startTab = c.getAttribute('data-start'); saveAppSettings(); drawStart();
+      showToast('🏠 다음부터 \'' + c.textContent.trim() + '\' 화면으로 시작해요');
+    });
     // 알림 설정
     const sumToggle = document.getElementById('summary-toggle');
     const [sh, sm] = (appSettings.summaryTime || '21:00').split(':');
@@ -2878,7 +2976,8 @@
       if (document.getElementById('note-overlay') && window.__noteClosePersist) window.__noteClosePersist();
       mc.innerHTML = ''; return true;
     }
-    if (activeTab !== 'checklist') { const b = document.querySelector('[data-tab="checklist"]'); if (b) { b.click(); return true; } }
+    const home = appSettings.startTab || 'checklist';
+    if (activeTab !== home) { switchTab(home); return true; }
     return false;
   };
 
@@ -2890,6 +2989,7 @@
   const n = new Date(); calYear = n.getFullYear(); calMonth = n.getMonth();
   renderNav();
   renderAll();
+  if (appSettings.startTab && appSettings.startTab !== 'checklist' && ['calendar', 'notes'].includes(appSettings.startTab)) switchTab(appSettings.startTab);
   document.getElementById('cal-prev').addEventListener('click', () => { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } calSelectedDate = null; renderCalendar(); });
   document.getElementById('cal-next').addEventListener('click', () => { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } calSelectedDate = null; renderCalendar(); });
 })();
