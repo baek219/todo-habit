@@ -173,6 +173,18 @@
   .cal-cell.holiday-text { color: #D64545; }
   .cal-cell .holiday-dot { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: #D64545; margin-top: 14px; }
   .cal-cell { position: relative; }
+  /* 기간 고르기 */
+  .rp-tabs { display:flex; gap:8px; margin-top:12px; }
+  .rp-tab { flex:1; border:2px solid var(--border); border-radius:12px; padding:8px 10px; background:var(--bg); cursor:pointer; text-align:left; font-family:inherit; color:var(--text); }
+  .rp-tab small { display:block; font-size:11px; font-weight:800; color:var(--text-muted); }
+  .rp-tab b { font-size:15px; }
+  .rp-tab.on { border-color:var(--primary); box-shadow:0 0 0 2px var(--primary) inset; }
+  .rp-guide { margin-top:10px; padding:9px 12px; border-radius:10px; background:var(--bg); font-size:13px; font-weight:700; line-height:1.45; }
+  .rp-guide .em { color:var(--primary); }
+  .rp-grid .cal-cell { flex-direction:column; gap:1px; }
+  .rp-grid .cal-cell.in-rng { background: rgba(127,127,127,.18); background: color-mix(in srgb, var(--primary) 18%, transparent); border-color: transparent; }
+  .rp-grid .cal-cell.rp-s, .rp-grid .cal-cell.rp-e { background: var(--primary); color:#fff !important; border-color: var(--primary); }
+  .rp-grid .cal-cell .rp-lb { font-size:9px; font-weight:800; line-height:1; }
   .type-dots { position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); display: flex; gap: 3px; align-items: flex-end; }
   .type-dot { width: 6px; height: 6px; }
   .type-dot.shape-circle { border-radius: 50%; box-shadow: 0 0 0 1.5px rgba(255,255,255,0.95); }
@@ -284,7 +296,7 @@
   .mcell.other { opacity: 0.38; }
   .mcell.sel { background: var(--primary-soft); }
   .mcell.today .dn .n { background: var(--primary); color: #fff !important; border-radius: 9px; padding: 0 5px; }
-  .mcell .dn { display: flex; align-items: baseline; gap: 2px; white-space: nowrap; overflow: hidden; }
+  .mcell .dn { display: flex; align-items: baseline; gap: 2px; white-space: nowrap; overflow: hidden; height: 17px; line-height: 17px; }
   .mcell .dn .n { font-size: 12px; font-weight: 800; }
   .mcell .dn .lu { font-size: 8.5px; color: var(--text-muted); font-weight: 600; }
   .mcell .dn .ho { font-size: 8.5px; color: #D64545; font-weight: 800; overflow: hidden; text-overflow: ellipsis; }
@@ -296,6 +308,7 @@
   .mcell .ln.done { opacity: 0.5; }
   .mcell .ln.done .t { text-decoration: line-through; }
   .mcell .more { font-size: 9px; color: var(--text-muted); font-weight: 700; }
+  .mcell .ln.rng { margin-left: -3px; margin-right: -2px; padding-left: 3px; border-radius: 0; font-weight: 700; }
   .mcal-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; justify-content: center; font-size: 11px; color: var(--text-muted); margin: 10px 12px 0; }
   .mcal-legend b { font-weight: 900; margin-right: 2px; }
   .mcal-legend .chip { padding: 4px 9px; font-size: 11px; }
@@ -597,7 +610,7 @@
     <div class="settings-card">
       <button class="settings-btn danger" id="reset-btn">전체 데이터 초기화</button>
     </div>
-    <div class="footer-note">할일습관 앱 · v1.7</div>
+    <div class="footer-note">할일습관 앱 · v2.0</div>
   </div>
 </div>
 
@@ -613,6 +626,7 @@
 <script src="firebase.js"></script>
 <script src="sync.js"></script>
 <script src="lunar.js"></script>
+<script src="repeat.js"></script>
 <script>
 (function () {
   const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -633,6 +647,43 @@
   // 달력의 매일/매주/매달/할일 구분용 색 - 색약이신 분들도 서로 구분되도록 만들어진 전용 팔레트(Okabe-Ito)
   const TYPE_COLORS = { daily: '#0072B2', weekly: '#E69F00', monthly: '#009E73', todo: '#CC79A7', memo: '#D55E00' };
   const TYPE_SYMBOL = { daily: '●', weekly: '■', monthly: '▲', todo: '◆', memo: '✎' };
+  // 기간 (시작일 ~ 끝나는 날). 끝나는 날이 없으면 하루짜리
+  function inRange(start, end, ds) { return !!start && start <= ds && ds <= (end && end > start ? end : start); }
+  // 반복(매주·매달·매년, 양력·음력)까지 고려해서 그날 걸리는 회차의 시작일
+  const R = window.Repeat;
+  function isRep(x) { return !!(R && R.isRepeat(x.repeat)); }
+  function todoOcc(t, ds) { return isRep(t) ? R.occStartOn(t.dueDate, t.endDate, t.repeat, !!t.lunar, ds) : (inRange(t.dueDate, t.endDate, ds) ? t.dueDate : null); }
+  function noteOcc(n, ds) { return isRep(n) ? R.occStartOn(n.date, n.endDate, n.repeat, !!n.lunar, ds) : (inRange(n.date, n.endDate, ds) ? n.date : null); }
+  function todoOn(t, ds) { return !!todoOcc(t, ds); }
+  function noteOn(n, ds) { return !!noteOcc(n, ds); }
+  // 반복 할일은 회차마다 따로 체크 (doneDates 에 회차 시작일을 기록)
+  function todoDoneOn(t, ds) { if (!isRep(t)) return !!t.done; const o = todoOcc(t, ds); return !!o && (t.doneDates || []).includes(o); }
+  function toggleTodoOcc(t, occ) {
+    t.doneDates = t.doneDates || [];
+    const i = t.doneDates.indexOf(occ);
+    if (i >= 0) t.doneDates.splice(i, 1); else t.doneDates.push(occ);
+    return i < 0;
+  }
+  // 체크리스트에 보여줄 '지금 회차' (진행 중이거나 다음 회차)
+  function currentOcc(t) { return isRep(t) ? R.nextOcc(t.dueDate, t.endDate, t.repeat, !!t.lunar, toISODate(new Date())) : t.dueDate; }
+  function repeatText(start, rep, lunar) { return R && R.isRepeat(rep) ? R.describe(start, rep, !!lunar) : ''; }
+  // 반복 선택 버튼 (할일 창·메모 편집·달력 추가에서 같이 씀)
+  function repeatPickerHtml(id, st) {
+    const lunarable = st.repeat === 'monthly' || st.repeat === 'yearly';
+    return `<div class="chip-row" id="${id}">
+        ${[['none', '반복 안 함'], ['weekly', '매주'], ['monthly', '매달'], ['yearly', '매년']].map(([k, l]) => `<div class="chip ${(st.repeat || 'none') === k ? 'active-day' : ''}" data-rep="${k}">${k === 'none' ? l : '🔁 ' + l}</div>`).join('')}
+      </div>
+      ${lunarable ? `<div class="chip-row" style="margin-top:6px;"><div class="chip ${!st.lunar ? 'active-day' : ''}" data-lunar="0">☀️ 양력</div><div class="chip ${st.lunar ? 'active-day' : ''}" data-lunar="1">🌙 음력</div></div>` : ''}
+      ${st.repeat && st.repeat !== 'none' && st.start ? `<div class="hint" style="color:var(--primary); font-weight:700;">→ ${repeatText(st.start, st.repeat, st.lunar)}마다 나타나요${st.lunar ? ' (윤달은 건너뛰어요)' : ''}</div>` : ''}`;
+  }
+  function wireRepeatPicker(id, st, onChange) {
+    const root = document.getElementById(id); if (!root) return;
+    const box = root.parentElement;
+    box.querySelectorAll('[data-rep]').forEach(c => c.onclick = () => { st.repeat = c.getAttribute('data-rep'); if (st.repeat === 'weekly' || st.repeat === 'none') st.lunar = false; onChange(); });
+    box.querySelectorAll('[data-lunar]').forEach(c => c.onclick = () => { st.lunar = c.getAttribute('data-lunar') === '1'; onChange(); });
+  }
+  function md(ds) { return parseInt(ds.slice(5, 7), 10) + '/' + parseInt(ds.slice(8, 10), 10); }
+  function rangeLabel(start, end) { return end && end > start ? `${md(start)}~${md(end)}` : md(start); }
   const HOLIDAYS = {
     '2026-01-01': '신정', '2026-02-16': '설날 연휴', '2026-02-17': '설날', '2026-02-18': '설날 연휴',
     '2026-03-01': '삼일절', '2026-03-02': '삼일절 대체공휴일', '2026-05-01': '노동절', '2026-05-05': '어린이날',
@@ -850,7 +901,7 @@
         ${n.pinned ? '<span class="npin">📌</span>' : ''}
         <div class="nt">${escapeHtml(n.title || (n.body || '').split('\n')[0] || '제목 없음')}</div>
         <div class="nb">${escapeHtml(n.title ? (n.body || '') : (n.body || '').split('\n').slice(1).join('\n'))}</div>
-        <div class="nd">${n.date ? `<b style="color:${TYPE_COLORS.memo};">📅 ${parseInt(n.date.slice(5, 7), 10)}/${parseInt(n.date.slice(8), 10)}</b> · ` : ''}${noteDateLabel(n.updatedAt || n.createdAt || Date.now())}</div>
+        <div class="nd">${n.date ? `<b style="color:${TYPE_COLORS.memo};">📅 ${rangeLabel(n.date, n.endDate)}${isRep(n) ? ' 🔁 ' + repeatText(n.date, n.repeat, n.lunar) : ''}</b> · ` : ''}${noteDateLabel(n.updatedAt || n.createdAt || Date.now())}</div>
       </div>`).join('')}</div>`;
     el.querySelectorAll('[data-note]').forEach(c => c.addEventListener('click', () => openNoteEditor(c.getAttribute('data-note'))));
   }
@@ -865,6 +916,10 @@
           <input class="note-editor-title" id="note-title" placeholder="제목" value="${escapeHtml(draft.title)}" maxlength="80" />
           <textarea class="note-editor-body" id="note-body" placeholder="내용을 자유롭게 적어보세요">${escapeHtml(draft.body)}</textarea>
           <div class="inline-row" style="margin-top:8px;"><button class="tb" id="note-date" style="border:1.5px solid var(--border); background:var(--bg); color:var(--text); border-radius:10px; padding:7px 11px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit;"></button>
+            <button class="tb" id="note-enddate" style="display:none; border:1.5px solid var(--border); background:var(--bg); color:var(--text); border-radius:10px; padding:7px 11px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit;"></button>
+          </div>
+          <div id="note-repeat-box" style="margin-top:6px;"></div>
+          <div class="inline-row" style="margin-top:2px;">
             <span class="hint" style="margin:0;">날짜를 정하면 달력·위젯·PC 달력에도 ✎로 보여요</span></div>
           <div class="note-color-row" id="note-colors">${NOTE_COLORS.map(c => `<div class="note-color ${c.key === (draft.color || '') ? 'on' : ''}" data-ncolor="${c.key}" title="${c.label}" style="background:${c.key ? c.bg : 'var(--surface)'};"></div>`).join('')}</div>
           <div class="note-toolbar">
@@ -923,13 +978,31 @@
     // 날짜 지정
     const dateBtn = document.getElementById('note-date');
     function drawDate() {
-      if (draft.date) { const d = new Date(draft.date + 'T00:00:00'); dateBtn.textContent = `📅 ${d.getMonth() + 1}월 ${d.getDate()}일 (${'일월화수목금토'[d.getDay()]}) ✕`; dateBtn.style.color = TYPE_COLORS.memo; }
-      else { dateBtn.textContent = '📅 날짜 정하기 (선택)'; dateBtn.style.color = ''; }
+      const endBtn = document.getElementById('note-enddate');
+      if (draft.endDate && draft.date && draft.endDate <= draft.date) draft.endDate = null;
+      if (draft.date) {
+        const W = '일월화수목금토', d = new Date(draft.date + 'T00:00:00');
+        if (draft.endDate) {
+          const e = new Date(draft.endDate + 'T00:00:00'), n = Math.round((e - d) / 86400000) + 1;
+          dateBtn.textContent = `📅 ${d.getMonth() + 1}/${d.getDate()} (${W[d.getDay()]}) → ${e.getMonth() + 1}/${e.getDate()} (${W[e.getDay()]}) · ${n}일간`;
+        } else dateBtn.textContent = `📅 ${d.getMonth() + 1}월 ${d.getDate()}일 (${W[d.getDay()]})`;
+        dateBtn.style.color = TYPE_COLORS.memo;
+      } else { dateBtn.textContent = '📅 날짜·기간 정하기 (선택)'; dateBtn.style.color = ''; draft.endDate = null; }
+      endBtn.style.display = draft.date ? '' : 'none';
+      endBtn.textContent = '✕ 날짜 빼기';
+      // 반복 (날짜가 있을 때만)
+      const rb = document.getElementById('note-repeat-box');
+      if (!draft.date) { rb.innerHTML = ''; draft.repeat = null; draft.lunar = false; return; }
+      const st = { repeat: draft.repeat || 'none', lunar: !!draft.lunar, start: draft.date };
+      rb.innerHTML = repeatPickerHtml('note-rep', st);
+      wireRepeatPicker('note-rep', st, () => { draft.repeat = st.repeat !== 'none' ? st.repeat : null; draft.lunar = !!draft.repeat && st.lunar; drawDate(); persist(); });
     }
+    document.getElementById('note-enddate').addEventListener('click', () => {
+      draft.date = null; draft.endDate = null; drawDate(); persist();
+    });
     drawDate();
     dateBtn.addEventListener('click', () => {
-      if (draft.date) { draft.date = null; drawDate(); persist(); return; }
-      openDatePicker(toISODate(new Date()), (ds) => { draft.date = ds; drawDate(); persist(); });
+      openRangePicker(draft.date || toISODate(new Date()), draft.endDate, (st, en) => { draft.date = st; draft.endDate = en; drawDate(); persist(); }, { title: '메모 날짜 고르기' });
     });
     // 뒤로가기로 닫아도 저장되도록
     window.__noteClosePersist = () => { clearTimeout(t); persist(); renderNotes(); };
@@ -1029,8 +1102,8 @@
   function todayProgress() {
     const t = toISODate(new Date());
     const habits = tasks.filter(x => x.type === 'habit' && isHabitScheduled(x, t));
-    const todos = tasks.filter(x => x.type === 'todo' && ((!x.done && x.dueDate <= t) || (x.done && x.completedAt === t)));
-    const done = habits.filter(h => h.completedDates.includes(t)).length + todos.filter(x => x.done).length;
+    const todos = tasks.filter(x => x.type === 'todo' && (isRep(x) ? todoOn(x, t) : ((!x.done && x.dueDate <= t) || (x.done && x.completedAt === t))));
+    const done = habits.filter(h => h.completedDates.includes(t)).length + todos.filter(x => isRep(x) ? todoDoneOn(x, t) : x.done).length;
     return { total: habits.length + todos.length, done, habits, todos, today: t };
   }
 
@@ -1317,7 +1390,17 @@
               target: habitTarget(t), counts, completedDates: t.completedDates.filter(d => d >= since), pauses: t.pauses || [],
               reminderTime: t.reminderTime || null, streak: currentStreak(t), createdAt: t.createdAt || null, startDate: t.startDate || null };
           }
-          return { id: t.id, type: 'todo', title: t.title, done: !!t.done, dueDate: t.dueDate, completedAt: t.completedAt || null, reminderTime: t.reminderTime || null };
+          const slim = { id: t.id, type: 'todo', title: t.title, done: !!t.done, dueDate: t.dueDate, endDate: t.endDate || null, completedAt: t.completedAt || null, reminderTime: t.reminderTime || null };
+          if (isRep(t)) {
+            // 반복 할일: 위젯·알림용으로 회차 날짜를 미리 계산해서 보냄 (음력 계산은 여기서만 가능)
+            const n0 = new Date();
+            const from = toISODate(new Date(n0.getFullYear(), n0.getMonth() - 2, 1)), to = toISODate(new Date(n0.getFullYear() + 1, n0.getMonth() + 1, 0));
+            slim.repeat = t.repeat; slim.lunar = !!t.lunar; slim.span = R.span(t.dueDate, t.endDate);
+            slim.occ = R.occList(t.dueDate, t.endDate, t.repeat, !!t.lunar, from, to);
+            slim.doneDates = (t.doneDates || []).filter(d => d >= from);
+            slim.repeatText = repeatText(t.dueDate, t.repeat, t.lunar);
+          }
+          return slim;
         });
         const lv = levelInfo();
         const t = currentTheme();
@@ -1356,8 +1439,19 @@
     const ms = isoAdd(today, -70);
     Object.keys(dayLogs).forEach(k => { if (k >= ms && dayLogs[k] && dayLogs[k].mood) moods[k] = dayLogs[k].mood; });
     const dayNotes = {};
-    notes.forEach(n => { if (n.date && n.date >= s0 && n.date <= e0) (dayNotes[n.date] = dayNotes[n.date] || []).push((n.title || (n.body || '').split('\n')[0] || '메모').slice(0, 30)); });
-    return { lunar: lunarCache.map, holidays, moods, dayNotes };
+    const noteRanges = {};
+    notes.forEach(n => {
+      if (!n.date) return;
+      const title = (n.title || (n.body || '').split('\n')[0] || '메모').slice(0, 30);
+      const sp = R ? R.span(n.date, n.endDate) : 0;
+      const starts = R ? R.occList(n.date, n.endDate, n.repeat, !!n.lunar, s0, e0) : [n.date];
+      starts.forEach(o => {
+        if (!sp) { if (o >= s0 && o <= e0) (dayNotes[o] = dayNotes[o] || []).push((isRep(n) ? '🔁' : '') + title); return; }
+        // 기간 메모: 날마다 띠로 (첫날에 이름)
+        for (let k = 0, ds = o; k <= sp; k++, ds = isoAdd(ds, 1)) if (ds >= s0 && ds <= e0) (noteRanges[ds] = noteRanges[ds] || []).push({ t: title, first: k === 0, id: n.id, s: o, e: isoAdd(o, sp) });
+      });
+    });
+    return { lunar: lunarCache.map, holidays, moods, dayNotes, noteRanges };
   }
   // 달력 위젯에서 날짜를 누르면 → 앱의 달력 탭에서 그 날짜 보여주기
   window.__openCalendarDate = function (ds) {
@@ -1371,7 +1465,7 @@
     const d = new Date(ds + 'T00:00:00');
     calYear = d.getFullYear(); calMonth = d.getMonth(); calSelectedDate = ds;
     renderCalendar();
-    setTimeout(() => { const el = document.getElementById('cal-detail'); if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 80);
+    scrollTopNow();
   };
 
   function pullAndroidOps() {
@@ -1382,6 +1476,7 @@
     ops.forEach(op => {
       const t = tasks.find(x => x.id === op.id); if (!t) return;
       if (t.type === 'habit') setHabitCount(t, op.date, op.count);
+      else if (isRep(t)) { t.doneDates = (t.doneDates || []).filter(d => d !== op.date); if (op.done) t.doneDates.push(op.date); }
       else { t.done = !!op.done; t.completedAt = t.done ? op.date : null; }
     });
     saveTasks();
@@ -1608,6 +1703,16 @@
     if (tab === 'stats') renderStats();
     if (tab === 'settings') renderSettings();
     if (tab === 'notes') renderNotes();
+    scrollTopNow();
+  }
+  // 탭을 열면 항상 맨 위부터 보이게
+  function scrollTopNow() {
+    const top = () => {
+      try { window.scrollTo(0, 0); } catch (e) {}
+      if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+      document.querySelectorAll('.tab-page').forEach(p => { p.scrollTop = 0; });
+    };
+    top(); requestAnimationFrame(top); setTimeout(top, 120);
   }
 
   /* ---------- 체크리스트 탭 ---------- */
@@ -1704,8 +1809,10 @@
     const tomorrowISO = isoAdd(todayISO, 1);
     // 할일은 완료 여부와 관계없이 날짜 상관없이 다 보여주고, 위/아래 두 섹션(할일/완료된 할일)으로 나눔
     const allTodos = all.filter(t => t.type === 'todo');
-    const pendingTodos = allTodos.filter(t => !t.done).sort((a, b) => a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0);
-    const doneTodos = allTodos.filter(t => t.done).sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''));
+    // 반복 할일은 항상 위 목록에 (다음 회차 날짜 기준으로 정렬)
+    const sortKey = t => isRep(t) ? (currentOcc(t) || '9999') : t.dueDate;
+    const pendingTodos = allTodos.filter(t => isRep(t) || !t.done).sort((a, b) => sortKey(a) < sortKey(b) ? -1 : sortKey(a) > sortKey(b) ? 1 : 0);
+    const doneTodos = allTodos.filter(t => !isRep(t) && t.done).sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''));
     const dailyHabits = all.filter(t => t.type === 'habit' && t.frequency === 'daily');
     const weeklyHabits = all.filter(t => t.type === 'habit' && t.frequency === 'weekly');
     const monthlyHabits = all.filter(t => t.type === 'habit' && t.frequency === 'monthly');
@@ -1728,8 +1835,20 @@
       const catBadge = t.category ? `<span class="cat-badge" style="background:${catColor(t.category)}">${escapeHtml(t.category)}</span>` : '';
       const memoHtml = t.memo ? `<div class="todo-memo">${escapeHtml(t.memo)}</div>` : '';
       let dateBadge = '';
-      if (isDone) {
+      const occ = isRep(t) ? currentOcc(t) : null;
+      const occDone = isRep(t) && !!occ && (t.doneDates || []).includes(occ);
+      if (isRep(t)) {
+        const sp = R.span(t.dueDate, t.endDate);
+        const occEnd = occ ? isoAdd(occ, sp) : null;
+        const when = !occ ? '끝남' : (occ <= todayISO && todayISO <= occEnd) ? (sp ? `진행 중 · ${rangeLabel(occ, occEnd)}` : '오늘') : occ === tomorrowISO ? '내일' : `다음 ${sp ? rangeLabel(occ, occEnd) : formatDateLabel(occ, todayISO)}`;
+        dateBadge = `<span class="date-badge ${occ && occ <= todayISO ? 'today' : 'future'}">🔁 ${repeatText(t.dueDate, t.repeat, t.lunar)} · ${when}</span>`;
+      } else if (isDone) {
         dateBadge = t.completedAt ? `<span class="date-badge today">완료: ${t.completedAt}</span>` : '';
+      } else if (t.endDate && t.endDate > t.dueDate) {
+        // 기간 할일
+        if (t.endDate < todayISO) dateBadge = `<span class="date-badge overdue">지남 · ${rangeLabel(t.dueDate, t.endDate)}</span>`;
+        else if (t.dueDate <= todayISO) dateBadge = `<span class="date-badge today">진행 중 · ${rangeLabel(t.dueDate, t.endDate)}</span>`;
+        else dateBadge = `<span class="date-badge future">↔ ${rangeLabel(t.dueDate, t.endDate)}</span>`;
       } else if (t.dueDate < todayISO) {
         dateBadge = `<span class="date-badge overdue">지남 · ${formatDateLabel(t.dueDate, todayISO)}</span>`;
       } else if (t.dueDate === todayISO) {
@@ -1741,8 +1860,8 @@
       }
       const remindBadge = (!isDone && t.reminderTime && window.AndroidBridge) ? `<span class="mini-badge" style="margin-left:0; margin-right:4px;">⏰ ${timeLabel(t.reminderTime)}</span>` : '';
       return `<div class="todo-item" ${isDone ? '' : `data-task-id="${t.id}"`}>
-        <div class="todo-check ${t.done ? 'done' : ''}" data-toggle="${t.id}">${t.done ? '✓' : ''}</div>
-        <div class="todo-body"><div>${dateBadge}${remindBadge}${catBadge}</div><div class="todo-text ${t.done ? 'done' : ''}">${escapeHtml(t.title)}</div>${memoHtml}</div>
+        <div class="todo-check ${(isRep(t) ? occDone : t.done) ? 'done' : ''}" data-toggle="${t.id}">${(isRep(t) ? occDone : t.done) ? '✓' : ''}</div>
+        <div class="todo-body"><div>${dateBadge}${remindBadge}${catBadge}</div><div class="todo-text ${(isRep(t) ? occDone : t.done) ? 'done' : ''}">${escapeHtml(t.title)}</div>${memoHtml}</div>
         <div class="todo-actions">${isDone ? '' : '<button class="drag-handle" aria-label="순서 바꾸기">☰</button>'}<button class="icon-btn" data-memo="${t.id}">✎</button><button class="todo-delete" data-delete="${t.id}">✕</button></div>
       </div>`;
     }
@@ -1805,6 +1924,14 @@
         const t = tasks.find(x => x.id === el.getAttribute('data-toggle'));
         if (!t) return;
         const levelBefore = levelInfo().level;
+        if (isRep(t)) {
+          const occ = currentOcc(t); if (!occ) return;
+          const nowDone = toggleTodoOcc(t, occ);
+          saveTasks(); renderLists();
+          if (nowDone) showToast(`✅ ${md(occ)} 회차 완료! 다음 회차는 다시 체크할 수 있어요`);
+          celebrateAfter(t, toISODate(new Date()), levelBefore, !nowDone);
+          return;
+        }
         const wasDone = t.done;
         t.done = !t.done;
         t.completedAt = t.done ? toISODate(new Date()) : null;
@@ -1949,6 +2076,92 @@
     render();
   }
 
+  // 날짜 버튼에 보여줄 글자 (하루 / 기간)
+  function rangeButtonHtml(st, en) {
+    const W = ['일','월','화','수','목','금','토'];
+    const d = new Date(st + 'T00:00:00');
+    if (!en || en <= st) return `📅 ${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${W[d.getDay()]}) <span style="opacity:.55; font-weight:600;">· 하루</span>`;
+    const e = new Date(en + 'T00:00:00');
+    const days = Math.round((e - d) / 86400000) + 1;
+    return `📅 <span style="font-size:11px; opacity:.6;">시작</span> ${d.getMonth() + 1}/${d.getDate()} (${W[d.getDay()]}) → <span style="font-size:11px; opacity:.6;">끝</span> ${e.getMonth() + 1}/${e.getDate()} (${W[e.getDay()]}) <b>· ${days}일간</b>`;
+  }
+
+  /* 시작~끝 고르기: 첫 번째로 누른 날 = 시작, 두 번째로 누른 날 = 끝 */
+  function openRangePicker(startStr, endStr, onPick, opts) {
+    opts = opts || {};
+    const c = document.getElementById('confirm-container');
+    let s = startStr || toISODate(new Date());
+    let e = endStr && endStr > s ? endStr : s;
+    let step = opts.step || 'start'; // 다음에 누를 날이 시작인지 끝인지
+    const init = new Date((step === 'end' ? e : s) + 'T00:00:00');
+    let pickYear = init.getFullYear(), pickMonth = init.getMonth();
+    const WDK = ['일','월','화','수','목','금','토'];
+    const lab = (ds) => { const d = new Date(ds + 'T00:00:00'); return `${d.getMonth() + 1}/${d.getDate()} (${WDK[d.getDay()]})`; };
+    function render() {
+      const blanks = firstWeekdayMonIndex(pickYear, pickMonth);
+      const total = daysInMonth(pickYear, pickMonth);
+      const todayISO = toISODate(new Date());
+      let cellsHtml = '';
+      for (let i = 0; i < blanks; i++) cellsHtml += `<div class="cal-cell empty"></div>`;
+      for (let d = 1; d <= total; d++) {
+        const ds = `${pickYear}-${pad(pickMonth + 1)}-${pad(d)}`;
+        const wd = weekdayMonIndex(ds);
+        let cls = HOLIDAYS[ds] ? 'holiday-text' : wd === 0 ? 'sun-text' : wd === 6 ? 'sat-text' : '';
+        if (ds === todayISO) cls += ' today-outline';
+        let lb = '';
+        if (ds === s && ds === e) { cls += ' rp-s'; lb = '하루'; }
+        else if (ds === s) { cls += ' rp-s'; lb = '시작'; }
+        else if (ds === e) { cls += ' rp-e'; lb = '끝'; }
+        else if (ds > s && ds < e) cls += ' in-rng';
+        cellsHtml += `<div class="cal-cell ${cls}" data-date="${ds}"><span>${d}</span>${lb ? `<span class="rp-lb">${lb}</span>` : ''}</div>`;
+      }
+      const days = Math.round((new Date(e + 'T00:00:00') - new Date(s + 'T00:00:00')) / 86400000) + 1;
+      const guide = step === 'start'
+        ? `<span class="em">① 시작하는 날</span>을 눌러주세요<br><span style="opacity:.6">그 다음 ② 끝나는 날을 누르면 돼요</span>`
+        : `<span class="em">② 끝나는 날</span>을 눌러주세요<br><span style="opacity:.6">하루짜리면 그냥 [하루만]이나 [확인]을 누르세요</span>`;
+      c.innerHTML = `
+        <div class="modal-overlay" style="z-index:60;" id="rangepicker-overlay">
+          <div class="modal-sheet">
+            <div class="modal-title">${opts.title || '날짜 고르기'}</div>
+            <div class="rp-tabs">
+              <button type="button" class="rp-tab ${step === 'start' ? 'on' : ''}" id="rp-tab-s"><small>① 시작</small><b>${lab(s)}</b></button>
+              <button type="button" class="rp-tab ${step === 'end' ? 'on' : ''}" id="rp-tab-e"><small>② 끝</small><b>${days > 1 ? lab(e) : '하루만'}</b></button>
+            </div>
+            <div class="rp-guide" id="rp-guide">${guide}<div style="margin-top:4px;">${days > 1 ? `📅 ${lab(s)} → ${lab(e)} · <b>${days}일간</b>` : `📅 ${lab(s)} 하루`}</div></div>
+            <div class="cal-head" style="padding:0; margin-top:12px;">
+              <button class="cal-nav-btn" id="rp-prev">‹</button>
+              <div class="cal-title">${pickYear}년 ${pickMonth + 1}월</div>
+              <button class="cal-nav-btn" id="rp-next">›</button>
+            </div>
+            <div class="cal-dow-row" style="margin-top:10px;"><span class="dow-sun">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span class="dow-sat">토</span></div>
+            <div class="cal-grid rp-grid">${cellsHtml}</div>
+            <div class="modal-actions">
+              <button class="modal-btn cancel" id="rp-cancel">취소</button>
+              <button class="modal-btn cancel" id="rp-one">하루만</button>
+              <button class="modal-btn confirm" id="rp-ok">확인</button>
+            </div>
+          </div>
+        </div>`;
+      document.getElementById('rp-prev').onclick = () => { pickMonth--; if (pickMonth < 0) { pickMonth = 11; pickYear--; } render(); };
+      document.getElementById('rp-next').onclick = () => { pickMonth++; if (pickMonth > 11) { pickMonth = 0; pickYear++; } render(); };
+      document.getElementById('rp-tab-s').onclick = () => { step = 'start'; render(); };
+      document.getElementById('rp-tab-e').onclick = () => { step = 'end'; render(); };
+      document.getElementById('rp-cancel').onclick = () => { c.innerHTML = ''; };
+      document.getElementById('rp-one').onclick = () => { c.innerHTML = ''; onPick(s, null); };
+      document.getElementById('rp-ok').onclick = () => { c.innerHTML = ''; onPick(s, e > s ? e : null); };
+      c.querySelectorAll('.rp-grid .cal-cell[data-date]').forEach(cell => {
+        cell.onclick = () => {
+          const ds = cell.getAttribute('data-date');
+          if (step === 'start') { s = ds; if (e < s || opts.resetEnd !== false) e = s; step = 'end'; }
+          else if (ds < s) { s = ds; e = ds; step = 'end'; } // 시작보다 앞을 누르면 새 시작으로
+          else { e = ds; }
+          render();
+        };
+      });
+    }
+    render();
+  }
+
   function openColorPicker(initialColor, catName, onConfirm) {
     const c = document.getElementById('confirm-container');
     let { h, s, l } = hexToHsl(initialColor);
@@ -2070,6 +2283,9 @@
               <div class="chip" id="duedate-tomorrow-chip">내일</div>
             </div>
             <button type="button" class="modal-input" id="duedate-display-btn" style="text-align:left; cursor:pointer;"></button>
+            <div class="hint" style="margin:6px 2px 0;">👆 눌러서 날짜를 바꿔요. 여행처럼 여러 날이면 <b>시작하는 날 → 끝나는 날</b> 순서로 두 번 누르면 돼요</div>
+            <div class="field-label">반복 (생일·기념일 등)</div>
+            <div id="todo-repeat-box"></div>
           </div>
           <div class="field-label">카테고리 (선택)</div>
           <div class="chip-row" id="cat-row"></div>
@@ -2123,17 +2339,28 @@
     const duedateField = document.getElementById('duedate-field');
     const duedateDisplayBtn = document.getElementById('duedate-display-btn');
     let selectedDueDate = modalDueDate;
-    function updateDuedateLabel() {
-      const d = new Date(selectedDueDate + 'T00:00:00');
-      const wd = ['일','월','화','수','목','금','토'][d.getDay()];
-      duedateDisplayBtn.textContent = `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 (${wd}요일)`;
+    let selectedEndDate = isEdit && editTask.endDate && editTask.endDate > editTask.dueDate ? editTask.endDate : null;
+    let updateDuedateLabel = function () {
+      if (selectedEndDate && selectedEndDate <= selectedDueDate) selectedEndDate = null;
+      duedateDisplayBtn.innerHTML = rangeButtonHtml(selectedDueDate, selectedEndDate);
+      const t = toISODate(new Date());
+      document.getElementById('duedate-today-chip').classList.toggle('active-day', !selectedEndDate && selectedDueDate === t);
+      document.getElementById('duedate-tomorrow-chip').classList.toggle('active-day', !selectedEndDate && selectedDueDate === isoAdd(t, 1));
+    };
+    const repState = { repeat: isEdit && editTask.repeat ? editTask.repeat : 'none', lunar: !!(isEdit && editTask.lunar), start: selectedDueDate };
+    function drawRepeat() {
+      repState.start = selectedDueDate;
+      document.getElementById('todo-repeat-box').innerHTML = repeatPickerHtml('todo-rep', repState);
+      wireRepeatPicker('todo-rep', repState, drawRepeat);
     }
+    const _upd = updateDuedateLabel;
+    updateDuedateLabel = function () { _upd(); drawRepeat(); };
     updateDuedateLabel();
     duedateDisplayBtn.addEventListener('click', () => {
-      openDatePicker(selectedDueDate, (dateStr) => { selectedDueDate = dateStr; updateDuedateLabel(); });
+      openRangePicker(selectedDueDate, selectedEndDate, (st, en) => { selectedDueDate = st; selectedEndDate = en; updateDuedateLabel(); });
     });
-    document.getElementById('duedate-today-chip').addEventListener('click', () => { selectedDueDate = toISODate(new Date()); updateDuedateLabel(); });
-    document.getElementById('duedate-tomorrow-chip').addEventListener('click', () => { selectedDueDate = isoAdd(toISODate(new Date()), 1); updateDuedateLabel(); });
+    document.getElementById('duedate-today-chip').addEventListener('click', () => { selectedDueDate = toISODate(new Date()); selectedEndDate = null; updateDuedateLabel(); });
+    document.getElementById('duedate-tomorrow-chip').addEventListener('click', () => { selectedDueDate = isoAdd(toISODate(new Date()), 1); selectedEndDate = null; updateDuedateLabel(); });
     const typeBtns = container.querySelectorAll('[data-type]');
     const repeatField = document.getElementById('repeat-field');
     const monthdayField = document.getElementById('monthday-field');
@@ -2283,6 +2510,10 @@
         }
         if (editTask.type === 'todo') {
           editTask.dueDate = selectedDueDate || toISODate(new Date());
+          editTask.endDate = selectedEndDate && selectedEndDate > editTask.dueDate ? selectedEndDate : null;
+          editTask.repeat = repState.repeat !== 'none' ? repState.repeat : null;
+          editTask.lunar = !!editTask.repeat && !!repState.lunar;
+          if (editTask.repeat) { editTask.done = false; editTask.completedAt = null; editTask.doneDates = editTask.doneDates || []; }
         }
         if (editTask.type === 'habit') {
           if (editTask.frequency === 'weekly') {
@@ -2294,7 +2525,8 @@
         }
       } else if (modalType === 'todo') {
         const dueDate = selectedDueDate || toISODate(new Date());
-        tasks.unshift({ id: uid(), type: 'todo', title: text, category: modalCategory, memo, done: false, createdAt: toISODate(new Date()), completedAt: null, dueDate, reminderTime: readRemind() });
+        tasks.unshift({ id: uid(), type: 'todo', title: text, category: modalCategory, memo, done: false, createdAt: toISODate(new Date()), completedAt: null, dueDate, endDate: selectedEndDate && selectedEndDate > dueDate ? selectedEndDate : null,
+          repeat: repState.repeat !== 'none' ? repState.repeat : null, lunar: repState.repeat !== 'none' && !!repState.lunar, doneDates: [], reminderTime: readRemind() });
       } else if (modalType === 'daily') {
         tasks.unshift({ id: uid(), type: 'habit', frequency: 'daily', title: text, category: modalCategory, memo, repeatDays: [0,1,2,3,4,5,6], monthDay: 1, completedDates: [], target: modalTarget, counts: {}, pauses: [], reminderTime: readRemind(), createdAt: toISODate(new Date()) });
       } else if (modalType === 'weekly') {
@@ -2324,7 +2556,7 @@
     const scheduled = tasks.filter(t => t.type === 'habit' && isHabitScheduled(t, dateStr));
     const done = scheduled.filter(h => h.completedDates.includes(dateStr));
     const todosDone = tasks.filter(t => t.type === 'todo' && t.completedAt === dateStr);
-    const todosCreated = tasks.filter(t => t.type === 'todo' && t.dueDate === dateStr && !t.done);
+    const todosCreated = tasks.filter(t => t.type === 'todo' && todoOn(t, dateStr) && !t.done);
     return { scheduled, done, todosDone, todosCreated };
   }
   function colorForDate(dateStr) {
@@ -2354,16 +2586,47 @@
   function calItemsFor(ds, withDaily) {
     const out = [];
     tasks.forEach(t => {
-      if (t.type === 'todo') { if (t.dueDate === ds) out.push({ t, type: 'todo', done: !!t.done }); return; }
+      if (t.type === 'todo') { const o = todoOcc(t, ds); if (o) out.push({ t, type: 'todo', done: todoDoneOn(t, ds), occ: o, occEnd: isoAdd(o, R ? R.span(t.dueDate, t.endDate) : 0) }); return; }
       if (t.type !== 'habit' || !isHabitScheduled(t, ds)) return;
       if (t.frequency === 'daily' && !withDaily) return;
       out.push({ t, type: t.frequency, done: t.completedDates.includes(ds) });
     });
-    notes.forEach(n => { if (n.date === ds) out.push({ n, type: 'memo', done: false }); });
+    notes.forEach(n => { const o = noteOcc(n, ds); if (o) out.push({ n, type: 'memo', done: false, occ: o, occEnd: isoAdd(o, R ? R.span(n.date, n.endDate) : 0) }); });
     const order = { todo: 0, daily: 1, weekly: 2, monthly: 3, memo: 4 };
-    return out.sort((x, y) => order[x.type] - order[y.type]);
+    // 기간 항목을 먼저 (여러 날에 걸친 일정이 칸 위쪽에 같은 줄로 보이도록)
+    const isRange = x => !!(x.occ && x.occEnd && x.occEnd > x.occ);
+    return out.sort((x, y) => (isRange(y) - isRange(x)) || (order[x.type] - order[y.type]));
   }
   function itemTitle(x) { return x.type === 'memo' ? (x.n.title || (x.n.body || '').split('\n')[0] || '메모') : x.t.title; }
+
+  // 한 주 안의 기간 띠 줄 자리 정하기: 먼저 시작한 것 → 더 긴 것 순으로 위쪽 줄부터 채움
+  function weekLanes(dsList, itemsList) {
+    const isRange = x => !!(x.occ && x.occEnd && x.occEnd > x.occ);
+    const keyOf = x => (x.type === 'memo' ? 'n' + x.n.id : 't' + x.t.id) + '@' + x.occ;
+    const ranges = {};
+    itemsList.forEach((items, k) => items.forEach(x => {
+      if (!isRange(x)) return;
+      const key = keyOf(x);
+      if (!ranges[key]) ranges[key] = { key, from: k, to: k, occ: x.occ, occEnd: x.occEnd };
+      else ranges[key].to = k;
+    }));
+    const list = Object.values(ranges).sort((a, b) => (a.occ < b.occ ? -1 : a.occ > b.occ ? 1 : 0) || (b.occEnd > a.occEnd ? 1 : b.occEnd < a.occEnd ? -1 : 0) || (a.key < b.key ? -1 : 1));
+    const laneEnd = []; // 줄마다 마지막으로 차지한 칸 번호
+    list.forEach(r => {
+      let L = 0;
+      while (L < laneEnd.length && laneEnd[L] >= r.from) L++;
+      laneEnd[L] = r.to; r.lane = L;
+    });
+    const rows = itemsList.map((items, k) => {
+      const slots = [];
+      items.forEach(x => { if (isRange(x)) slots[ranges[keyOf(x)].lane] = x; });
+      const out = [];
+      for (let i = 0; i < slots.length; i++) out.push(slots[i] ? { x: slots[i] } : { blank: true });
+      items.forEach(x => { if (!isRange(x)) out.push({ x }); });
+      return out;
+    });
+    return { rows, count: laneEnd.length };
+  }
 
   function renderCalendar() {
     if (calYear === undefined) { const n = new Date(); calYear = n.getFullYear(); calMonth = n.getMonth(); }
@@ -2374,22 +2637,42 @@
     const todayISO = toISODate(new Date());
     const monthHolidays = [];
     let html = '';
-    for (let i = 0; i < weeks * 7; i++) {
-      const d = new Date(calYear, calMonth, 1 - first.getDay() + i);
-      const ds = toISODate(d);
-      const other = d.getMonth() !== calMonth;
-      const hol = HOLIDAYS[ds];
-      if (hol && !other) monthHolidays.push({ name: hol, day: d.getDate() });
-      const items = calItemsFor(ds, showDaily);
-      const MAX = 4;
-      const shown = items.length > MAX ? items.slice(0, MAX - 1) : items;
-      const mood = dayLogs[ds] && dayLogs[ds].mood ? `<span class="mo">${dayLogs[ds].mood}</span>` : '';
-      const cls = ['mcell', other ? 'other' : '', ds === todayISO ? 'today' : '', ds === calSelectedDate ? 'sel' : '', d.getDay() === 0 ? 'sun' : d.getDay() === 6 ? 'sat' : '', hol ? 'hol' : ''].join(' ');
-      html += `<div class="${cls}" data-date="${ds}">
+    const MAX = 4;
+    for (let w = 0; w < weeks; w++) {
+      // 한 주(7칸)를 한꺼번에: 기간 띠마다 '몇 번째 줄'인지 자리를 정해서 칸이 바뀌어도 같은 높이로 이어지게
+      const days = [];
+      for (let k = 0; k < 7; k++) {
+        const d = new Date(calYear, calMonth, 1 - first.getDay() + w * 7 + k);
+        const ds = toISODate(d);
+        days.push({ d, ds, items: calItemsFor(ds, showDaily) });
+      }
+      const lanes = weekLanes(days.map(x => x.ds), days.map(x => x.items));
+      days.forEach(({ d, ds, items }, k) => {
+        const other = d.getMonth() !== calMonth;
+        const hol = HOLIDAYS[ds];
+        if (hol && !other) monthHolidays.push({ name: hol, day: d.getDate() });
+        const lines = lanes.rows[k]; // [{x, blank}] 기간 띠 줄 + 일반 항목
+        const realTotal = items.length;
+        let shown = lines;
+        if (lines.length > MAX) shown = lines.slice(0, MAX - 1);
+        const hidden = realTotal - shown.filter(l => !l.blank).length;
+        const mood = dayLogs[ds] && dayLogs[ds].mood ? `<span class="mo">${dayLogs[ds].mood}</span>` : '';
+        const cls = ['mcell', other ? 'other' : '', ds === todayISO ? 'today' : '', ds === calSelectedDate ? 'sel' : '', d.getDay() === 0 ? 'sun' : d.getDay() === 6 ? 'sat' : '', hol ? 'hol' : ''].join(' ');
+        html += `<div class="${cls}" data-date="${ds}">
         <div class="dn"><span class="n">${d.getDate()}</span>${hol ? `<span class="ho">${escapeHtml(hol.replace(' 대체공휴일', '(대체)').replace(' 연휴', ''))}</span>` : `<span class="lu">${lunarShort(ds)}</span>`}${mood}</div>
-        ${shown.map(x => `<div class="ln ${x.done ? 'done' : ''}"><span class="s" style="color:${TYPE_COLORS[x.type]}">${x.done ? '✓' : TYPE_SYMBOL[x.type]}</span><span class="t">${escapeHtml(itemTitle(x))}</span></div>`).join('')}
-        ${items.length > shown.length ? `<div class="more">+${items.length - shown.length}개</div>` : ''}
+        ${shown.map(l => {
+          if (l.blank) return `<div class="ln">&nbsp;</div>`;
+          const x = l.x;
+          const rs = x.occ || null, re = x.occEnd || null;
+          if (rs && re && re > rs) {
+            const firstDay = ds === rs || d.getDay() === 0;
+            return `<div class="ln rng ${x.done ? 'done' : ''}" style="background:${TYPE_COLORS[x.type]}2E; border-left:${ds === rs ? `3px solid ${TYPE_COLORS[x.type]}` : '0'};"><span class="t">${firstDay ? escapeHtml(itemTitle(x)) : '&nbsp;'}</span></div>`;
+          }
+          return `<div class="ln ${x.done ? 'done' : ''}"><span class="s" style="color:${TYPE_COLORS[x.type]}">${x.done ? '✓' : TYPE_SYMBOL[x.type]}</span><span class="t">${escapeHtml(itemTitle(x))}</span></div>`;
+        }).join('')}
+        ${hidden > 0 ? `<div class="more">+${hidden}개</div>` : ''}
       </div>`;
+      });
     }
     const grid = document.getElementById('cal-grid');
     grid.innerHTML = html;
@@ -2409,30 +2692,36 @@
   }
 
   // ---- 날짜를 누르면: 그날 항목 체크 + 그 날짜 기준으로 추가 ----
-  let calAddType = 'todo';
+  let calAddType = 'todo', calAddEnd = null, calAddEndFor = null, calAddStart = null;
+  const calAddRep = { repeat: 'none', lunar: false, start: null };
   function renderCalDetail() {
     const ds = calSelectedDate;
+    if (calAddEndFor !== ds) { calAddEnd = null; calAddStart = ds; calAddEndFor = ds; calAddRep.repeat = 'none'; calAddRep.lunar = false; }
+    if (!calAddStart) calAddStart = ds;
+    calAddRep.start = calAddStart;
     const d = new Date(ds + 'T00:00:00');
-    const wd = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()], md = d.getDate(), mo = d.getMonth() + 1;
+    const wd = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()], dd = d.getDate(), mo = d.getMonth() + 1;
     const items = calItemsFor(ds, true);
     const NAME = { daily: '매일', weekly: '매주', monthly: '매달', todo: '할일', memo: '메모' };
     const HINT = {
-      todo: `${mo}월 ${md}일 하루만 하는 할일`, daily: `${mo}월 ${md}일부터 매일 반복`,
-      weekly: `매주 ${wd}요일마다 반복 (${mo}월 ${md}일부터)`, monthly: `매달 ${md}일마다 반복`, memo: `${mo}월 ${md}일 날짜가 붙은 메모`
+      todo: calAddEnd ? `여러 날 하는 할일 (예: 여행) · 아래 날짜를 눌러 바꿀 수 있어요` : `하루짜리 할일 · 여행처럼 여러 날이면 아래 날짜를 눌러 끝나는 날을 고르세요`, daily: `${mo}월 ${dd}일부터 매일 반복`,
+      weekly: `매주 ${wd}요일마다 반복 (${mo}월 ${dd}일부터)`, monthly: `매달 ${dd}일마다 반복`, memo: `${mo}월 ${dd}일 날짜가 붙은 메모`
     };
     const holidayName = HOLIDAYS[ds];
     const dlog = dayLogs[ds];
     const box = document.getElementById('cal-detail');
     box.style.display = '';
-    box.innerHTML = `<div class="cal-detail-title" style="font-size:15px;">${mo}월 ${md}일 ${wd}요일 <small style="color:var(--text-muted); font-weight:600;">(음)${lunarShort(ds)}</small></div>
+    box.innerHTML = `<div class="cal-detail-title" style="font-size:15px;">${mo}월 ${dd}일 ${wd}요일 <small style="color:var(--text-muted); font-weight:600;">(음)${lunarShort(ds)}</small></div>
       ${holidayName ? `<div class="cal-detail-holiday"><span class="holiday-badge">휴</span>${escapeHtml(holidayName)}</div>` : ''}
       ${dlog && (dlog.mood || dlog.note) ? `<div class="cal-detail-row" style="color:var(--text);"><span>${dlog.mood ? dlog.mood + ' ' : ''}${escapeHtml(dlog.note || '')}</span></div>` : ''}
       ${items.length ? items.map((x, i) => {
         const c = TYPE_COLORS[x.type];
-        if (x.type === 'memo') return `<div class="dd-row" data-dd="${i}"><div class="bx" style="border-color:${c}; color:${c};">✎</div><div class="tt">${escapeHtml(itemTitle(x))}</div><div class="ty" style="color:${c}">메모 ›</div></div>`;
+        if (x.type === 'memo') return `<div class="dd-row" data-dd="${i}"><div class="bx" style="border-color:${c}; color:${c};">✎</div><div class="tt">${escapeHtml(itemTitle(x))}${x.occEnd && x.occEnd > x.occ ? ` <small style="color:${c}; font-weight:800;">↔ ${rangeLabel(x.occ, x.occEnd)}</small>` : ''}${isRep(x.n) ? ` <small style="color:var(--text-muted); font-weight:700;">🔁 ${repeatText(x.n.date, x.n.repeat, x.n.lunar)}</small>` : ''}</div><div class="ty" style="color:${c}">메모 ›</div></div>`;
         const tg = x.type === 'todo' ? 1 : habitTarget(x.t), cnt = x.type === 'todo' ? 0 : habitCount(x.t, ds);
+        const rng = (x.occEnd && x.occEnd > x.occ ? ` <small style="color:${c}; font-weight:800;">↔ ${rangeLabel(x.occ, x.occEnd)}</small>` : '') +
+          (x.type === 'todo' && isRep(x.t) ? ` <small style="color:var(--text-muted); font-weight:700;">🔁 ${repeatText(x.t.dueDate, x.t.repeat, x.t.lunar)}</small>` : '');
         return `<div class="dd-row" data-dd="${i}"><div class="bx" style="border-color:${c}; ${x.done ? `background:${c};` : ''}">${x.done ? '✓' : ''}</div>
-          <div class="tt ${x.done ? 'done' : ''}">${escapeHtml(x.t.title)}${tg > 1 ? ` <small style="color:var(--text-muted)">${cnt}/${tg}</small>` : ''}</div>
+          <div class="tt ${x.done ? 'done' : ''}">${escapeHtml(x.t.title)}${rng}${tg > 1 ? ` <small style="color:var(--text-muted)">${cnt}/${tg}</small>` : ''}</div>
           <div class="ty" style="color:${c}">${TYPE_SYMBOL[x.type]} ${NAME[x.type]}</div></div>`;
       }).join('') : `<div class="cal-detail-row"><span>이 날은 예정된 게 없어요</span></div>`}
       <div style="font-size:12.5px; font-weight:800; margin-top:14px;">＋ 이 날짜에 추가</div>
@@ -2440,7 +2729,9 @@
       <div class="hint">${HINT[calAddType]}</div>
       ${calAddType === 'memo'
         ? `<button class="settings-btn" id="cal-add-note" style="border-color:${TYPE_COLORS.memo}; color:${TYPE_COLORS.memo};">✎ 이 날짜에 메모 쓰기</button>`
-        : `<div class="inline-row" style="margin-top:8px; flex-wrap:nowrap;"><input class="modal-input" id="cal-add-input" placeholder="${({ todo: '예: 우유 사기', daily: '예: 물 마시기', weekly: '예: 헬스장 가기', monthly: '예: 공과금 내기' })[calAddType]}" maxlength="60" style="padding:10px 12px;" />
+        : `${calAddType === 'todo' ? `<button type="button" class="modal-input" id="cal-add-end" style="text-align:left; cursor:pointer; margin-top:8px; padding:10px 12px; font-size:13.5px;">${rangeButtonHtml(calAddStart, calAddEnd)}</button>
+             <div style="margin-top:8px;">${repeatPickerHtml('cal-add-rep', calAddRep)}</div>` : ''}
+           <div class="inline-row" style="margin-top:8px; flex-wrap:nowrap;"><input class="modal-input" id="cal-add-input" placeholder="${({ todo: '예: 우유 사기', daily: '예: 물 마시기', weekly: '예: 헬스장 가기', monthly: '예: 공과금 내기' })[calAddType]}" maxlength="60" style="padding:10px 12px;" />
            <button class="modal-btn confirm" id="cal-add-btn" style="flex:none; padding:11px 16px; background:${TYPE_COLORS[calAddType]};">추가</button></div>`}`;
     box.querySelectorAll('[data-dd]').forEach(r => r.addEventListener('click', () => {
       const x = items[parseInt(r.getAttribute('data-dd'), 10)];
@@ -2448,7 +2739,8 @@
       const t = tasks.find(y => y.id === x.t.id); if (!t) return;
       const levelBefore = levelInfo().level;
       const wasDone = x.done;
-      if (t.type === 'todo') { t.done = !t.done; t.completedAt = t.done ? toISODate(new Date()) : null; }
+      if (t.type === 'todo' && isRep(t)) toggleTodoOcc(t, x.occ);
+      else if (t.type === 'todo') { t.done = !t.done; t.completedAt = t.done ? toISODate(new Date()) : null; }
       else setHabitCount(t, ds, wasDone ? 0 : habitTarget(t));
       saveTasks(); renderCalendar();
       celebrateAfter(t, ds, levelBefore, wasDone);
@@ -2458,6 +2750,17 @@
       calAddType = b.getAttribute('data-addtype'); renderCalDetail();
       const el = document.getElementById('cal-add-input'); if (el) { el.value = keep; }
     }));
+    wireRepeatPicker('cal-add-rep', calAddRep, () => {
+      const keep = (document.getElementById('cal-add-input') || {}).value || '';
+      renderCalDetail(); const el = document.getElementById('cal-add-input'); if (el) el.value = keep;
+    });
+    const endChip = document.getElementById('cal-add-end');
+    if (endChip) endChip.onclick = () => {
+      const keep = (document.getElementById('cal-add-input') || {}).value || '';
+      openRangePicker(calAddStart, calAddEnd, (st, en) => {
+        calAddStart = st; calAddEnd = en; renderCalDetail(); document.getElementById('cal-add-input').value = keep;
+      }, { step: 'end', title: '시작 ~ 끝 고르기' });
+    };
     const noteBtn = document.getElementById('cal-add-note');
     if (noteBtn) noteBtn.onclick = () => openNoteEditor(null, ds);
     const addBtn = document.getElementById('cal-add-btn');
@@ -2465,9 +2768,11 @@
       const add = () => {
         const v = document.getElementById('cal-add-input').value.trim(); if (!v) return;
         const base = { id: uid(), title: v, category: null, memo: '', reminderTime: null };
-        if (calAddType === 'todo') tasks.unshift(Object.assign(base, { type: 'todo', done: false, createdAt: toISODate(new Date()), completedAt: null, dueDate: ds }));
+        if (calAddType === 'todo') tasks.unshift(Object.assign(base, { type: 'todo', done: false, createdAt: toISODate(new Date()), completedAt: null, dueDate: calAddStart, endDate: calAddEnd && calAddEnd > calAddStart ? calAddEnd : null,
+          repeat: calAddRep.repeat !== 'none' ? calAddRep.repeat : null, lunar: calAddRep.repeat !== 'none' && calAddRep.lunar, doneDates: [] }));
         else tasks.unshift(Object.assign(base, { type: 'habit', frequency: calAddType, repeatDays: calAddType === 'weekly' ? [d.getDay()] : [0, 1, 2, 3, 4, 5, 6],
-          monthDay: calAddType === 'monthly' ? md : 1, completedDates: [], target: 1, counts: {}, pauses: [], createdAt: ds, startDate: ds }));
+          monthDay: calAddType === 'monthly' ? dd : 1, completedDates: [], target: 1, counts: {}, pauses: [], createdAt: ds, startDate: ds }));
+        calAddEnd = null; calAddStart = ds; calAddRep.repeat = 'none'; calAddRep.lunar = false;
         saveTasks(); renderCalendar();
         showToast(`${TYPE_SYMBOL[calAddType]} '${v}' 추가했어요`);
       };

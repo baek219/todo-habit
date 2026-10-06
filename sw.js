@@ -1,7 +1,7 @@
 // 인터넷이 없어도 앱이 열리도록 파일을 폰에 저장해두는 역할
 // 화면 파일은 '인터넷 먼저 → 안 되면 저장본' 방식이라, 새 버전을 올리면 다음에 열 때 바로 반영돼요.
-const CACHE_NAME = 'todo-habit-v1.7';
-const FILES_TO_CACHE = ['./', './index.html', './desk.html', './login.html', './firebase.js', './sync.js', './lunar.js', './manifest.json', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
+const CACHE_NAME = 'todo-habit-v2.0';
+const FILES_TO_CACHE = ['./', './index.html', './desk.html', './login.html', './firebase.js', './sync.js', './lunar.js', './repeat.js', './manifest.json', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
