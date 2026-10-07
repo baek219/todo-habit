@@ -113,6 +113,7 @@
   .quick-prev .qc { font-size: 13px; font-weight: 800; border-radius: 9px; padding: 5px 9px; background: var(--primary-soft); color: var(--primary-dark, var(--primary)); }
   .quick-prev .qc.imp { background: var(--imp); color: #fff; }
   .qex { display:inline-block; border:1px dashed var(--border); border-radius: 8px; padding: 1px 7px; margin: 2px 2px; cursor:pointer; color: var(--text); font-weight:700; }
+  .dd-edit { flex: none; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 9px; width: 34px; height: 30px; font-size: 15px; cursor: pointer; margin-left: 6px; }
   .quick-bar { padding: 10px 16px 0; }
   .quick-bar button { width: 100%; text-align: left; border: 1.5px dashed var(--border); background: var(--surface); color: var(--text); border-radius: 14px; padding: 12px 14px; font-size: 14px; font-weight: 800; font-family: inherit; cursor: pointer; }
   .quick-bar button small { font-weight: 600; color: var(--text-muted); margin-left: 6px; }
@@ -653,7 +654,7 @@
     <div class="settings-card">
       <button class="settings-btn danger" id="reset-btn">전체 데이터 초기화</button>
     </div>
-    <div class="footer-note">할일습관 앱 · v2.2</div>
+    <div class="footer-note">할일습관 앱 · v2.3</div>
   </div>
 </div>
 
@@ -2411,6 +2412,8 @@
       if (gone) { appSettings.bonusXP = (appSettings.bonusXP || 0) + (gone.type === 'habit' ? gone.completedDates.length : (gone.done ? 1 : 0)); saveAppSettings(); }
       tasks = tasks.filter(x => x.id !== id);
       saveTasks(); closeModal(); renderAll();
+      if (activeTab === 'calendar') renderCalendar();
+      showToast('🗑 삭제했어요');
     });
   }
 
@@ -2518,6 +2521,7 @@
           <div class="field-label">메모 (선택)</div>
           <textarea id="modal-memo" class="modal-textarea" placeholder="예: 저녁 8시 전에">${isEdit ? escapeHtml(editTask.memo || '') : ''}</textarea>
           <div class="modal-actions">
+            ${isEdit ? '<button class="modal-btn cancel" id="modal-delete" style="color:#C1543D; flex:none; padding:13px 16px;">🗑 삭제</button>' : ''}
             <button class="modal-btn cancel" id="modal-cancel">취소</button>
             <button class="modal-btn confirm" id="modal-confirm" ${isEdit && editTask.title.trim() ? '' : 'disabled'}>${isEdit ? '저장하기' : '추가하기'}</button>
           </div>
@@ -2764,7 +2768,10 @@
         tasks.unshift({ id: uid(), type: 'habit', frequency: 'monthly', title: text, category: modalCategory, memo, repeatDays: [0,1,2,3,4,5,6], monthDay: md, completedDates: [], target: 1, counts: {}, pauses: [], reminderTime: readRemind(), createdAt: toISODate(new Date()) });
       }
       saveTasks(); renderAll(); closeModal();
+      if (activeTab === 'calendar') renderCalendar();
     });
+    const delBtn = document.getElementById('modal-delete');
+    if (delBtn) delBtn.addEventListener('click', () => confirmDeleteTask(editTask.id));
 
     // 입력창에 포커스가 갈 때 키보드에 가리지 않도록 자동 스크롤
     input.addEventListener('focus', () => {
@@ -2957,8 +2964,9 @@
           (x.type === 'todo' && isRep(x.t) ? ` <small style="color:var(--text-muted); font-weight:700;">🔁 ${repeatText(x.t.dueDate, x.t.repeat, x.t.lunar)}</small>` : '');
         return `<div class="dd-row" data-dd="${i}"><div class="bx" style="border-color:${c}; ${x.done ? `background:${c};` : ''}">${x.done ? '✓' : ''}</div>
           <div class="tt ${x.done ? 'done' : ''}">${x.imp ? '<span class="imp-badge">⭐</span>' : ''}${x.time ? `<span class="time-badge">🕘 ${shortTime(x.time)}</span>` : ''}${escapeHtml(x.t.title)}${rng}${tg > 1 ? ` <small style="color:var(--text-muted)">${cnt}/${tg}</small>` : ''}</div>
-          <div class="ty" style="color:${c}">${TYPE_SYMBOL[x.type]} ${NAME[x.type]}</div></div>`;
-      }).join('') : `<div class="cal-detail-row"><span>이 날은 예정된 게 없어요</span></div>`}
+          <div class="ty" style="color:${c}">${TYPE_SYMBOL[x.type]} ${NAME[x.type]}</div>
+          <button class="dd-edit" data-edit="${x.t.id}" aria-label="수정">✎</button></div>`;
+      }).join('') + `<div class="hint" style="margin-top:6px;">👆 줄을 누르면 체크 · <b>✎</b>를 누르면 수정·삭제 · 메모는 눌러서 바로 고쳐요</div>` : `<div class="cal-detail-row"><span>이 날은 예정된 게 없어요</span></div>`}
       <div style="font-size:12.5px; font-weight:800; margin-top:14px;">＋ 이 날짜에 추가</div>
       <div class="dd-types">${['todo', 'daily', 'weekly', 'monthly', 'memo'].map(k => `<button data-addtype="${k}" class="${calAddType === k ? 'on' : ''}" style="border-color:${TYPE_COLORS[k]}; ${calAddType === k ? `background:${TYPE_COLORS[k]};` : `color:${TYPE_COLORS[k]};`}">${TYPE_SYMBOL[k]} ${NAME[k]}</button>`).join('')}</div>
       <div class="hint">${HINT[calAddType]}</div>
@@ -2969,6 +2977,10 @@
              <div style="margin-top:8px;"><button type="button" class="imp-toggle ${calAddImp ? 'on' : ''}" id="cal-add-imp">${calAddImp ? '⭐ 중요한 날 (켜짐)' : '☆ 중요한 날로 강조'}</button></div>` : ''}
            <div class="inline-row" style="margin-top:8px; flex-wrap:nowrap;"><input class="modal-input" id="cal-add-input" placeholder="${({ todo: '예: 우유 사기', daily: '예: 물 마시기', weekly: '예: 헬스장 가기', monthly: '예: 공과금 내기' })[calAddType]}" maxlength="60" style="padding:10px 12px;" />
            <button class="modal-btn confirm" id="cal-add-btn" style="flex:none; padding:11px 16px; background:${TYPE_COLORS[calAddType]};">추가</button></div>`}`;
+    box.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const t = tasks.find(y => y.id === b.getAttribute('data-edit')); if (t) openModal(t);
+    }));
     box.querySelectorAll('[data-dd]').forEach(r => r.addEventListener('click', () => {
       const x = items[parseInt(r.getAttribute('data-dd'), 10)];
       if (x.type === 'memo') { openNoteEditor(x.n.id); return; }
