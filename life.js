@@ -392,7 +392,9 @@
     place = place || weatherPlaces()[0];
     const key = placeKey(place);
     let cache = {}; try { cache = JSON.parse(localStorage.getItem(WX_KEY)) || {}; } catch (e) {}
-    if (!force && cache[key] && Date.now() - cache[key].at < 30 * 60000) return cache[key].w;
+    // 15분이 지났거나 시(時)가 바뀌었으면 새로 받아옴 (시간별 예보가 '지금'부터 맞게)
+    const c0 = cache[key];
+    if (!force && c0 && Date.now() - c0.at < 15 * 60000 && new Date(c0.at).getHours() === new Date().getHours()) return Object.assign({}, c0.w, { fetchedAt: c0.at });
     const base = 'latitude=' + place.lat + '&longitude=' + place.lon + '&timezone=Asia%2FSeoul';
     const r = await fetch('https://api.open-meteo.com/v1/forecast?' + base +
       '&current=temperature_2m,apparent_temperature,weather_code,precipitation,relative_humidity_2m,wind_speed_10m' +
@@ -403,7 +405,7 @@
     const nowH = d.current.time.slice(0, 13);
     const hi = Math.max(0, d.hourly.time.findIndex(t => t.slice(0, 13) === nowH));
     const w = {
-      place: place.name, temp: Math.round(d.current.temperature_2m), feels: Math.round(d.current.apparent_temperature), code, label, icon,
+      place: place.name, obs: d.current.time, temp: Math.round(d.current.temperature_2m), feels: Math.round(d.current.apparent_temperature), code, label, icon,
       humidity: d.current.relative_humidity_2m, wind: Math.round(d.current.wind_speed_10m / 3.6 * 10) / 10,
       max: Math.round(d.daily.temperature_2m_max[0]), min: Math.round(d.daily.temperature_2m_min[0]), rain: d.daily.precipitation_probability_max[0], wet: d.current.precipitation > 0,
       hours: d.hourly.time.slice(hi, hi + 24).map((t, i) => ({ h: Number(t.slice(11, 13)), temp: Math.round(d.hourly.temperature_2m[hi + i]), rain: d.hourly.precipitation_probability[hi + i], icon: WMO(d.hourly.weather_code[hi + i])[1] })),
@@ -414,9 +416,19 @@
       const a = await fetch('https://air-quality-api.open-meteo.com/v1/air-quality?' + base + '&current=pm10,pm2_5');
       if (a.ok) { const q = await a.json(); w.pm10 = q.current && q.current.pm10 != null ? Math.round(q.current.pm10) : null; w.pm25 = q.current && q.current.pm2_5 != null ? Math.round(q.current.pm2_5) : null; }
     } catch (e) {}
-    cache[key] = { at: Date.now(), w };
+    const at = Date.now();
+    cache[key] = { at, w };
     try { localStorage.setItem(WX_KEY, JSON.stringify(cache)); } catch (e) {}
-    return w;
+    return Object.assign({}, w, { fetchedAt: at });
+  }
+  // '오전 12:15 기준 · 3분 전에 받아옴' (기준 = 날씨 정보가 관측·계산된 시각)
+  function wxStamp(w) {
+    if (!w) return '';
+    const hm = t => { const H = Number(t.slice(11, 13)), M = t.slice(14, 16); return (H < 12 ? '오전 ' : '오후 ') + (H % 12 || 12) + ':' + M; };
+    const base = w.obs ? hm(w.obs) + ' 기준' : '';
+    const min = w.fetchedAt ? Math.floor((Date.now() - w.fetchedAt) / 60000) : null;
+    const ago = min == null ? '' : min < 1 ? '방금 받아옴' : min < 60 ? min + '분 전에 받아옴' : Math.floor(min / 60) + '시간 전에 받아옴';
+    return [base, ago].filter(Boolean).join(' · ');
   }
   // 메뉴 추천의 날씨 칸에 맞춰 바꿈
   function weatherChip(w) {
@@ -553,7 +565,7 @@
 
   window.Life = {
     h, iso, today, won, newId, daysBetween, prettyDate, WD, toast, sheet, choice, usedValues, pager, daysChoice, everyText,
-    store, api, hasServer, group, weather, weatherChip, weatherPlaces, setWeatherPlaces, pmGrade, searchPlace, reversePlace,
+    store, api, hasServer, group, weather, wxStamp, weatherChip, weatherPlaces, setWeatherPlaces, pmGrade, searchPlace, reversePlace,
     isDark, setDark, ensureFixed,
     canInstall: () => !!installEvt, install, standalone, ddayNext,
     onUser(fn) { userSubs.add(fn); try { fn(window.CloudSync && window.CloudSync.user); } catch (e) {} return () => userSubs.delete(fn); },

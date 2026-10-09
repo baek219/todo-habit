@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261010c" />
+<link rel="stylesheet" href="life.css?v=20261010d" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .places{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:start}
@@ -41,19 +41,19 @@
 <main class="page">
   <header class="page-head">
     <span class="date" id="today"></span>
-    <div class="card-head"><h1>날씨</h1><div class="row"><button class="btn sm" type="button" id="refresh">새로고침</button><button class="btn sm primary" type="button" id="add">+ 지역 추가</button></div></div>
+    <div class="card-head"><h1>날씨</h1><div class="row"><button class="btn sm" type="button" id="refresh">모두 새로고침</button><button class="btn sm primary" type="button" id="add">+ 지역 추가</button></div></div>
     <p>보고 싶은 지역을 여러 개 담아두세요. 맨 위 지역은 홈 화면과 메뉴 추천에도 쓰여요.</p>
   </header>
   <div class="places" id="places"></div>
   <p class="small muted">날씨·미세먼지 정보: Open-Meteo · 미세먼지 등급은 환경부 기준(좋음·보통·나쁨·매우 나쁨)으로 나눴어요.</p>
 </main>
 
-<script src="firebase.js?v=20261010c"></script>
-<script src="sync.js?v=20261010c"></script>
-<script src="life-config.js?v=20261010c"></script>
-<script src="life.js?v=20261010c"></script>
-<script src="shell.js?v=20261010c"></script>
-<script src="notify.js?v=20261010c"></script>
+<script src="firebase.js?v=20261010d"></script>
+<script src="sync.js?v=20261010d"></script>
+<script src="life-config.js?v=20261010d"></script>
+<script src="life.js?v=20261010d"></script>
+<script src="shell.js?v=20261010d"></script>
+<script src="notify.js?v=20261010d"></script>
 <script>
 (function () {
   const { h, today, prettyDate, toast, sheet, WD } = Life;
@@ -115,18 +115,22 @@
 
   function card(place, i, total, force) {
     const body = h('div', { class: 'stack', style: 'gap:12px' }, h('span', { class: 'small muted' }, '불러오는 중…'));
+    const stamp = h('span', { class: 'tiny muted wx-stamp' }, '');
     const el = h('section', { class: 'wcard' + (i === 0 ? ' first' : '') },
       h('div', { class: 'whead' },
         h('div', { class: 'stack', style: 'gap:0' },
           h('div', { class: 'row', style: 'gap:6px' }, h('h2', {}, place.name), i === 0 ? h('span', { class: 'badge go' }, '기본') : null),
-          place.sub ? h('span', { class: 'tiny muted' }, place.sub) : null),
+          place.sub ? h('span', { class: 'tiny muted' }, place.sub) : null,
+          stamp),
         h('div', { class: 'tools' },
           i > 0 ? h('button', { class: 'icon-btn', type: 'button', 'aria-label': place.name + ' 위로', title: '위로 (맨 위가 기본 지역)', onclick: () => move(i, -1) }, '↑') : null,
           i < total - 1 ? h('button', { class: 'icon-btn', type: 'button', 'aria-label': place.name + ' 아래로', onclick: () => move(i, 1) }, '↓') : null,
+          h('button', { class: 'icon-btn', type: 'button', 'aria-label': place.name + ' 날씨 새로고침', title: '이 지역만 새로고침', onclick: () => el.replaceWith(card(place, i, total, true)) }, '↻'),
           h('button', { class: 'icon-btn', type: 'button', 'aria-label': place.name + ' 이름 바꾸기', title: '이름 바꾸기', onclick: () => rename(i) }, '✎'),
           h('button', { class: 'icon-btn', type: 'button', 'aria-label': place.name + ' 빼기', onclick: () => remove(i) }, '✕'))),
       body);
     Life.weather(force, place).then(w => {
+      stamp.textContent = Life.wxStamp(w); stamp.dataset.at = w.fetchedAt; stamp.dataset.obs = w.obs || '';
       const g10 = Life.pmGrade(w.pm10, 'pm10'), g25 = Life.pmGrade(w.pm25, 'pm25');
       const lo = Math.min(...w.days.map(d => d.min)), hi = Math.max(...w.days.map(d => d.max)), span = Math.max(1, hi - lo);
       body.replaceChildren(
@@ -182,6 +186,8 @@
   let lastList = '';
   Life.store('settings').subscribe(() => { const now = JSON.stringify(Life.weatherPlaces()); if (now !== lastList) { lastList = now; render(); } });
   render();
+  // '몇 분 전' 글자를 1분마다 고침
+  setInterval(() => document.querySelectorAll('.wx-stamp').forEach(s => { if (s.dataset.at) s.textContent = Life.wxStamp({ obs: s.dataset.obs, fetchedAt: Number(s.dataset.at) }); }), 60000);
 })();
 </script>
 </body>
