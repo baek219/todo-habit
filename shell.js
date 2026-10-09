@@ -17,7 +17,7 @@
     paw: '<circle cx="7" cy="9" r="2"/><circle cx="12" cy="6" r="2"/><circle cx="17" cy="9" r="2"/><path d="M8 17c0-3 2-5 4-5s4 2 4 5c0 2-2 3-4 3s-4-1-4-3z"/>',
     bowl: '<path d="M3 11h18a9 9 0 01-18 0z"/><path d="M8 7c0-2 2-2 2-4M13 7c0-2 2-2 2-4"/>',
     pin: '<path d="M12 21s7-6.5 7-12a7 7 0 00-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/>',
-    ball: '<circle cx="12" cy="12" r="9"/><path d="M8 12h8M12 8v8"/>',
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
     cart: '<path d="M3 4h2l2.4 11h10.2L20 8H7"/><circle cx="9" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/>',
     house: '<path d="M4 11l8-6 8 6v9H4z"/><path d="M9 20v-5h6v5"/>',
     people: '<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 19c0-3 3-5 6-5s6 2 6 5M15 14.5c2.5 0 6 1.2 6 4.5"/>',
@@ -28,7 +28,7 @@
   const svg = (k) => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICON[k] + '</svg>';
 
   const GROUPS = [
-    { items: [{ href: 'home.html', label: '홈', icon: 'home' }] },
+    { items: [{ href: 'home.html', label: '홈', icon: 'home' }, { href: 'weather.html', label: '날씨', icon: 'sun' }] },
     { title: '기록', items: [
       { href: 'index.html', label: '할일·습관', icon: 'check' },
       { href: 'money.html', label: '가계부', icon: 'won' },
@@ -37,8 +37,7 @@
     ] },
     { title: '먹고 즐기기', items: [
       { href: 'menu.html', label: '메뉴 추천', icon: 'bowl' },
-      { href: 'food.html', label: '맛집 찾기', icon: 'pin' },
-      { href: 'lotto.html', label: '로또 번호', icon: 'ball' }
+      { href: 'food.html', label: '맛집 찾기', icon: 'pin' }
     ] },
     { title: '도구', items: [
       { href: 'calc.html', label: '내 집 마련 계산기', icon: 'house' },
@@ -107,7 +106,7 @@
     let curLabel = '';
     const side = document.createElement('nav');
     side.className = 'ln-side'; side.setAttribute('aria-label', '생활노트 메뉴');
-    let html = '<a class="ln-brand" href="home.html"><img src="icon-192.png" alt=""><span><b>생활노트</b><small>할일 · 기록 · 맛집</small></span></a>';
+    let html = '<a class="ln-brand" href="home.html"><img src="icon-192.png" alt=""><span><b>생활노트</b><small>할일 · 기록 · 날씨 · 맛집</small></span></a>';
     GROUPS.forEach(g => {
       html += '<div class="ln-group">' + (g.title ? '<div class="ln-gtitle">' + g.title + '</div>' : '');
       g.items.forEach(it => {

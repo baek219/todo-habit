@@ -255,27 +255,58 @@
   window.addEventListener('cloudsync', onAuth);
 
   /* ---------- 날씨 (Open-Meteo, 열쇠 필요 없음) ---------- */
-  const WX_KEY = 'life_weather_cache_v1';
+  const WX_KEY = 'life_weather_cache_v2';
   const WMO = c => c === 0 ? ['맑음', '☀️'] : c <= 2 ? ['구름 조금', '🌤️'] : c === 3 ? ['흐림', '☁️'] : c <= 48 ? ['안개', '🌫️'] : c <= 57 ? ['이슬비', '🌦️'] : c <= 67 ? ['비', '🌧️'] : c <= 77 ? ['눈', '🌨️'] : c <= 82 ? ['소나기', '🌧️'] : c <= 86 ? ['눈', '🌨️'] : ['뇌우', '⛈️'];
-  function weatherPlace() {
+  const DEFAULT_PLACE = { name: '서울', lat: 37.5665, lon: 126.978 };
+  // 저장해 둔 지역 목록 (첫 번째가 홈·메뉴 추천에 쓰이는 기본 지역)
+  function weatherPlaces() {
     const m = (stores.settings ? stores.settings.meta() : null) || {};
-    let local = null; try { local = JSON.parse(localStorage.getItem('life_weather_place_v1')); } catch (e) {}
-    return m.weatherPlace || local || { name: '서울', lat: 37.5665, lon: 126.978 };
+    if (Array.isArray(m.weatherPlaces) && m.weatherPlaces.length) return m.weatherPlaces;
+    let local = null; try { local = JSON.parse(localStorage.getItem('life_weather_places_v1')); } catch (e) {}
+    if (Array.isArray(local) && local.length) return local;
+    if (m.weatherPlace) return [m.weatherPlace];
+    return [DEFAULT_PLACE];
   }
-  async function weather(force) {
-    const place = weatherPlace();
-    try {
-      const c = JSON.parse(localStorage.getItem(WX_KEY));
-      if (!force && c && c.place === place.name && Date.now() - c.at < 30 * 60000) return c.w;
-    } catch (e) {}
-    const u = 'https://api.open-meteo.com/v1/forecast?latitude=' + place.lat + '&longitude=' + place.lon +
-      '&current=temperature_2m,apparent_temperature,weather_code,precipitation&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FSeoul&forecast_days=1';
-    const r = await fetch(u); if (!r.ok) throw new Error('날씨를 가져오지 못했어요.');
+  function setWeatherPlaces(list) {
+    list = (list || []).slice(0, 12);
+    try { localStorage.setItem('life_weather_places_v1', JSON.stringify(list)); } catch (e) {}
+    if (window.CloudSync && window.CloudSync.user) settingsStore().setMeta({ weatherPlaces: list });
+  }
+  const placeKey = p => p.name + '@' + Number(p.lat).toFixed(2) + ',' + Number(p.lon).toFixed(2);
+  function pmGrade(v, kind) {
+    if (v == null) return null;
+    const t = kind === 'pm25' ? [15, 35, 75] : [30, 80, 150];
+    return v <= t[0] ? ['좋음', 'go'] : v <= t[1] ? ['보통', ''] : v <= t[2] ? ['나쁨', 'warn'] : ['매우 나쁨', 'bad'];
+  }
+  // 한 지역의 지금 날씨 + 24시간 + 7일 예보 + 미세먼지 (30분 동안은 저장본 사용)
+  async function weather(force, place) {
+    place = place || weatherPlaces()[0];
+    const key = placeKey(place);
+    let cache = {}; try { cache = JSON.parse(localStorage.getItem(WX_KEY)) || {}; } catch (e) {}
+    if (!force && cache[key] && Date.now() - cache[key].at < 30 * 60000) return cache[key].w;
+    const base = 'latitude=' + place.lat + '&longitude=' + place.lon + '&timezone=Asia%2FSeoul';
+    const r = await fetch('https://api.open-meteo.com/v1/forecast?' + base +
+      '&current=temperature_2m,apparent_temperature,weather_code,precipitation,relative_humidity_2m,wind_speed_10m' +
+      '&hourly=temperature_2m,precipitation_probability,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=7');
+    if (!r.ok) throw new Error('날씨를 가져오지 못했어요.');
     const d = await r.json();
     const code = d.current.weather_code, [label, icon] = WMO(code);
-    const w = { place: place.name, temp: Math.round(d.current.temperature_2m), feels: Math.round(d.current.apparent_temperature), code, label, icon,
-      max: Math.round(d.daily.temperature_2m_max[0]), min: Math.round(d.daily.temperature_2m_min[0]), rain: d.daily.precipitation_probability_max[0], wet: d.current.precipitation > 0 };
-    try { localStorage.setItem(WX_KEY, JSON.stringify({ at: Date.now(), place: place.name, w })); } catch (e) {}
+    const nowH = d.current.time.slice(0, 13);
+    const hi = Math.max(0, d.hourly.time.findIndex(t => t.slice(0, 13) === nowH));
+    const w = {
+      place: place.name, temp: Math.round(d.current.temperature_2m), feels: Math.round(d.current.apparent_temperature), code, label, icon,
+      humidity: d.current.relative_humidity_2m, wind: Math.round(d.current.wind_speed_10m / 3.6 * 10) / 10,
+      max: Math.round(d.daily.temperature_2m_max[0]), min: Math.round(d.daily.temperature_2m_min[0]), rain: d.daily.precipitation_probability_max[0], wet: d.current.precipitation > 0,
+      hours: d.hourly.time.slice(hi, hi + 24).map((t, i) => ({ h: Number(t.slice(11, 13)), temp: Math.round(d.hourly.temperature_2m[hi + i]), rain: d.hourly.precipitation_probability[hi + i], icon: WMO(d.hourly.weather_code[hi + i])[1] })),
+      days: d.daily.time.map((t, i) => ({ date: t, icon: WMO(d.daily.weather_code[i])[1], label: WMO(d.daily.weather_code[i])[0], max: Math.round(d.daily.temperature_2m_max[i]), min: Math.round(d.daily.temperature_2m_min[i]), rain: d.daily.precipitation_probability_max[i] })),
+      pm10: null, pm25: null
+    };
+    try { // 미세먼지 (실패해도 날씨는 보여줌)
+      const a = await fetch('https://air-quality-api.open-meteo.com/v1/air-quality?' + base + '&current=pm10,pm2_5');
+      if (a.ok) { const q = await a.json(); w.pm10 = q.current && q.current.pm10 != null ? Math.round(q.current.pm10) : null; w.pm25 = q.current && q.current.pm2_5 != null ? Math.round(q.current.pm2_5) : null; }
+    } catch (e) {}
+    cache[key] = { at: Date.now(), w };
+    try { localStorage.setItem(WX_KEY, JSON.stringify(cache)); } catch (e) {}
     return w;
   }
   // 메뉴 추천의 날씨 칸에 맞춰 바꿈
@@ -286,9 +317,12 @@
     if (w.feels >= 27) return '더움';
     return '맑음';
   }
-  function setWeatherPlace(place) {
-    try { localStorage.setItem('life_weather_place_v1', JSON.stringify(place)); localStorage.removeItem(WX_KEY); } catch (e) {}
-    if (window.CloudSync && window.CloudSync.user) settingsStore().setMeta({ weatherPlace: place });
+  // 지역 이름으로 찾기 (한국 위주)
+  async function searchPlace(q) {
+    const r = await fetch('https://geocoding-api.open-meteo.com/v1/search?count=8&language=ko&name=' + encodeURIComponent(q));
+    const d = await r.json();
+    return (d.results || []).filter(x => !x.country_code || x.country_code === 'KR')
+      .map(x => ({ name: x.name, lat: +x.latitude.toFixed(3), lon: +x.longitude.toFixed(3), sub: [x.admin1, x.admin2].filter(Boolean).join(' ') }));
   }
 
   /* ---------- 앱처럼 설치 ---------- */
@@ -344,7 +378,7 @@
 
   window.Life = {
     h, iso, today, won, newId, daysBetween, prettyDate, WD, toast, sheet,
-    store, api, hasServer, group, weather, weatherChip, weatherPlace, setWeatherPlace,
+    store, api, hasServer, group, weather, weatherChip, weatherPlaces, setWeatherPlaces, pmGrade, searchPlace,
     canInstall: () => !!installEvt, install, standalone,
     onUser(fn) { userSubs.add(fn); try { fn(window.CloudSync && window.CloudSync.user); } catch (e) {} return () => userSubs.delete(fn); },
     user: () => (window.CloudSync && window.CloudSync.user) || null,

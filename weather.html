@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>날씨 · 생활노트</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<meta name="theme-color" content="#2F6F5E" />
+<link rel="stylesheet" href="life.css" />
+<script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
+<style>
+  .places{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:start}
+  .wcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:grid;gap:12px;min-width:0}
+  .wcard.first{border-color:var(--primary)}
+  .whead{display:flex;align-items:center;gap:8px;justify-content:space-between}
+  .whead h2{font-size:18px}
+  .wnow{display:flex;align-items:center;gap:14px}
+  .wnow .ic{font-size:44px;line-height:1}
+  .wnow b{font-size:36px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+  .facts{display:flex;flex-wrap:wrap;gap:6px}
+  .facts .badge{font-weight:600}
+  .hours{display:flex;gap:4px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+  .hour{flex:none;width:46px;display:grid;justify-items:center;gap:2px;font-size:12px;font-variant-numeric:tabular-nums;background:var(--surface2);border-radius:10px;padding:6px 0}
+  .hour .t{font-weight:800;font-size:13px}
+  .hour .r{color:#2F7FD0;font-size:11px;min-height:14px}
+  .days{list-style:none;margin:0;padding:0;display:grid}
+  .days li{display:grid;grid-template-columns:72px 28px 1fr 52px;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px;font-variant-numeric:tabular-nums}
+  .days li:last-child{border-bottom:0}
+  .range{position:relative;height:6px;border-radius:99px;background:var(--surface2)}
+  .range i{position:absolute;top:0;bottom:0;border-radius:99px;background:linear-gradient(90deg,#5AA9E6,#F2B705,#E0503A)}
+  .days .rp{color:#2F7FD0;font-size:12px;text-align:right}
+  .tools{display:flex;gap:4px}
+  details summary{cursor:pointer;font-weight:700;font-size:14px;color:var(--primary-dark)}
+  details[open] summary{margin-bottom:10px}
+  .results{display:grid;gap:6px}
+  .results button{justify-content:flex-start;text-align:left}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="page-head">
+    <span class="date" id="today"></span>
+    <div class="card-head"><h1>날씨</h1><div class="row"><button class="btn sm" type="button" id="refresh">새로고침</button><button class="btn sm primary" type="button" id="add">+ 지역 추가</button></div></div>
+    <p>보고 싶은 지역을 여러 개 담아두세요. 맨 위 지역은 홈 화면과 메뉴 추천에도 쓰여요.</p>
+  </header>
+  <div class="places" id="places"></div>
+  <p class="small muted">날씨·미세먼지 정보: Open-Meteo · 미세먼지 등급은 환경부 기준(좋음·보통·나쁨·매우 나쁨)으로 나눴어요.</p>
+</main>
+
+<script src="firebase.js"></script>
+<script src="sync.js"></script>
+<script src="life-config.js"></script>
+<script src="life.js"></script>
+<script src="shell.js"></script>
+<script>
+(function () {
+  const { h, today, prettyDate, toast, sheet, WD } = Life;
+  const $ = id => document.getElementById(id);
+  $('today').textContent = prettyDate(today());
+
+  /* 지역 추가 */
+  function addPlace() {
+    const results = h('div', { class: 'results' });
+    const q = h('input', { type: 'search', placeholder: '예: 수지구, 판교, 부산, 제주', maxlength: '30' });
+    const add = p => {
+      const list = Life.weatherPlaces();
+      if (list.some(x => Math.abs(x.lat - p.lat) < 0.01 && Math.abs(x.lon - p.lon) < 0.01)) { toast('이미 있는 지역이에요'); return; }
+      if (list.length >= 12) { toast('지역은 12개까지 담을 수 있어요'); return; }
+      Life.setWeatherPlaces(list.concat([{ name: p.name, lat: p.lat, lon: p.lon }])); close(); toast(p.name + ' 날씨를 추가했어요'); render();
+    };
+    const search = async () => {
+      const v = q.value.trim(); if (!v) return;
+      results.replaceChildren(h('span', { class: 'small muted' }, '찾는 중…'));
+      try {
+        const list = await Life.searchPlace(v);
+        results.replaceChildren(...(list.length ? list.map(x => h('button', { class: 'btn', type: 'button', onclick: () => add(x) }, h('span', {}, h('b', {}, x.name), x.sub ? h('span', { class: 'small muted' }, '  ' + x.sub) : null)))
+          : [h('span', { class: 'small muted' }, '못 찾았어요. 시·군·구 이름으로 찾아보세요. (예: 용인, 수지구, 강남구)')]));
+      } catch (e) { results.replaceChildren(h('span', { class: 'small muted' }, '검색하지 못했어요. 인터넷 연결을 확인해 주세요.')); }
+    };
+    q.addEventListener('keydown', e => { if (e.key === 'Enter') search(); });
+    const close = sheet('지역 추가', h('div', { class: 'stack' },
+      h('button', { class: 'btn primary', type: 'button', onclick: () => {
+        if (!navigator.geolocation) { toast('이 기기에서는 위치를 쓸 수 없어요'); return; }
+        navigator.geolocation.getCurrentPosition(p => add({ name: '현재 위치', lat: +p.coords.latitude.toFixed(3), lon: +p.coords.longitude.toFixed(3) }),
+          () => toast('위치를 쓸 수 없어요. 맛집 찾기의 "위치 허용 방법"을 참고하거나 아래에서 검색해 주세요.'), { timeout: 10000, maximumAge: 600000 });
+      } }, '지금 내 위치 추가'),
+      h('div', { class: 'row' }, h('div', { style: 'flex:1 1 180px' }, q), h('button', { class: 'btn', type: 'button', onclick: search }, '찾기')),
+      results));
+  }
+  $('add').onclick = addPlace;
+  $('refresh').onclick = () => render(true);
+
+  function move(i, dir) {
+    const list = Life.weatherPlaces().slice(); const j = i + dir; if (j < 0 || j >= list.length) return;
+    [list[i], list[j]] = [list[j], list[i]]; Life.setWeatherPlaces(list); render();
+  }
+  function rename(i) {
+    const list = Life.weatherPlaces().slice();
+    const inp = h('input', { type: 'text', maxlength: '20', value: list[i].name });
+    const close = sheet('이름 바꾸기', h('div', { class: 'stack' }, h('label', { class: 'field' }, h('span', { class: 'label' }, '지역 이름 (예: 집, 회사, 부모님 댁)'), inp),
+      h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => { if (!inp.value.trim()) return; list[i] = Object.assign({}, list[i], { name: inp.value.trim() }); Life.setWeatherPlaces(list); close(); render(); } }, '저장'))));
+  }
+  function remove(i) {
+    const list = Life.weatherPlaces().slice();
+    if (list.length <= 1) { toast('지역은 하나 이상 있어야 해요'); return; }
+    const name = list[i].name; list.splice(i, 1); Life.setWeatherPlaces(list); toast(name + ' 날씨를 뺐어요'); render();
+  }
+
+  function card(place, i, total, force) {
+    const body = h('div', { class: 'stack', style: 'gap:12px' }, h('span', { class: 'small muted' }, '불러오는 중…'));
+    const el = h('section', { class: 'wcard' + (i === 0 ? ' first' : '') },
+      h('div', { class: 'whead' },
+        h('div', { class: 'row', style: 'gap:6px' }, h('h2', {}, place.name), i === 0 ? h('span', { class: 'badge go' }, '기본') : null),
+        h('div', { class: 'tools' },
+          i > 0 ? h('button', { class: 'icon-btn', type: 'button', 'aria-label': place.name + ' 위로', title: '위로 (맨 위가 기본 지역)', onclick: () => move(i, -1) }, '↑') : null,
+          i < total - 1 ? h('button', { class: 'icon-btn', type: 'button', 'aria-label': place.name + ' 아래로', onclick: () => move(i, 1) }, '↓') : null,
+          h('button', { class: 'icon-btn', type: 'button', 'aria-label': place.name + ' 이름 바꾸기', title: '이름 바꾸기', onclick: () => rename(i) }, '✎'),
+          h('button', { class: 'icon-btn', type: 'button', 'aria-label': place.name + ' 빼기', onclick: () => remove(i) }, '✕'))),
+      body);
+    Life.weather(force, place).then(w => {
+      const g10 = Life.pmGrade(w.pm10, 'pm10'), g25 = Life.pmGrade(w.pm25, 'pm25');
+      const lo = Math.min(...w.days.map(d => d.min)), hi = Math.max(...w.days.map(d => d.max)), span = Math.max(1, hi - lo);
+      body.replaceChildren(
+        h('div', { class: 'wnow' }, h('span', { class: 'ic', 'aria-hidden': 'true' }, w.icon),
+          h('div', {}, h('b', {}, w.temp + '°'), h('div', { class: 'small muted' }, w.label + ' · 체감 ' + w.feels + '°'))),
+        h('div', { class: 'facts' },
+          h('span', { class: 'badge' }, '최고 ' + w.max + '° / 최저 ' + w.min + '°'),
+          h('span', { class: 'badge' }, '비 ' + w.rain + '%'),
+          h('span', { class: 'badge' }, '습도 ' + w.humidity + '%'),
+          h('span', { class: 'badge' }, '바람 ' + w.wind + 'm/s'),
+          g10 ? h('span', { class: 'badge ' + g10[1] }, '미세먼지 ' + g10[0]) : null,
+          g25 ? h('span', { class: 'badge ' + g25[1] }, '초미세 ' + g25[0]) : null),
+        h('details', i === 0 ? { open: true } : {},
+          h('summary', {}, '시간별·주간 예보'),
+          h('div', { class: 'stack', style: 'gap:12px' },
+            h('div', { class: 'hours', role: 'list', 'aria-label': '24시간 예보' }, w.hours.map((x, k) => h('div', { class: 'hour', role: 'listitem' },
+              h('span', { class: 'tiny muted' }, k === 0 ? '지금' : x.h + '시'), h('span', { 'aria-hidden': 'true' }, x.icon), h('span', { class: 't' }, x.temp + '°'), h('span', { class: 'r' }, x.rain >= 20 ? x.rain + '%' : '')))),
+            h('ul', { class: 'days' }, w.days.map((d, k) => {
+              const dt = new Date(d.date + 'T00:00:00');
+              return h('li', {}, h('span', {}, k === 0 ? '오늘' : k === 1 ? '내일' : WD[dt.getDay()] + ' ' + (dt.getMonth() + 1) + '/' + dt.getDate()),
+                h('span', { 'aria-hidden': 'true', title: d.label }, d.icon),
+                h('span', { class: 'row', style: 'gap:6px;flex-wrap:nowrap' }, h('span', { class: 'small muted', style: 'width:28px;text-align:right' }, d.min + '°'),
+                  h('span', { class: 'range', style: 'flex:1' }, h('i', { style: 'left:' + ((d.min - lo) / span * 100) + '%;right:' + ((hi - d.max) / span * 100) + '%' })),
+                  h('b', { style: 'width:28px' }, d.max + '°')),
+                h('span', { class: 'rp' }, d.rain >= 20 ? '비 ' + d.rain + '%' : ''));
+            }))))
+      );
+    }).catch(() => body.replaceChildren(h('span', { class: 'small muted' }, '날씨를 불러오지 못했어요. "새로고침"을 눌러 보세요.')));
+    return el;
+  }
+
+  function render(force) {
+    const list = Life.weatherPlaces();
+    lastList = JSON.stringify(list);
+    $('places').replaceChildren(...list.map((p, i) => card(p, i, list.length, force)));
+  }
+  // 다른 기기에서 지역 목록을 바꾸면 따라감
+  let lastList = '';
+  Life.store('settings').subscribe(() => { const now = JSON.stringify(Life.weatherPlaces()); if (now !== lastList) { lastList = now; render(); } });
+  render();
+})();
+</script>
+</body>
+</html>
