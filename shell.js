@@ -1,6 +1,7 @@
-/* 생활노트 왼쪽 메뉴 (모든 페이지 공통)
+/* 생활노트 메뉴 (모든 페이지 공통)
  * - PC(넓은 화면): 왼쪽에 메뉴가 항상 보여요.
- * - 폰(좁은 화면): 위쪽 줄의 ☰ 버튼을 누르면 왼쪽에서 메뉴가 나와요.
+ * - 폰(좁은 화면): 아래쪽 탭 메뉴(홈·할일·가계부·장보기·더보기). 할일습관 화면은 자기 탭이 있어서 위쪽 ☰ 버튼만.
+ * - 페이지마다 '사용법' 버튼을 붙여요.
  * - 안드로이드 앱 안에서는 앱 자체 메뉴를 쓰므로 나타나지 않아요.
  */
 (function () {
@@ -23,6 +24,8 @@
     people: '<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 19c0-3 3-5 6-5s6 2 6 5M15 14.5c2.5 0 6 1.2 6 4.5"/>',
     down: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
     menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+    more: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
+    help: '<circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 014.8.9c0 1.7-2.4 2.2-2.4 3.6"/><circle cx="12" cy="17" r=".6" fill="currentColor"/>',
     x: '<path d="M6 6l12 12M18 6L6 18"/>'
   };
   const svg = (k) => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICON[k] + '</svg>';
@@ -46,45 +49,74 @@
   ];
 
   const css = `
-  :root{--ln-bg:#EFF4F1;--ln-surface:#FFFFFF;--ln-fg:#223028;--ln-muted:#728075;--ln-line:#E1E8E2;--ln-primary:#2F6F5E;--ln-soft:#DCEAE4;--ln-w:236px}
-  html.ln-dark{--ln-bg:#17201C;--ln-surface:#1F2B25;--ln-fg:#E9F1EC;--ln-muted:#8FA69C;--ln-line:#2C3B34;--ln-primary:#4CA98A;--ln-soft:#24352D}
-  .ln-side{position:fixed;top:0;bottom:0;left:0;width:var(--ln-w);background:var(--ln-surface);border-right:1px solid var(--ln-line);z-index:60;display:flex;flex-direction:column;
-    padding:calc(18px + env(safe-area-inset-top,0px)) 12px calc(14px + env(safe-area-inset-bottom,0px));font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Segoe UI",sans-serif;color:var(--ln-fg);overflow-y:auto}
-  .ln-brand{display:flex;align-items:center;gap:10px;padding:0 8px 16px;text-decoration:none;color:var(--ln-fg)}
-  .ln-brand img{width:34px;height:34px;border-radius:9px}
-  .ln-brand b{font-size:17px;font-weight:800;letter-spacing:-.01em}
-  .ln-brand small{display:block;font-size:11px;color:var(--ln-muted);font-weight:600}
-  .ln-group{display:flex;flex-direction:column;gap:2px;margin-bottom:12px}
-  .ln-gtitle{font-size:11px;font-weight:700;color:var(--ln-muted);letter-spacing:.08em;padding:6px 10px 4px}
-  .ln-link{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;color:var(--ln-fg);text-decoration:none;font-size:15px;font-weight:600}
-  .ln-link:hover{background:var(--ln-bg)}
-  .ln-link[aria-current="page"]{background:var(--ln-soft);color:var(--ln-primary)}
-  .ln-link:focus-visible,.ln-btn:focus-visible,.ln-top button:focus-visible{outline:2px solid var(--ln-primary);outline-offset:2px}
-  .ln-acc{margin-top:auto;border-top:1px solid var(--ln-line);padding:12px 6px 0;display:grid;gap:8px}
-  .ln-who{display:flex;align-items:center;gap:9px;min-width:0}
-  .ln-who img{width:30px;height:30px;border-radius:50%;flex:none;background:var(--ln-soft)}
-  .ln-who span{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .ln-who em{display:block;font-style:normal;font-size:11px;color:var(--ln-muted);font-weight:500}
-  .ln-tip{font-size:11px;color:var(--ln-muted);line-height:1.45}
-  .ln-btn{border:1.5px solid var(--ln-line);background:var(--ln-surface);color:var(--ln-fg);border-radius:10px;padding:9px 10px;font:inherit;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
-  .ln-btn.g{border-color:#dadce0}
+  @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css");
+  :root{--ln-bg:#F2F5F2;--ln-surface:#FFFFFF;--ln-fg:#18231D;--ln-muted:#6B7A71;--ln-line:#E3E9E4;--ln-primary:#2B6B57;--ln-soft:#E2EEE8;--ln-mark:#FFE58A;--ln-w:248px;
+    --ln-font:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif}
+  html.ln-dark{--ln-bg:#121815;--ln-surface:#1A221E;--ln-fg:#E8EFEA;--ln-muted:#93A59B;--ln-line:#2A3630;--ln-primary:#5DBB98;--ln-soft:#1E3229;--ln-mark:#6B5A12}
+  .ln-side,.ln-top,.ln-bn,.ln-help,.ln-hs{font-family:var(--ln-font);-webkit-font-smoothing:antialiased}
+  .ln-side{position:fixed;top:0;bottom:0;left:0;width:var(--ln-w);background:var(--ln-bg);border-right:1px solid var(--ln-line);z-index:60;display:flex;flex-direction:column;
+    padding:calc(22px + env(safe-area-inset-top,0px)) 14px calc(16px + env(safe-area-inset-bottom,0px));color:var(--ln-fg);overflow-y:auto}
+  .ln-brand{display:flex;align-items:center;gap:11px;padding:0 8px 22px;text-decoration:none;color:var(--ln-fg)}
+  .ln-brand img{width:36px;height:36px;border-radius:11px}
+  .ln-brand b{display:block;font-size:18px;font-weight:800;letter-spacing:-.03em;line-height:1.2}
+  .ln-brand small{display:block;font-size:12px;color:var(--ln-muted);font-weight:500}
+  .ln-group{display:flex;flex-direction:column;gap:2px;margin-bottom:16px}
+  .ln-gtitle{font-size:12px;font-weight:650;color:var(--ln-muted);padding:4px 12px 6px}
+  .ln-link{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:12px;color:var(--ln-fg);text-decoration:none;font-size:15px;font-weight:550;letter-spacing:-.01em}
+  .ln-link svg{color:var(--ln-muted)}
+  .ln-link:hover{background:var(--ln-surface)}
+  .ln-link[aria-current="page"]{background:var(--ln-surface);font-weight:750;box-shadow:0 1px 2px rgba(24,35,29,.06),0 0 0 1px var(--ln-line)}
+  .ln-link[aria-current="page"] svg{color:var(--ln-primary)}
+  .ln-link:focus-visible,.ln-btn:focus-visible,.ln-top button:focus-visible,.ln-bn a:focus-visible,.ln-bn button:focus-visible,.ln-help:focus-visible{outline:2px solid var(--ln-primary);outline-offset:2px}
+  .ln-acc{margin-top:auto;border-top:1px solid var(--ln-line);padding:14px 4px 0;display:grid;gap:9px}
+  .ln-who{display:flex;align-items:center;gap:10px;min-width:0}
+  .ln-who img{width:32px;height:32px;border-radius:50%;flex:none;background:var(--ln-soft)}
+  .ln-who span{font-size:13.5px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ln-who em{display:block;font-style:normal;font-size:11.5px;color:var(--ln-muted);font-weight:500}
+  .ln-tip{font-size:11.5px;color:var(--ln-muted);line-height:1.5}
+  .ln-btn{border:1px solid var(--ln-line);background:var(--ln-surface);color:var(--ln-fg);border-radius:12px;padding:10px;font:inherit;font-size:14px;font-weight:650;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
   .ln-btn.ln-install{background:var(--ln-primary);border-color:var(--ln-primary);color:#fff}
-  html.ln-dark .ln-btn.ln-install{color:#0F1A15}
-  .ln-top{display:none}
-  .ln-veil{display:none}
+  html.ln-dark .ln-btn.ln-install{color:#0C1611}
+  .ln-top,.ln-veil,.ln-bn{display:none}
+  /* 사용법 버튼 */
+  .ln-help{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--ln-line);background:var(--ln-surface);color:var(--ln-fg);border-radius:999px;padding:6px 12px 6px 9px;font-size:13px;font-weight:650;cursor:pointer;line-height:1}
+  .ln-help svg{width:17px;height:17px;color:var(--ln-primary)}
+  .page-head > .ln-help{position:absolute;right:0;top:2px}
+  /* 사용법 창 */
+  .ln-hveil{position:fixed;inset:0;background:rgba(15,24,19,.42);z-index:95;display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(2px)}
+  .ln-hs{background:var(--ln-surface);color:var(--ln-fg);width:100%;max-width:540px;border-radius:24px 24px 0 0;padding:24px 22px calc(26px + env(safe-area-inset-bottom,0px));max-height:86vh;overflow-y:auto;display:grid;gap:16px}
+  .ln-hs h2{margin:0;font-size:21px;font-weight:800;letter-spacing:-.03em}
+  .ln-hs .ln-hsub{margin:-8px 0 0;color:var(--ln-muted);font-size:14px}
+  .ln-hs ol{margin:0;padding:0;list-style:none;counter-reset:s;display:grid;gap:12px}
+  .ln-hs ol li{counter-increment:s;display:grid;grid-template-columns:28px 1fr;gap:10px;font-size:14.5px;line-height:1.55}
+  .ln-hs ol li::before{content:counter(s);width:24px;height:24px;border-radius:50%;background:var(--ln-soft);color:var(--ln-primary);font-weight:800;font-size:13px;display:grid;place-items:center;margin-top:1px}
+  .ln-hs ol li b{font-weight:750}
+  .ln-hs .ln-htips{background:var(--ln-bg);border-radius:14px;padding:12px 14px;font-size:13.5px;color:var(--ln-muted);display:grid;gap:6px}
+  .ln-hs .ln-htips b{color:var(--ln-fg)}
+  .ln-hs .ln-hclose{justify-self:stretch;border:0;background:var(--ln-fg);color:var(--ln-bg);border-radius:14px;padding:13px;font:inherit;font-size:15px;font-weight:700;cursor:pointer}
+  @media (min-width:700px){.ln-hveil{align-items:center}.ln-hs{border-radius:24px}}
   @media (min-width:960px){
     html.ln-on{padding-left:var(--ln-w)}
     html.ln-on .fab,html.ln-on .bottom-nav{left:var(--ln-w)!important}
   }
   @media (max-width:959.98px){
-    .ln-side{transform:translateX(-102%);transition:transform .22s ease;box-shadow:none}
+    .ln-side{transform:translateX(-102%);transition:transform .22s ease;box-shadow:none;background:var(--ln-surface)}
     .ln-side.open{transform:none;box-shadow:0 10px 40px rgba(0,0,0,.25)}
-    .ln-veil.open{display:block;position:fixed;inset:0;background:rgba(20,30,25,.45);z-index:59}
-    .ln-top{display:flex;position:sticky;top:0;z-index:30;align-items:center;gap:8px;padding:calc(8px + env(safe-area-inset-top,0px)) 12px 8px;background:var(--ln-bg);
-      font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Segoe UI",sans-serif;color:var(--ln-fg)}
-    .ln-top button{border:1px solid var(--ln-line);background:var(--ln-surface);color:var(--ln-fg);border-radius:10px;width:40px;height:40px;display:grid;place-items:center;cursor:pointer}
-    .ln-top b{font-size:16px;font-weight:800}
+    .ln-veil.open{display:block;position:fixed;inset:0;background:rgba(15,24,19,.42);z-index:59}
+    /* 할일습관 화면용 위쪽 줄 */
+    .ln-top{display:flex;position:sticky;top:0;z-index:30;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top,0px)) 14px 8px;background:var(--ln-bg);color:var(--ln-fg)}
+    .ln-top button.ln-menu{border:1px solid var(--ln-line);background:var(--ln-surface);color:var(--ln-fg);border-radius:12px;width:40px;height:40px;display:grid;place-items:center;cursor:pointer}
+    .ln-top b{font-size:16px;font-weight:800;letter-spacing:-.02em}
     .ln-top .ln-cur{color:var(--ln-muted);font-size:14px;font-weight:600}
+    .ln-top .ln-help{margin-left:auto}
+    /* 아래쪽 탭 메뉴 */
+    html.ln-bnon .ln-bn{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:50;background:color-mix(in srgb,var(--ln-surface) 92%,transparent);
+      backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);border-top:1px solid var(--ln-line);padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px))}
+    .ln-bn a,.ln-bn button{display:grid;justify-items:center;gap:3px;padding:6px 0 4px;border:0;background:transparent;color:var(--ln-muted);text-decoration:none;font:inherit;font-size:11px;font-weight:600;cursor:pointer;border-radius:12px}
+    .ln-bn svg{width:23px;height:23px}
+    .ln-bn [aria-current="page"]{color:var(--ln-fg);font-weight:800}
+    .ln-bn [aria-current="page"] svg{color:var(--ln-primary);stroke-width:2.2}
+    html.ln-bnon body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
   }
   @media (prefers-reduced-motion:reduce){.ln-side{transition:none}}
   `;
@@ -97,16 +129,105 @@
     return (file === '' ? 'index.html' : file) + (file === 'index.html' && tab && tab !== 'checklist' ? '?tab=' + tab : '');
   }
 
+  /* 페이지별 사용법 */
+  const HELP = {
+    'home.html': { title: '홈 사용법', sub: '오늘 필요한 것만 한 화면에 모아 보여줘요.', steps: [
+      '각 칸 오른쪽 위 글자(예: <b>가계부</b>, <b>목록</b>)를 누르면 그 메뉴로 가요.',
+      '맨 위 날씨는 <b>날씨</b> 메뉴에서 맨 위에 둔 지역 기준이에요.',
+      '<b>Google로 로그인</b>하면 폰·PC의 할 일과 모든 기록이 자동으로 맞춰져요.',
+      '폰에서 <b>앱으로 설치</b>가 보이면 눌러 두세요. 홈 화면에 생활노트 아이콘이 생겨요.'
+    ], tips: ['반려동물 일정·사료 떨어짐은 7일 안으로 다가온 것만 홈에 나와요.'] },
+    'weather.html': { title: '날씨 사용법', sub: '여러 지역의 날씨를 한 번에 봐요.', steps: [
+      '위쪽 <b>+ 지역 추가</b>를 눌러요.',
+      '<b>지금 내 위치 추가</b>를 누르거나, "수지구 동천동"처럼 동네 이름을 검색해서 골라요.',
+      '카드의 <b>↑ ↓</b>로 순서를 바꿔요. <b>맨 위 지역</b>이 홈 화면과 메뉴 추천에 쓰여요.',
+      '<b>✎</b>로 "집", "회사"처럼 이름을 바꾸고, <b>✕</b>로 뺄 수 있어요.',
+      '<b>시간별·주간 예보</b>를 누르면 24시간과 7일 예보가 펼쳐져요.'
+    ], tips: ['동네 이름 검색은 로그인했을 때 카카오 지도로 정확하게 찾아요.', '미세먼지는 좋음·보통·나쁨·매우 나쁨 4단계로 보여줘요.'] },
+    'index.html': { title: '할일·습관 사용법', sub: '할 일과 매일 지킬 습관을 체크해요.', steps: [
+      '오른쪽 아래 <b>+</b> 버튼으로 할 일이나 습관을 추가해요.',
+      '<b>⚡ 빠른 추가</b>에 "내일 오후 3시 치과"처럼 말하듯 쓰면 날짜·시간이 알아서 들어가요.',
+      '항목 왼쪽 동그라미를 눌러 체크해요. 습관은 날마다 따로 체크돼요.',
+      '아래 탭에서 <b>달력</b>, <b>메모</b>, <b>내 기록</b>(통계), <b>설정</b>으로 이동해요.',
+      '설정에서 Google로 로그인하면 안드로이드 앱·PC와 기록이 맞춰져요.'
+    ], tips: [] },
+    'money.html': { title: '가계부 사용법', sub: '쓴 돈을 바로 적고 한 달 흐름을 봐요.', steps: [
+      '<b>빠르게 적기</b>에 금액을 넣고 분류를 골라 <b>저장</b>해요. 버는 돈은 위쪽 <b>수입</b>으로 바꿔서 적어요.',
+      '<b>◀ ▶</b>로 달을 옮기고, <b>예산 정하기</b>로 한 달 쓸 돈을 정하면 남은 돈이 보여요.',
+      '통신비·구독료는 <b>+ 고정 지출</b>로 한 번만 등록하면 매달 그날 자동으로 들어가요.',
+      '내역을 누르면 고치거나 지울 수 있어요.'
+    ], tips: ['<b>가족 공유</b>를 켜면 배우자와 같은 가계부를 같이 써요.', '반려동물 수첩에서 비용을 적으면 여기에도 같이 들어갈 수 있어요.'] },
+    'shop.html': { title: '장보기 사용법', sub: '살 것을 적어두고 마트에서 하나씩 체크해요.', steps: [
+      '살 것과 수량을 적고 <b>담기</b>를 눌러요.',
+      '<b>자주 사는 것</b>에 생긴 버튼을 누르면 바로 담겨요.',
+      '마트에서 산 것은 체크해요. 아래 "장바구니에 담음"으로 내려가요.',
+      '다 사면 <b>산 것 지우기</b>를 두 번 눌러 정리해요.'
+    ], tips: ['<b>가족 공유</b>를 켜면 한 사람이 담고 다른 사람이 마트에서 체크할 수 있어요.'] },
+    'pet.html': { title: '반려동물 수첩 사용법', sub: '병원·접종·사료·몸무게를 한곳에 적어요.', steps: [
+      '<b>+ 아이 추가</b>로 이름·종류·생일을 등록해요.',
+      '<b>+ 기록</b>에서 병원·예방접종·체중 등을 고르고, <b>다음 일정</b>을 넣으면 D-day로 알려줘요.',
+      '비용을 적으면 <b>가계부에도 적기</b>로 가계부(반려동물)에 같이 들어가요.',
+      '<b>+ 소모품</b>에 사료·모래를 산 날과 며칠 가는지 넣으면, 떨어질 날짜를 미리 알려줘요.',
+      '새로 사면 <b>새로 샀어요</b>를 눌러요. 누를수록 실제 간격에 맞춰 날짜가 정확해져요.'
+    ], tips: ['<b>장보기에 담기</b>를 누르면 장보기 목록에 바로 들어가요.'] },
+    'menu.html': { title: '메뉴 추천 사용법', sub: '오늘 뭐 먹을지 3가지를 골라줘요.', steps: [
+      '끼니·누구랑·기분을 골라요. 날씨는 오늘 날씨로 자동 선택돼요.',
+      '<b>AI에게 추천받기</b>: 조건에 맞춰 AI가 골라줘요. (로그인 필요, 하루 10번)',
+      '<b>조건으로 바로 뽑기</b>: 로그인 없이 바로 3가지를 뽑아요.',
+      '마음에 들면 <b>근처 맛집 찾기</b>로 가게를 찾거나, <b>이걸로 결정</b>을 눌러 기록해요.'
+    ], tips: ['최근에 정한 메뉴는 다음 추천에서 빠져요.'] },
+    'food.html': { title: '맛집 찾기 사용법', sub: '가게를 찾고, 평점·후기를 보고, 내 맛집에 모아요.', steps: [
+      '메뉴나 가게 이름을 넣고 <b>찾기</b>를 눌러요. (로그인 필요)',
+      '<b>내 위치 주변</b>은 위치 허용이 필요해요. 번거로우면 <b>동네 이름으로</b>를 써요.',
+      '<b>구글 평점·후기</b>로 별점·후기·영업시간을 봐요. (하루 30번)',
+      '<b>☆ 담기</b>로 내 맛집에 모으고, <b>내 맛집</b> 탭에서 가본 곳·내 별점·메모를 적어요.',
+      '<b>목록 공유하기</b>로 만든 주소를 보내면 로그인 없이도 목록을 볼 수 있어요.'
+    ], tips: ['위치가 안 잡히면 <b>위치 허용 방법</b> 버튼을 눌러 보세요.'] },
+    'calc.html': { title: '내 집 마련 계산기 사용법', sub: '대출이 얼마 필요하고 매달 얼마씩 갚는지 계산해요.', steps: [
+      '집값, 가진 돈, 부대비용을 <b>만원</b> 단위로 넣어요. (5억 = 50,000)',
+      '금리와 갚는 기간, 갚는 방식을 골라요.',
+      '<b>계산 결과</b>에서 매달 갚는 돈, 총 이자를 보고, 그래프로 해마다 원금·이자 비율을 봐요.',
+      '<b>거꾸로 계산</b>에 매달 갚을 수 있는 돈을 넣으면 살 수 있는 집값이 나와요.'
+    ], tips: ['입력한 숫자는 이 기기에만 저장돼요.', '실제 대출 한도·금리는 은행 상담에서 꼭 확인하세요.'] },
+    'family.html': { title: '가족 공유 사용법', sub: '가계부·장보기·반려동물을 가족과 같이 써요.', steps: [
+      '로그인한 뒤 <b>가족 공유 시작</b>을 눌러요.',
+      '나온 <b>초대 주소</b>를 복사해서 가족에게 카톡으로 보내요.',
+      '가족이 주소를 열고 Google로 로그인한 뒤 <b>수락하고 같이 쓰기</b>를 누르면 끝이에요.'
+    ], tips: ['할일·습관, 메뉴 기록, 내 맛집은 각자 따로예요.', '나가면 다시 내 기록만 보여요.'] }
+  };
+  function pageFile() { return (location.pathname.split('/').pop() || 'index.html') || 'index.html'; }
+  function showHelp() {
+    const hp = HELP[pageFile()]; if (!hp) return;
+    const veil = document.createElement('div'); veil.className = 'ln-hveil';
+    const box = document.createElement('div'); box.className = 'ln-hs'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-label', hp.title);
+    box.innerHTML = '<h2></h2><p class="ln-hsub"></p><ol>' + hp.steps.map(x => '<li><span>' + x + '</span></li>').join('') + '</ol>' +
+      (hp.tips.length ? '<div class="ln-htips">' + hp.tips.map(x => '<span>' + x + '</span>').join('') + '</div>' : '') + '<button type="button" class="ln-hclose">알겠어요</button>';
+    box.querySelector('h2').textContent = hp.title; box.querySelector('.ln-hsub').textContent = hp.sub;
+    const close = () => { veil.remove(); document.removeEventListener('keydown', onKey); };
+    const onKey = e => { if (e.key === 'Escape') close(); };
+    veil.addEventListener('click', e => { if (e.target === veil) close(); });
+    box.querySelector('.ln-hclose').addEventListener('click', close);
+    document.addEventListener('keydown', onKey);
+    veil.appendChild(box); document.body.appendChild(veil);
+    box.querySelector('.ln-hclose').focus();
+  }
+  function helpButton() {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'ln-help';
+    b.innerHTML = svg('help') + '<span>사용법</span>'; b.setAttribute('aria-label', '이 화면 사용법 보기');
+    b.addEventListener('click', showHelp); return b;
+  }
+
   function build() {
     const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
     document.documentElement.classList.add('ln-on');
     if (isDark()) document.documentElement.classList.add('ln-dark');
 
     const cur = currentKey();
+    const pageHead = document.querySelector('.page-head');
     let curLabel = '';
     const side = document.createElement('nav');
     side.className = 'ln-side'; side.setAttribute('aria-label', '생활노트 메뉴');
-    let html = '<a class="ln-brand" href="home.html"><img src="icon-192.png" alt=""><span><b>생활노트</b><small>할일 · 기록 · 날씨 · 맛집</small></span></a>';
+    let html = '<a class="ln-brand" href="home.html"><img src="icon-192.png" alt=""><span><b>생활노트</b><small>우리 집 생활 수첩</small></span></a>';
     GROUPS.forEach(g => {
       html += '<div class="ln-group">' + (g.title ? '<div class="ln-gtitle">' + g.title + '</div>' : '');
       g.items.forEach(it => {
@@ -120,17 +241,35 @@
     side.innerHTML = html;
 
     const veil = document.createElement('div'); veil.className = 'ln-veil';
-    const top = document.createElement('div'); top.className = 'ln-top';
-    top.innerHTML = '<button type="button" aria-label="메뉴 열기">' + svg('menu') + '</button><b>생활노트</b><span class="ln-cur"></span>';
-    top.querySelector('.ln-cur').textContent = curLabel ? '· ' + curLabel : '';
-
     const open = () => { side.classList.add('open'); veil.classList.add('open'); };
     const close = () => { side.classList.remove('open'); veil.classList.remove('open'); };
-    top.querySelector('button').addEventListener('click', open);
     veil.addEventListener('click', close);
     document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
 
-    document.body.prepend(top);
+    if (pageHead) {
+      // 생활노트 페이지: 폰에서는 아래쪽 탭 메뉴, 사용법은 제목 옆
+      document.documentElement.classList.add('ln-bnon');
+      const bn = document.createElement('nav'); bn.className = 'ln-bn'; bn.setAttribute('aria-label', '주요 메뉴');
+      const tabs = [['home.html', '홈', 'home'], ['index.html', '할일', 'check'], ['money.html', '가계부', 'won'], ['shop.html', '장보기', 'cart']];
+      bn.innerHTML = tabs.map(([href, label, ic]) => '<a href="' + href + '"' + (cur === href ? ' aria-current="page"' : '') + '>' + svg(ic) + '<span>' + label + '</span></a>').join('') +
+        '<button type="button"' + (tabs.some(t => t[0] === cur) ? '' : ' aria-current="page"') + '>' + svg('more') + '<span>' + (tabs.some(t => t[0] === cur) ? '더보기' : (curLabel || '더보기')) + '</span></button>';
+      bn.querySelector('button').addEventListener('click', open);
+      document.body.appendChild(bn);
+      if (HELP[pageFile()]) pageHead.appendChild(helpButton());
+    } else {
+      // 할일습관 화면: 자기 아래 탭이 있으니 위쪽 줄에 메뉴 버튼과 사용법
+      const top = document.createElement('div'); top.className = 'ln-top';
+      top.innerHTML = '<button type="button" class="ln-menu" aria-label="메뉴 열기">' + svg('menu') + '</button><b>생활노트</b><span class="ln-cur"></span>';
+      top.querySelector('.ln-cur').textContent = curLabel ? curLabel : '';
+      top.querySelector('.ln-menu').addEventListener('click', open);
+      if (HELP[pageFile()]) top.appendChild(helpButton());
+      document.body.prepend(top);
+      // PC에서는 위쪽 줄이 없으니 머리 부분에 사용법을 붙임
+      const hdr = document.querySelector('.header');
+      if (hdr && HELP[pageFile()]) { const hb = helpButton(); hb.classList.add('ln-help-pc'); hdr.appendChild(hb); }
+      const st2 = document.createElement('style'); st2.textContent = '@media (max-width:959.98px){.ln-help-pc{display:none!important}}'; document.head.appendChild(st2);
+    }
+
     document.body.appendChild(veil);
     document.body.appendChild(side);
     renderAccount();

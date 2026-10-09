@@ -14,7 +14,7 @@
   .hello{display:grid;gap:6px}
   .hello h1{font-size:26px}
   .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
-  .tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:grid;gap:10px;align-content:start;min-width:0}
+  .tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px;box-shadow:var(--shadow);display:grid;gap:10px;align-content:start;min-width:0}
   .tile-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
   .tile-head h2{font-size:16px}
   .tile-head a{font-size:13px;font-weight:700;text-decoration:none}
@@ -48,41 +48,41 @@
 
   <div class="tiles">
     <section class="tile wx">
-      <div class="tile-head"><h2>오늘 날씨</h2><a href="weather.html">지역 더 보기 →</a></div>
+      <div class="tile-head"><h2>오늘 날씨</h2><a href="weather.html">지역 더 보기</a></div>
       <div id="wx-body" class="stack" style="gap:6px"><span class="small muted">날씨를 불러오는 중…</span></div>
     </section>
 
     <section class="tile">
-      <div class="tile-head"><h2>오늘 할 일</h2><a href="index.html">열기 →</a></div>
+      <div class="tile-head"><h2>오늘 할 일</h2><a href="index.html">열기</a></div>
       <div class="row" style="gap:18px"><div><span class="label">남은 할 일</span><div class="big" id="t-left">0</div></div><div><span class="label">오늘 습관</span><div class="big" id="t-habit">0/0</div></div></div>
       <ul class="mini" id="t-list"></ul>
     </section>
 
     <section class="tile">
-      <div class="tile-head"><h2>이번 달 지출</h2><a href="money.html">가계부 →</a></div>
+      <div class="tile-head"><h2>이번 달 지출</h2><a href="money.html">가계부</a></div>
       <div class="big" id="m-out">0원</div>
       <div id="m-budget" class="stack" style="gap:6px"></div>
       <span class="small muted" id="m-today"></span>
     </section>
 
     <section class="tile">
-      <div class="tile-head"><h2>오늘 뭐 먹지?</h2><a href="menu.html">추천받기 →</a></div>
+      <div class="tile-head"><h2>오늘 뭐 먹지?</h2><a href="menu.html">추천받기</a></div>
       <ul class="mini" id="f-menu"></ul>
       <div class="row"><a class="btn sm soft" href="menu.html">메뉴 추천</a><a class="btn sm" href="food.html">맛집 찾기</a></div>
     </section>
 
     <section class="tile">
-      <div class="tile-head"><h2>장보기</h2><a href="shop.html">목록 →</a></div>
+      <div class="tile-head"><h2>장보기</h2><a href="shop.html">목록</a></div>
       <ul class="mini" id="s-list"></ul>
     </section>
 
     <section class="tile">
-      <div class="tile-head"><h2>반려동물 일정</h2><a href="pet.html">수첩 →</a></div>
+      <div class="tile-head"><h2>반려동물 일정</h2><a href="pet.html">수첩</a></div>
       <ul class="mini" id="p-list"></ul>
     </section>
 
     <section class="tile">
-      <div class="tile-head"><h2>내 맛집</h2><a href="food.html?tab=mine">모두 보기 →</a></div>
+      <div class="tile-head"><h2>내 맛집</h2><a href="food.html?tab=mine">모두 보기</a></div>
       <ul class="mini" id="r-list"></ul>
     </section>
 
