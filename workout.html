@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>운동 기록 · 생활노트</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<meta name="theme-color" content="#2F6F5E" />
+<link rel="stylesheet" href="life.css" />
+<script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
+<style>
+  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+  .cal .wd{font-size:12px;font-weight:650;color:var(--muted);text-align:center}
+  .cal .d{aspect-ratio:1;border-radius:12px;background:var(--surface2);display:grid;place-items:center;font-size:13px;font-variant-numeric:tabular-nums;color:var(--muted);position:relative;border:0;font-family:inherit;cursor:pointer;max-width:100%}
+  .cal .d.on{background:var(--primary);color:var(--on-primary);font-weight:800}
+  .cal .d.on2{background:var(--primary-dark);color:var(--on-primary);font-weight:800}
+  .cal .d.today{outline:2px solid var(--fg);outline-offset:1px}
+  .cal .d.blank{visibility:hidden}
+  .month-nav{display:flex;align-items:center;gap:6px}
+  .month-nav b{font-size:17px;min-width:110px;text-align:center}
+  .week{display:grid;gap:6px}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="page-head">
+    <span class="date" id="today"></span>
+    <h1>운동 기록</h1>
+    <p>운동한 날을 체크하면 달력에 초록색으로 쌓여요. 이번 주 목표까지 얼마나 남았는지도 보여줘요.</p>
+  </header>
+
+  <section class="card">
+    <h2>오늘 운동</h2>
+    <form id="form" class="stack" autocomplete="off" style="gap:12px">
+      <div class="chips" id="types"></div>
+      <div class="grid2" style="gap:10px">
+        <label class="field"><span class="label">몇 분</span><input id="f-min" type="number" min="1" max="600" inputmode="numeric" value="30" /></label>
+        <label class="field"><span class="label">날짜</span><input id="f-date" type="date" /></label>
+      </div>
+      <label class="field"><span class="label">메모</span><input id="f-memo" type="text" maxlength="60" placeholder="예: 동네 한 바퀴 5km" /></label>
+      <div class="row"><button class="btn primary" type="submit">기록</button></div>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>이번 주</h2><button class="btn sm ghost" type="button" id="goal-btn">목표 바꾸기</button></div>
+    <div class="week" id="week"></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <div class="month-nav"><button class="btn sm" type="button" id="prev" aria-label="이전 달">◀</button><b id="ml" class="num"></b><button class="btn sm" type="button" id="next" aria-label="다음 달">▶</button></div>
+    </div>
+    <div class="stat-row">
+      <div class="stat"><span class="label">운동한 날</span><b id="s-days">0일</b></div>
+      <div class="stat"><span class="label">총 시간</span><b id="s-min">0분</b></div>
+      <div class="stat"><span class="label">연속 기록</span><b id="s-streak">0일</b></div>
+    </div>
+    <div class="cal" id="cal"></div>
+  </section>
+
+  <section class="card">
+    <h2>최근 기록</h2>
+    <ul class="list" id="list"></ul>
+  </section>
+</main>
+
+<script src="firebase.js"></script>
+<script src="sync.js"></script>
+<script src="life-config.js"></script>
+<script src="life.js"></script>
+<script src="shell.js"></script>
+<script>
+(function () {
+  const { h, today, prettyDate, toast, sheet, iso, WD } = Life;
+  const W = Life.store('workout');
+  const $ = id => document.getElementById(id);
+  $('today').textContent = prettyDate(today());
+  $('f-date').value = today();
+  const TYPES = ['걷기', '달리기', '헬스', '홈트', '자전거', '등산', '수영', '요가·스트레칭', '기타'];
+  let type = '걷기', ym = today().slice(0, 7);
+  function drawTypes() { $('types').replaceChildren(...TYPES.map(t => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(t === type), onclick: () => { type = t; drawTypes(); } }, t))); }
+  drawTypes();
+
+  $('form').addEventListener('submit', e => {
+    e.preventDefault();
+    const min = parseInt($('f-min').value, 10);
+    if (!(min > 0)) { toast('몇 분 했는지 넣어 주세요'); return; }
+    W.put({ type, min, date: $('f-date').value || today(), memo: $('f-memo').value.trim() });
+    $('f-memo').value = ''; toast(type + ' ' + min + '분 기록했어요');
+  });
+  $('goal-btn').onclick = () => {
+    const sel = h('select', {}, [1, 2, 3, 4, 5, 6, 7].map(n => h('option', { value: n, selected: n === (W.meta().goal || 3) }, '일주일에 ' + n + '번')));
+    const close = sheet('이번 주 목표', h('div', { class: 'stack' }, sel, h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => { W.setMeta({ goal: Number(sel.value) }); close(); toast('목표를 바꿨어요'); } }, '저장'))));
+  };
+  function shift(n) { const [y, m] = ym.split('-').map(Number); const d = new Date(y, m - 1 + n, 1); ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); render(); }
+  $('prev').onclick = () => shift(-1); $('next').onclick = () => shift(1);
+
+  function dayMap() { const m = {}; W.items().forEach(x => { m[x.date] = (m[x.date] || 0) + (x.min || 0); }); return m; }
+  function render() {
+    const map = dayMap(), t = today();
+    // 이번 주 (월요일 시작)
+    const now = new Date(), mon = new Date(now); mon.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    const weekDays = Array.from({ length: 7 }, (_, i) => { const d = new Date(mon); d.setDate(mon.getDate() + i); return iso(d); });
+    const done = weekDays.filter(d => map[d]).length, goal = W.meta().goal || 3;
+    $('week').replaceChildren(
+      h('div', { class: 'row', style: 'justify-content:space-between' }, h('b', { style: 'font-size:20px' }, done + ' / ' + goal + '번'), h('span', { class: 'small muted' }, done >= goal ? '이번 주 목표 달성!' : '목표까지 ' + (goal - done) + '번 남았어요')),
+      h('div', { class: 'bar' }, h('i', { style: 'width:' + Math.min(100, done / goal * 100) + '%' })));
+    // 달력
+    const [y, m] = ym.split('-').map(Number);
+    $('ml').textContent = y + '년 ' + m + '월';
+    const first = new Date(y, m - 1, 1), days = new Date(y, m, 0).getDate(), lead = (first.getDay() + 6) % 7;
+    const cells = ['월', '화', '수', '목', '금', '토', '일'].map(w => h('span', { class: 'wd' }, w));
+    for (let i = 0; i < lead; i++) cells.push(h('span', { class: 'd blank', 'aria-hidden': 'true' }));
+    let mDays = 0, mMin = 0;
+    for (let d = 1; d <= days; d++) {
+      const ds = ym + '-' + String(d).padStart(2, '0'), mins = map[ds] || 0;
+      if (mins) { mDays++; mMin += mins; }
+      cells.push(h('button', { type: 'button', class: 'd' + (mins >= 60 ? ' on2' : mins ? ' on' : '') + (ds === t ? ' today' : ''), title: ds + (mins ? ' · ' + mins + '분' : ''), 'aria-label': (d) + '일' + (mins ? ' 운동 ' + mins + '분' : ''), onclick: () => { $('f-date').value = ds; window.scrollTo({ top: 0, behavior: 'smooth' }); } }, d));
+    }
+    $('cal').replaceChildren(...cells);
+    $('s-days').textContent = mDays + '일'; $('s-min').textContent = mMin >= 60 ? Math.floor(mMin / 60) + '시간 ' + (mMin % 60) + '분' : mMin + '분';
+    let streak = 0; const c = new Date(); if (!map[iso(c)]) c.setDate(c.getDate() - 1);
+    while (map[iso(c)]) { streak++; c.setDate(c.getDate() - 1); }
+    $('s-streak').textContent = streak + '일';
+    const recent = W.items().sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 15);
+    $('list').replaceChildren(...(recent.length ? recent.map(x => h('li', {},
+      h('span', { class: 'badge go' }, x.type),
+      h('div', { class: 'grow' }, h('b', {}, x.min + '분'), h('div', { class: 'tiny muted' }, prettyDate(x.date) + (x.memo ? ' · ' + x.memo : ''))),
+      h('button', { class: 'icon-btn', type: 'button', 'aria-label': '기록 지우기', onclick: () => W.remove(x.id) }, '✕'))) : [h('li', { class: 'empty' }, '위에서 운동 종류를 고르고 "기록"을 눌러 보세요.')]));
+  }
+  W.subscribe(render);
+  render();
+})();
+</script>
+</body>
+</html>

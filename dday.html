@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>기념일 · 생활노트</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<meta name="theme-color" content="#2F6F5E" />
+<link rel="stylesheet" href="life.css" />
+<script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
+<style>
+  .next{display:grid;gap:4px;padding:18px 20px;border-radius:var(--r);background:var(--fg);color:var(--bg)}
+  .next .big{font-size:40px;font-weight:800;letter-spacing:-.03em;line-height:1.1;font-variant-numeric:tabular-nums}
+  .next .t{font-size:17px;font-weight:700}
+  .next .s{font-size:13.5px;opacity:.75}
+  .dd{min-width:70px;justify-content:center;font-variant-numeric:tabular-nums}
+  .tx{cursor:pointer}
+  .tx:hover{background:var(--surface2)}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="page-head">
+    <span class="date" id="today"></span>
+    <h1>기념일</h1>
+    <p>생일·결혼기념일 같은 날을 등록하면 며칠 남았는지 알려줘요. 음력 생일도 해마다 양력 날짜로 바꿔서 계산해요.</p>
+  </header>
+
+  <div id="next"></div>
+
+  <section class="card">
+    <div class="card-head"><h2>전체</h2><button class="btn sm soft" type="button" id="add">+ 기념일</button></div>
+    <ul class="list" id="list"></ul>
+  </section>
+</main>
+
+<script src="firebase.js"></script>
+<script src="sync.js"></script>
+<script src="lunar.js"></script>
+<script src="life-config.js"></script>
+<script src="life.js"></script>
+<script src="shell.js"></script>
+<script>
+(function () {
+  const { h, today, prettyDate, daysBetween, toast, sheet, iso } = Life;
+  const D = Life.store('dday');
+  const $ = id => document.getElementById(id);
+  $('today').textContent = prettyDate(today());
+  const KINDS = [['yearly', '해마다 (생일·기념일)'], ['count', '며칠째 세기 (사귄 날·태어난 날)'], ['once', '한 번 (시험·이사·여행)']];
+  const LABELS = ['생일', '결혼기념일', '기념일', '제사', '기타'];
+
+  function lunarToSolar(y, m, d) {
+    try {
+      const lc = new window.KoreanLunarCalendar();
+      for (let dd = d; dd >= d - 1; dd--) { if (lc.setLunarDate(y, m, dd, false)) { const s = lc.getSolarCalendar(); return iso(new Date(s.year, s.month - 1, s.day)); } }
+    } catch (e) {}
+    return null;
+  }
+  function solarOn(y, m, d) { const last = new Date(y, m, 0).getDate(); return iso(new Date(y, m - 1, Math.min(d, last))); }
+  // 다음에 돌아오는 날짜와 '몇 번째'
+  function nextOf(x) {
+    const t = today(), [oy, om, od] = x.date.split('-').map(Number), ty = Number(t.slice(0, 4));
+    if (x.kind === 'once') return { date: x.date, n: daysBetween(t, x.date) };
+    if (x.kind === 'count') {
+      const days = daysBetween(x.date, t) + 1; // 시작한 날이 1일째
+      const nextHundred = Math.ceil((days + 1) / 100) * 100;
+      const d = new Date(x.date + 'T00:00:00'); d.setDate(d.getDate() + nextHundred - 1);
+      return { date: iso(d), n: daysBetween(t, iso(d)), days, milestone: nextHundred + '일' };
+    }
+    for (let y = ty; y <= ty + 1; y++) {
+      const date = x.lunar ? lunarToSolar(y, om, od) : solarOn(y, om, od);
+      if (date && date >= t) return { date, n: daysBetween(t, date), years: y - oy };
+    }
+    return { date: x.date, n: 9999 };
+  }
+  const ddText = n => n === 0 ? '오늘' : n > 0 ? 'D-' + n : 'D+' + (-n);
+
+  function form(x) {
+    x = x || {};
+    let kind = x.kind || 'yearly';
+    const title = h('input', { type: 'text', maxlength: '30', value: x.title || '', placeholder: '예: 와이프 생일, 결혼기념일' });
+    const label = h('select', {}, LABELS.map(l => h('option', { selected: l === (x.label || '생일') }, l)));
+    const date = h('input', { type: 'date', value: x.date || '' });
+    const lunar = h('input', { type: 'checkbox', id: 'f-lunar', checked: !!x.lunar });
+    const lunarRow = h('label', { class: 'row small', for: 'f-lunar', style: 'gap:6px' }, lunar, '음력이에요 (날짜 칸에 음력 날짜를 넣어 주세요)');
+    const seg = h('div', { class: 'stack', style: 'gap:6px' });
+    const drawSeg = () => { seg.replaceChildren(...KINDS.map(([v, l]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(kind === v), onclick: () => { kind = v; drawSeg(); } }, l))); lunarRow.hidden = kind !== 'yearly'; };
+    drawSeg();
+    const memo = h('input', { type: 'text', maxlength: '60', value: x.memo || '', placeholder: '예: 선물 미리 사기' });
+    let armed = false;
+    const del = x.id ? h('button', { class: 'btn ghost', type: 'button', onclick: () => {
+      if (!armed) { armed = true; del.textContent = '한 번 더 누르면 삭제'; del.style.color = 'var(--danger)'; return; }
+      D.remove(x.id); close(); toast('삭제했어요');
+    } }, '삭제') : null;
+    const close = sheet(x.id ? '기념일 고치기' : '기념일 추가', h('div', { class: 'stack' },
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '이름'), title),
+      h('div', { class: 'field' }, h('span', { class: 'label' }, '어떻게 셀까요'), h('div', { class: 'chips' }, seg)),
+      h('div', { class: 'grid2', style: 'gap:10px' },
+        h('label', { class: 'field' }, h('span', { class: 'label' }, '날짜 (처음 그날)'), date),
+        h('label', { class: 'field' }, h('span', { class: 'label' }, '분류'), label)),
+      lunarRow,
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '메모'), memo),
+      h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => {
+        if (!title.value.trim() || !date.value) { toast('이름과 날짜를 넣어 주세요'); return; }
+        if (kind === 'yearly' && lunar.checked) { const [y, m, d] = date.value.split('-').map(Number); if (!lunarToSolar(Math.max(y, 1900), m, d)) { toast('음력 날짜가 맞는지 확인해 주세요'); return; } }
+        D.put(Object.assign({}, x, { title: title.value.trim(), kind, date: date.value, lunar: kind === 'yearly' && lunar.checked, label: label.value, memo: memo.value.trim() }));
+        close(); toast('저장했어요');
+      } }, '저장'), h('span', { class: 'spacer' }), del)));
+  }
+  $('add').onclick = () => form();
+
+  function sub(x, nx) {
+    if (x.kind === 'count') return nx.days + '일째 · 다음 ' + nx.milestone + '은 ' + prettyDate(nx.date);
+    if (x.kind === 'once') return prettyDate(x.date);
+    return prettyDate(nx.date) + (x.lunar ? ' (음력 ' + x.date.slice(5).replace('-', '/') + ')' : '') + (nx.years > 0 ? ' · ' + (x.label === '생일' ? nx.years + '번째 생일' : nx.years + '주년') : '');
+  }
+  function render() {
+    const all = D.items().map(x => ({ x, nx: nextOf(x) }))
+      .sort((a, b) => (a.nx.n < 0) - (b.nx.n < 0) || a.nx.n - b.nx.n);
+    const first = all.find(a => a.nx.n >= 0);
+    $('next').replaceChildren(...(first ? [h('section', { class: 'next', 'aria-label': '가장 가까운 기념일' },
+      h('span', { class: 's' }, '가장 가까운 날'), h('span', { class: 'big' }, ddText(first.nx.n)), h('span', { class: 't' }, first.x.title), h('span', { class: 's' }, sub(first.x, first.nx)))] : []));
+    $('list').replaceChildren(...(all.length ? all.map(({ x, nx }) => h('li', { class: 'tx', tabindex: '0', role: 'button', onclick: () => form(x), onkeydown: e => { if (e.key === 'Enter') form(x); } },
+      h('span', { class: 'badge dd ' + (nx.n < 0 ? '' : nx.n <= 7 ? 'warn' : 'go') }, x.kind === 'count' ? nx.days + '일째' : ddText(nx.n)),
+      h('div', { class: 'grow' }, h('div', { class: 'row', style: 'gap:6px' }, h('b', {}, x.title), h('span', { class: 'badge' }, x.label || '기념일')),
+        h('div', { class: 'tiny muted' }, sub(x, nx) + (x.memo ? ' · ' + x.memo : '')))))
+      : [h('li', { class: 'empty' }, '"+ 기념일"로 가족 생일, 결혼기념일 같은 날을 등록해 보세요.')]));
+  }
+  D.subscribe(render);
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>연락 챙기기 · 생활노트</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<meta name="theme-color" content="#2F6F5E" />
+<link rel="stylesheet" href="life.css" />
+<script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
+<style>
+  .p{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center}
+  .face{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--primary-soft);color:var(--primary-dark);font-weight:800;font-size:17px}
+  .face.due{background:var(--mark);color:#5A4600}
+  .acts{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="page-head">
+    <span class="date" id="today"></span>
+    <h1>연락 챙기기</h1>
+    <p>자주 연락하고 싶은 사람과 주기를 정해두면, 연락할 때가 된 사람을 알려줘요.</p>
+  </header>
+
+  <section class="card">
+    <div class="card-head"><h2 id="due-title">연락할 때가 됐어요</h2><button class="btn sm soft" type="button" id="add">+ 사람</button></div>
+    <ul class="list" id="due"></ul>
+  </section>
+  <section class="card">
+    <h2>나머지</h2>
+    <ul class="list" id="rest"></ul>
+  </section>
+  <p class="small muted">연락처 목록은 나만 볼 수 있어요. 가족 공유를 켜도 같이 보이지 않아요.</p>
+</main>
+
+<script src="firebase.js"></script>
+<script src="sync.js"></script>
+<script src="life-config.js"></script>
+<script src="life.js"></script>
+<script src="shell.js"></script>
+<script>
+(function () {
+  const { h, today, prettyDate, daysBetween, toast, sheet, iso } = Life;
+  const P = Life.store('contacts');
+  const $ = id => document.getElementById(id);
+  $('today').textContent = prettyDate(today());
+  const EVERY = [[3, '3일마다'], [7, '매주'], [14, '2주마다'], [30, '한 달마다'], [60, '두 달마다'], [90, '석 달마다']];
+  const dueOf = x => { if (!x.last) return today(); const d = new Date(x.last + 'T00:00:00'); d.setDate(d.getDate() + Number(x.every || 14)); return iso(d); };
+
+  function form(x) {
+    x = x || {};
+    const name = h('input', { type: 'text', maxlength: '20', value: x.name || '', placeholder: '예: 엄마, 김민수' });
+    const every = h('select', {}, EVERY.map(([d, l]) => h('option', { value: d, selected: d === (x.every || 7) }, l)));
+    const how = h('input', { type: 'text', maxlength: '30', value: x.how || '', placeholder: '예: 쉬는 날 오후에 전화' });
+    const last = h('input', { type: 'date', value: x.last || '' });
+    let armed = false;
+    const del = x.id ? h('button', { class: 'btn ghost', type: 'button', onclick: () => {
+      if (!armed) { armed = true; del.textContent = '한 번 더 누르면 삭제'; del.style.color = 'var(--danger)'; return; }
+      P.remove(x.id); close(); toast('삭제했어요');
+    } }, '삭제') : null;
+    const close = sheet(x.id ? x.name + ' 고치기' : '사람 추가', h('div', { class: 'stack' },
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '누구'), name),
+      h('div', { class: 'grid2', style: 'gap:10px' },
+        h('label', { class: 'field' }, h('span', { class: 'label' }, '얼마나 자주'), every),
+        h('label', { class: 'field' }, h('span', { class: 'label' }, '마지막으로 연락한 날'), last)),
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '메모'), how),
+      h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => {
+        if (!name.value.trim()) { toast('이름을 넣어 주세요'); return; }
+        P.put(Object.assign({}, x, { name: name.value.trim(), every: Number(every.value), how: how.value.trim(), last: last.value || x.last || '' }));
+        close(); toast('저장했어요');
+      } }, '저장'), h('span', { class: 'spacer' }), del)));
+  }
+  $('add').onclick = () => form();
+
+  function row(x) {
+    const d = dueOf(x), n = daysBetween(today(), d), since = x.last ? daysBetween(x.last, today()) : null;
+    return h('li', { class: 'p' },
+      h('span', { class: 'face' + (n <= 0 ? ' due' : ''), 'aria-hidden': 'true' }, x.name.slice(0, 1)),
+      h('div', { class: 'grow', role: 'button', tabindex: '0', style: 'cursor:pointer', onclick: () => form(x), onkeydown: e => { if (e.key === 'Enter') form(x); } },
+        h('b', {}, x.name),
+        h('div', { class: 'tiny muted' }, (since == null ? '아직 기록 없음' : since === 0 ? '오늘 연락함' : since + '일 전에 연락') + ' · ' + (EVERY.find(e => e[0] === Number(x.every)) || [, x.every + '일마다'])[1] + (x.how ? ' · ' + x.how : ''))),
+      h('div', { class: 'acts' },
+        n > 0 ? h('span', { class: 'badge go' }, 'D-' + n) : null,
+        h('button', { class: 'btn sm ' + (n <= 0 ? 'primary' : ''), type: 'button', onclick: () => { P.put(Object.assign({}, x, { last: today() })); toast(x.name + '님께 연락한 걸로 기록했어요'); } }, '연락했어요')));
+  }
+  function render() {
+    const all = P.items().sort((a, b) => dueOf(a).localeCompare(dueOf(b)));
+    const due = all.filter(x => dueOf(x) <= today()), rest = all.filter(x => dueOf(x) > today());
+    $('due-title').textContent = due.length ? '연락할 때가 됐어요 ' + due.length + '명' : '연락할 때가 됐어요';
+    $('due').replaceChildren(...(due.length ? due.map(row) : [h('li', { class: 'empty' }, all.length ? '지금은 연락할 사람이 없어요. 잘 챙기고 계시네요.' : '"+ 사람"으로 자주 연락하고 싶은 사람을 추가해 보세요.')]));
+    $('rest').replaceChildren(...(rest.length ? rest.map(row) : [h('li', { class: 'empty' }, '아직 없어요.')]));
+  }
+  P.subscribe(render);
+  render();
+})();
+</script>
+</body>
+</html>

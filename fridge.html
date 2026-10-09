@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>냉장고 · 생활노트</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<meta name="theme-color" content="#2F6F5E" />
+<link rel="stylesheet" href="life.css" />
+<script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
+<style>
+  .add-row{display:grid;grid-template-columns:1fr 90px;gap:8px}
+  .zone-head{display:flex;justify-content:space-between;align-items:baseline;padding:14px 2px 2px}
+  .zone-head b{font-size:15px}
+  .dd{min-width:64px;justify-content:center}
+  .item-actions{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="page-head">
+    <span class="date" id="today"></span>
+    <h1>냉장고</h1>
+    <p>넣은 음식과 유통기한을 적어두면, 먼저 먹어야 할 것부터 알려줘요.</p>
+  </header>
+
+  <section class="card">
+    <h2>넣기</h2>
+    <form id="form" class="stack" autocomplete="off" style="gap:12px">
+      <div class="add-row">
+        <input id="f-name" type="text" maxlength="30" placeholder="예: 우유, 두부, 김치" aria-label="음식 이름" />
+        <input id="f-qty" type="text" maxlength="10" placeholder="수량" aria-label="수량" />
+      </div>
+      <div class="field"><span class="label">어디에</span><div class="seg" role="group" aria-label="보관 장소" id="f-zone"></div></div>
+      <div class="field"><span class="label">유통기한 (또는 먹을 날)</span>
+        <div class="row"><input id="f-exp" type="date" style="max-width:200px" /><div class="chips" id="quick"></div></div></div>
+      <div class="row"><button class="btn primary" type="submit">넣기</button></div>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2 id="sum">냉장고 속</h2>
+      <div class="seg" role="group" aria-label="보기" id="view"></div></div>
+    <div id="list"></div>
+  </section>
+</main>
+
+<script src="firebase.js"></script>
+<script src="sync.js"></script>
+<script src="life-config.js"></script>
+<script src="life.js"></script>
+<script src="shell.js"></script>
+<script>
+(function () {
+  const { h, today, prettyDate, daysBetween, toast, iso } = Life;
+  const F = Life.store('fridge'), SHOP = Life.store('shop');
+  const $ = id => document.getElementById(id);
+  $('today').textContent = prettyDate(today());
+  const ZONES = ['냉장', '냉동', '실온'];
+  let zone = '냉장', view = '전체';
+  const plus = n => { const d = new Date(); d.setDate(d.getDate() + n); return iso(d); };
+  $('f-exp').value = plus(7);
+
+  function drawZone() { $('f-zone').replaceChildren(...ZONES.map(z => h('button', { type: 'button', 'aria-pressed': String(z === zone), onclick: () => { zone = z; drawZone(); } }, z))); }
+  function drawView() { $('view').replaceChildren(...['전체'].concat(ZONES).map(z => h('button', { type: 'button', 'aria-pressed': String(z === view), onclick: () => { view = z; drawView(); render(); } }, z))); }
+  [['3일', 3], ['1주', 7], ['2주', 14], ['1달', 30], ['3달', 90]].forEach(([l, n]) => $('quick').append(h('button', { type: 'button', class: 'chip', onclick: () => { $('f-exp').value = plus(n); } }, '+' + l)));
+  drawZone(); drawView();
+
+  $('form').addEventListener('submit', e => {
+    e.preventDefault();
+    const name = $('f-name').value.trim(); if (!name) { $('f-name').focus(); return; }
+    F.put({ name, qty: $('f-qty').value.trim(), zone, exp: $('f-exp').value || '', added: today() });
+    toast(name + ' 넣었어요'); $('f-name').value = ''; $('f-qty').value = ''; $('f-name').focus();
+  });
+
+  function badge(x) {
+    if (!x.exp) return h('span', { class: 'badge dd' }, '기한 없음');
+    const n = daysBetween(today(), x.exp);
+    return h('span', { class: 'badge dd ' + (n < 0 ? 'bad' : n <= 3 ? 'warn' : 'go') }, n < 0 ? (-n) + '일 지남' : n === 0 ? '오늘까지' : 'D-' + n);
+  }
+  function row(x) {
+    return h('li', {}, badge(x),
+      h('div', { class: 'grow' }, h('div', { style: 'font-weight:650' }, x.name + (x.qty ? ' · ' + x.qty : '')),
+        h('div', { class: 'tiny muted' }, x.zone + ' · ' + (x.exp ? prettyDate(x.exp) + '까지' : '') + ' · ' + prettyDate(x.added) + ' 넣음')),
+      h('div', { class: 'item-actions' },
+        h('button', { class: 'btn sm', type: 'button', onclick: () => {
+          if (SHOP.items().some(s => !s.done && s.name === x.name)) { toast('이미 장보기 목록에 있어요'); return; }
+          SHOP.put({ name: x.name, qty: '', done: false }); toast('장보기에 담았어요');
+        } }, '또 사기'),
+        h('button', { class: 'btn sm soft', type: 'button', onclick: () => { F.remove(x.id); toast(x.name + ' 다 먹은 걸로 정리했어요'); } }, '다 먹음')));
+  }
+  function render() {
+    const all = F.items().filter(x => view === '전체' || x.zone === view)
+      .sort((a, b) => (a.exp || '9999').localeCompare(b.exp || '9999'));
+    const soon = F.items().filter(x => x.exp && daysBetween(today(), x.exp) <= 3).length;
+    $('sum').textContent = '냉장고 속 ' + F.items().length + '개' + (soon ? ' · 곧 먹어야 할 것 ' + soon + '개' : '');
+    const box = $('list'); box.replaceChildren();
+    if (!all.length) { box.append(h('p', { class: 'empty' }, F.items().length ? '이 칸에는 아무것도 없어요.' : '장 보고 와서 위에 넣은 음식을 적어 보세요. 유통기한이 가까운 것부터 위로 올라와요.')); return; }
+    const zones = view === '전체' ? ZONES : [view];
+    zones.forEach(z => {
+      const items = all.filter(x => x.zone === z); if (!items.length) return;
+      box.append(h('div', { class: 'zone-head' }, h('b', {}, z), h('span', { class: 'small muted' }, items.length + '개')), h('ul', { class: 'list' }, items.map(row)));
+    });
+  }
+  F.subscribe(render);
+  render();
+})();
+</script>
+</body>
+</html>

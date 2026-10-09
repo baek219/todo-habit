@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>경조사 장부 · 생활노트</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<meta name="theme-color" content="#2F6F5E" />
+<link rel="stylesheet" href="life.css" />
+<script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
+<style>
+  .amount-input{font-size:22px!important;font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
+  .person{display:grid;gap:4px}
+  .person .row b{font-size:16px}
+  .flow{display:flex;gap:14px;font-size:13.5px;font-variant-numeric:tabular-nums}
+  .give{color:var(--danger)} .get{color:var(--good)}
+  .tx{cursor:pointer}
+  .tx:hover{background:var(--surface2)}
+  .tx .amt{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="page-head">
+    <span class="date" id="today"></span>
+    <h1>경조사 장부</h1>
+    <p>낸 돈과 받은 돈을 사람별로 기록해요. "그 사람한테 얼마 받았지?"를 바로 찾을 수 있어요.</p>
+  </header>
+
+  <section class="card">
+    <div class="card-head"><h2>기록하기</h2>
+      <div class="seg" role="group" aria-label="낸 돈·받은 돈">
+        <button type="button" id="d-give" aria-pressed="true">냈어요</button>
+        <button type="button" id="d-get" aria-pressed="false">받았어요</button>
+      </div></div>
+    <form id="form" class="stack" autocomplete="off" style="gap:12px">
+      <div class="grid2" style="gap:10px">
+        <label class="field"><span class="label">누구</span><input id="f-name" type="text" maxlength="20" placeholder="예: 김민수" list="names" /></label>
+        <label class="field"><span class="label">금액 (원)</span><input id="f-amt" class="amount-input" type="text" inputmode="numeric" placeholder="0" /></label>
+      </div>
+      <datalist id="names"></datalist>
+      <div class="chips" id="quick"></div>
+      <div class="field"><span class="label">관계</span><div class="chips" id="f-rel"></div></div>
+      <div class="field"><span class="label">무슨 일</span><div class="chips" id="f-ev"></div></div>
+      <div class="grid2" style="gap:10px">
+        <label class="field"><span class="label">날짜</span><input id="f-date" type="date" /></label>
+        <label class="field"><span class="label">메모</span><input id="f-memo" type="text" maxlength="60" placeholder="예: 화환도 보냄, 부부 같이 감" /></label>
+      </div>
+      <div class="row"><button class="btn primary" type="submit">저장</button></div>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="stat-row">
+      <div class="stat"><span class="label" id="y-label">올해 낸 돈</span><b id="s-give" class="give">0원</b></div>
+      <div class="stat"><span class="label">올해 받은 돈</span><b id="s-get" class="get">0원</b></div>
+      <div class="stat"><span class="label">기록한 사람</span><b id="s-people">0명</b></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>사람별로 보기</h2>
+      <input id="q" type="search" placeholder="이름으로 찾기" style="max-width:220px" aria-label="이름으로 찾기" /></div>
+    <ul class="list" id="people"></ul>
+  </section>
+
+  <section class="card">
+    <h2>전체 기록</h2>
+    <ul class="list" id="list"></ul>
+  </section>
+</main>
+
+<script src="firebase.js"></script>
+<script src="sync.js"></script>
+<script src="life-config.js"></script>
+<script src="life.js"></script>
+<script src="shell.js"></script>
+<script>
+(function () {
+  const { h, today, won, prettyDate, toast, sheet } = Life;
+  const S = Life.store('gifts');
+  const $ = id => document.getElementById(id);
+  $('today').textContent = prettyDate(today());
+  $('f-date').value = today();
+  const RELS = ['가족', '친척', '친구', '회사', '지인', '기타'];
+  const EVS = ['결혼', '장례', '돌잔치', '생일', '개업·집들이', '병문안', '기타'];
+  let dir = 'give', rel = '친구', ev = '결혼', q = '';
+  const parseAmt = v => parseInt(String(v).replace(/[^\d]/g, ''), 10) || 0;
+
+  function chipsOf(box, list, get, set) {
+    box.replaceChildren(...list.map(v => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(get() === v), onclick: () => { set(v); chipsOf(box, list, get, set); } }, v)));
+  }
+  chipsOf($('f-rel'), RELS, () => rel, v => rel = v);
+  chipsOf($('f-ev'), EVS, () => ev, v => ev = v);
+  function setDir(d) { dir = d; $('d-give').setAttribute('aria-pressed', String(d === 'give')); $('d-get').setAttribute('aria-pressed', String(d === 'get')); }
+  $('d-give').onclick = () => setDir('give'); $('d-get').onclick = () => setDir('get');
+  $('f-amt').addEventListener('input', e => { const n = parseAmt(e.target.value); e.target.value = n ? n.toLocaleString('ko-KR') : ''; });
+  [50000, 100000, 200000].forEach(n => $('quick').append(h('button', { type: 'button', class: 'chip', onclick: () => { $('f-amt').value = n.toLocaleString('ko-KR'); } }, (n / 10000) + '만원')));
+  // 이름을 고르면 지난번 관계를 따라감
+  $('f-name').addEventListener('change', () => {
+    const last = S.items().filter(x => x.person === $('f-name').value.trim()).sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0];
+    if (last) { rel = last.rel; chipsOf($('f-rel'), RELS, () => rel, v => rel = v); }
+  });
+
+  $('form').addEventListener('submit', e => {
+    e.preventDefault();
+    const person = $('f-name').value.trim(), amount = parseAmt($('f-amt').value);
+    if (!person) { toast('누구인지 적어 주세요'); $('f-name').focus(); return; }
+    if (!amount) { toast('금액을 넣어 주세요'); $('f-amt').focus(); return; }
+    S.put({ dir, person, rel, ev, amount, date: $('f-date').value || today(), memo: $('f-memo').value.trim() });
+    toast(person + ' · ' + won(amount) + (dir === 'give' ? ' 냈어요' : ' 받았어요'));
+    $('f-name').value = ''; $('f-amt').value = ''; $('f-memo').value = '';
+  });
+
+  function edit(x) {
+    const amt = h('input', { type: 'text', inputmode: 'numeric', class: 'amount-input', value: x.amount.toLocaleString('ko-KR') });
+    amt.addEventListener('input', () => { const n = parseAmt(amt.value); amt.value = n ? n.toLocaleString('ko-KR') : ''; });
+    const name = h('input', { type: 'text', maxlength: '20', value: x.person });
+    const d = h('select', {}, [['give', '냈어요'], ['get', '받았어요']].map(([v, l]) => h('option', { value: v, selected: v === x.dir }, l)));
+    const evSel = h('select', {}, EVS.map(v => h('option', { selected: v === x.ev }, v)));
+    const date = h('input', { type: 'date', value: x.date });
+    const memo = h('input', { type: 'text', maxlength: '60', value: x.memo || '' });
+    let armed = false;
+    const del = h('button', { class: 'btn ghost', type: 'button', onclick: () => {
+      if (!armed) { armed = true; del.textContent = '한 번 더 누르면 삭제'; del.style.color = 'var(--danger)'; return; }
+      S.remove(x.id); close(); toast('삭제했어요');
+    } }, '삭제');
+    const close = sheet('기록 고치기', h('div', { class: 'stack' },
+      h('div', { class: 'grid2', style: 'gap:10px' }, h('label', { class: 'field' }, h('span', { class: 'label' }, '누구'), name), h('label', { class: 'field' }, h('span', { class: 'label' }, '냈어요/받았어요'), d)),
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '금액'), amt),
+      h('div', { class: 'grid2', style: 'gap:10px' }, h('label', { class: 'field' }, h('span', { class: 'label' }, '무슨 일'), evSel), h('label', { class: 'field' }, h('span', { class: 'label' }, '날짜'), date)),
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '메모'), memo),
+      h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => {
+        const a = parseAmt(amt.value); if (!a || !name.value.trim()) { toast('이름과 금액을 넣어 주세요'); return; }
+        S.put(Object.assign({}, x, { person: name.value.trim(), dir: d.value, amount: a, ev: evSel.value, date: date.value || x.date, memo: memo.value.trim() })); close(); toast('고쳤어요');
+      } }, '저장'), h('span', { class: 'spacer' }), del)));
+  }
+
+  function row(x) {
+    return h('li', { class: 'tx', tabindex: '0', role: 'button', onclick: () => edit(x), onkeydown: e => { if (e.key === 'Enter') edit(x); } },
+      h('span', { class: 'badge ' + (x.dir === 'give' ? 'bad' : 'go') }, x.dir === 'give' ? '냄' : '받음'),
+      h('div', { class: 'grow' }, h('div', { style: 'font-weight:650' }, x.person + ' · ' + x.ev), h('div', { class: 'tiny muted' }, prettyDate(x.date) + ' · ' + x.rel + (x.memo ? ' · ' + x.memo : ''))),
+      h('span', { class: 'amt ' + x.dir }, won(x.amount)));
+  }
+
+  $('q').addEventListener('input', e => { q = e.target.value.trim(); render(); });
+
+  function render() {
+    const all = S.items().sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0));
+    const y = today().slice(0, 4);
+    $('y-label').textContent = y + '년 낸 돈';
+    $('s-give').textContent = won(all.filter(x => x.dir === 'give' && (x.date || '').startsWith(y)).reduce((s, x) => s + x.amount, 0));
+    $('s-get').textContent = won(all.filter(x => x.dir === 'get' && (x.date || '').startsWith(y)).reduce((s, x) => s + x.amount, 0));
+    const by = {};
+    all.forEach(x => { const p = by[x.person] = by[x.person] || { give: 0, get: 0, rel: x.rel, last: x.date, n: 0 }; p[x.dir] += x.amount; p.n++; });
+    $('s-people').textContent = Object.keys(by).length + '명';
+    $('names').replaceChildren(...Object.keys(by).map(n => h('option', { value: n })));
+    const people = Object.entries(by).filter(([n]) => !q || n.includes(q)).sort((a, b) => (b[1].last || '').localeCompare(a[1].last || ''));
+    $('people').replaceChildren(...(people.length ? people.slice(0, 50).map(([n, p]) => h('li', {},
+      h('div', { class: 'grow person' },
+        h('div', { class: 'row' }, h('b', {}, n), h('span', { class: 'badge' }, p.rel), h('span', { class: 'tiny muted' }, p.n + '번 · 마지막 ' + prettyDate(p.last))),
+        h('div', { class: 'flow' }, h('span', { class: 'give' }, '낸 돈 ' + won(p.give)), h('span', { class: 'get' }, '받은 돈 ' + won(p.get)))),
+      h('button', { class: 'btn sm soft', type: 'button', onclick: () => { $('f-name').value = n; rel = p.rel; chipsOf($('f-rel'), RELS, () => rel, v => rel = v); window.scrollTo({ top: 0, behavior: 'smooth' }); $('f-amt').focus(); } }, '이 사람 기록')))
+      : [h('li', { class: 'empty' }, q ? '"' + q + '"(으)로 기록한 사람이 없어요.' : '위에서 처음 기록하면 사람별로 모여요.')]));
+    const shown = all.filter(x => !q || x.person.includes(q));
+    $('list').replaceChildren(...(shown.length ? shown.slice(0, 100).map(row) : [h('li', { class: 'empty' }, '아직 기록이 없어요.')]));
+  }
+  S.subscribe(render);
+  render();
+})();
+</script>
+</body>
+</html>

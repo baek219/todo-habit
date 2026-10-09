@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>집안일 · 생활노트</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<meta name="theme-color" content="#2F6F5E" />
+<link rel="stylesheet" href="life.css" />
+<script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
+<style>
+  .chore{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}
+  .dd{min-width:64px;justify-content:center}
+  .who{font-size:12px;font-weight:700;border-radius:8px;padding:2px 8px;background:var(--primary-soft);color:var(--primary-dark)}
+  .score{display:flex;gap:10px;flex-wrap:wrap}
+  .score .stat{flex:1 1 140px}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="page-head">
+    <span class="date" id="today"></span>
+    <h1>집안일</h1>
+    <p>청소·빨래·분리수거처럼 반복되는 집안일을 정해두고, 한 사람이 체크하면 다음 날짜가 알아서 정해져요.</p>
+  </header>
+
+  <section class="card">
+    <div class="card-head"><h2 id="today-title">오늘 할 집안일</h2><button class="btn sm soft" type="button" id="add">+ 집안일</button></div>
+    <ul class="list" id="due"></ul>
+  </section>
+
+  <section class="card">
+    <h2>다가오는 집안일</h2>
+    <ul class="list" id="later"></ul>
+  </section>
+
+  <section class="card">
+    <h2 id="score-title">이번 달 누가 했나</h2>
+    <div class="score" id="score"></div>
+    <p class="small muted" id="share-tip"></p>
+  </section>
+</main>
+
+<script src="firebase.js"></script>
+<script src="sync.js"></script>
+<script src="life-config.js"></script>
+<script src="life.js"></script>
+<script src="shell.js"></script>
+<script>
+(function () {
+  const { h, today, prettyDate, daysBetween, toast, sheet, iso } = Life;
+  const C = Life.store('chores');
+  const $ = id => document.getElementById(id);
+  $('today').textContent = prettyDate(today());
+  let names = {};
+  const me = () => (Life.user() && Life.user().uid) || 'me';
+  const nameOf = id => id === 'together' ? '같이' : id === 'any' ? '아무나' : id === me() ? '나' : (names[id] || '가족');
+  const PRESETS = [['설거지', 1], ['빨래', 3], ['청소기', 3], ['분리수거', 7], ['음식물 쓰레기', 2], ['화장실 청소', 7], ['이불 빨래', 14], ['냉장고 정리', 30]];
+  const EVERY = [[1, '매일'], [2, '이틀마다'], [3, '3일마다'], [7, '매주'], [14, '2주마다'], [30, '매달']];
+
+  const dueOf = x => { if (!x.last) return today(); const d = new Date(x.last + 'T00:00:00'); d.setDate(d.getDate() + Number(x.every || 7)); return iso(d); };
+
+  function people() {
+    const ids = Object.keys(names).length ? Object.keys(names) : [me()];
+    return [['any', '아무나'], ['together', '같이']].concat(ids.map(id => [id, nameOf(id)]));
+  }
+  function form(x) {
+    x = x || {};
+    const name = h('input', { type: 'text', maxlength: '20', value: x.name || '', placeholder: '예: 분리수거' });
+    const presets = h('div', { class: 'chips' }, PRESETS.map(([n, d]) => h('button', { type: 'button', class: 'chip', onclick: () => { name.value = n; every.value = d; } }, n)));
+    const every = h('select', {}, EVERY.map(([d, l]) => h('option', { value: d, selected: d === (x.every || 7) }, l)));
+    const who = h('select', {}, people().map(([id, l]) => h('option', { value: id, selected: id === (x.who || 'any') }, l)));
+    const last = h('input', { type: 'date', value: x.last || '' });
+    let armed = false;
+    const del = x.id ? h('button', { class: 'btn ghost', type: 'button', onclick: () => {
+      if (!armed) { armed = true; del.textContent = '한 번 더 누르면 삭제'; del.style.color = 'var(--danger)'; return; }
+      C.remove(x.id); close(); toast('삭제했어요');
+    } }, '삭제') : null;
+    const close = sheet(x.id ? '집안일 고치기' : '집안일 추가', h('div', { class: 'stack' },
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '무슨 일'), name), x.id ? null : presets,
+      h('div', { class: 'grid2', style: 'gap:10px' },
+        h('label', { class: 'field' }, h('span', { class: 'label' }, '얼마나 자주'), every),
+        h('label', { class: 'field' }, h('span', { class: 'label' }, '누가'), who)),
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '마지막으로 한 날 (모르면 비워두세요)'), last),
+      h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => {
+        if (!name.value.trim()) { toast('무슨 일인지 적어 주세요'); return; }
+        C.put(Object.assign({ log: [] }, x, { name: name.value.trim(), every: Number(every.value), who: who.value, last: last.value || x.last || '' }));
+        close(); toast('저장했어요');
+      } }, '저장'), h('span', { class: 'spacer' }), del)));
+  }
+  $('add').onclick = () => form();
+
+  function done(x) {
+    const log = (x.log || []).concat([{ d: today(), by: me() }]).slice(-60);
+    C.put(Object.assign({}, x, { last: today(), lastBy: me(), log }));
+    toast(x.name + ' 했어요! 다음은 ' + prettyDate(dueOf({ last: today(), every: x.every })));
+  }
+  function row(x) {
+    const d = dueOf(x), n = daysBetween(today(), d);
+    return h('li', { class: 'chore' },
+      h('span', { class: 'badge dd ' + (n < 0 ? 'bad' : n === 0 ? 'warn' : 'go') }, n < 0 ? (-n) + '일 밀림' : n === 0 ? '오늘' : 'D-' + n),
+      h('div', { class: 'grow', style: 'cursor:pointer', role: 'button', tabindex: '0', onclick: () => form(x), onkeydown: e => { if (e.key === 'Enter') form(x); } },
+        h('div', { class: 'row', style: 'gap:6px' }, h('b', {}, x.name), h('span', { class: 'who' }, nameOf(x.who || 'any'))),
+        h('div', { class: 'tiny muted' }, (EVERY.find(e => e[0] === Number(x.every)) || [, x.every + '일마다'])[1] + (x.last ? ' · 마지막 ' + prettyDate(x.last) + (x.lastBy ? ' (' + nameOf(x.lastBy) + ')' : '') : ' · 아직 안 함'))),
+      h('button', { class: 'btn sm ' + (n <= 0 ? 'primary' : ''), type: 'button', onclick: () => done(x) }, '했어요'));
+  }
+  function render() {
+    const all = C.items().sort((a, b) => dueOf(a).localeCompare(dueOf(b)));
+    const due = all.filter(x => dueOf(x) <= today()), later = all.filter(x => dueOf(x) > today());
+    $('today-title').textContent = '오늘 할 집안일' + (due.length ? ' ' + due.length + '개' : '');
+    $('due').replaceChildren(...(due.length ? due.map(row) : [h('li', { class: 'empty' }, all.length ? '오늘 할 집안일은 다 했어요.' : '"+ 집안일"로 반복되는 집안일을 등록해 보세요. 자주 하는 일은 버튼으로 바로 고를 수 있어요.')]));
+    $('later').replaceChildren(...(later.length ? later.slice(0, 20).map(row) : [h('li', { class: 'empty' }, '다가오는 집안일이 없어요.')]));
+    // 이번 달 점수
+    const ym = today().slice(0, 7), cnt = {};
+    all.forEach(x => (x.log || []).forEach(l => { if (l.d.startsWith(ym)) cnt[l.by] = (cnt[l.by] || 0) + 1; }));
+    const ents = Object.entries(cnt).sort((a, b) => b[1] - a[1]);
+    $('score').replaceChildren(...(ents.length ? ents.map(([id, n]) => h('div', { class: 'stat' }, h('span', { class: 'label' }, nameOf(id)), h('b', {}, n + '번'))) : [h('p', { class: 'empty', style: 'flex:1' }, '"했어요"를 누르면 이번 달 누가 몇 번 했는지 여기 쌓여요.')]));
+    $('share-tip').textContent = C.isShared() ? '가족과 같이 쓰는 중이에요. 누가 체크해도 서로 보여요.' : '가족 공유를 켜면 배우자와 같은 목록을 쓰고, 누가 했는지도 표시돼요.';
+  }
+  async function loadNames() {
+    if (!Life.group.id()) { names = {}; render(); return; }
+    try { const g = await Life.group.info(); names = (g && g.names) || {}; } catch (e) { names = {}; }
+    render();
+  }
+  C.subscribe(render);
+  Life.group.onChange(loadNames);
+  Life.onUser(() => loadNames());
+  render();
+})();
+</script>
+</body>
+</html>

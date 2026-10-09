@@ -77,7 +77,7 @@
   }
 
   // 가족 공유를 켜면 이 기능들의 기록은 groups/{가족 아이디}/life/{이름} 에 같이 저장돼요
-  const SHARED = ['money', 'shop', 'pets', 'petlog', 'supplies'];
+  const SHARED = ['money', 'shop', 'pets', 'petlog', 'supplies', 'fridge', 'chores', 'dday', 'gifts', 'things'];
   const GROUP_CACHE = 'life_group_v1';
   function cachedGroup(uid) { try { const g = JSON.parse(localStorage.getItem(GROUP_CACHE)); return g && g.uid === uid ? g.gid : null; } catch (e) { return null; } }
   function setCachedGroup(uid, gid) { try { localStorage.setItem(GROUP_CACHE, JSON.stringify({ uid, gid: gid || null })); } catch (e) {} }
@@ -335,6 +335,26 @@
     try { const r = await api('geo/reverse', { query: { x: lon, y: lat } }); return r.found ? { name: r.name, sub: r.sub } : null; } catch (e) { return null; }
   }
 
+  /* ---------- 기념일: 다음에 돌아오는 날 (홈·기념일 페이지 공용) ---------- */
+  function ddayNext(x) {
+    const t = today(), [oy, om, od] = String(x.date).split('-').map(Number), ty = Number(t.slice(0, 4));
+    if (x.kind === 'once') return { date: x.date, n: daysBetween(t, x.date) };
+    if (x.kind === 'count') {
+      const days = daysBetween(x.date, t) + 1, nh = Math.ceil((days + 1) / 100) * 100;
+      const d = new Date(x.date + 'T00:00:00'); d.setDate(d.getDate() + nh - 1);
+      return { date: iso(d), n: daysBetween(t, iso(d)), days, milestone: nh + '일' };
+    }
+    for (let y = ty; y <= ty + 1; y++) {
+      let date = null;
+      if (x.lunar && window.KoreanLunarCalendar) {
+        const lc = new window.KoreanLunarCalendar();
+        for (let dd = od; dd >= od - 1 && !date; dd--) if (lc.setLunarDate(y, om, dd, false)) { const so = lc.getSolarCalendar(); date = iso(new Date(so.year, so.month - 1, so.day)); }
+      } else { const last = new Date(y, om, 0).getDate(); date = iso(new Date(y, om - 1, Math.min(od, last))); }
+      if (date && date >= t) return { date, n: daysBetween(t, date), years: y - oy };
+    }
+    return { date: x.date, n: 9999 };
+  }
+
   /* ---------- 앱처럼 설치 ---------- */
   let installEvt = null;
   window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; window.dispatchEvent(new Event('life-install')); });
@@ -389,7 +409,7 @@
   window.Life = {
     h, iso, today, won, newId, daysBetween, prettyDate, WD, toast, sheet,
     store, api, hasServer, group, weather, weatherChip, weatherPlaces, setWeatherPlaces, pmGrade, searchPlace, reversePlace,
-    canInstall: () => !!installEvt, install, standalone,
+    canInstall: () => !!installEvt, install, standalone, ddayNext,
     onUser(fn) { userSubs.add(fn); try { fn(window.CloudSync && window.CloudSync.user); } catch (e) {} return () => userSubs.delete(fn); },
     user: () => (window.CloudSync && window.CloudSync.user) || null,
     signIn: () => window.CloudSync && window.CloudSync.signInHere()

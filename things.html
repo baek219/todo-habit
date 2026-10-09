@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>물건 위치 · 생활노트</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<meta name="theme-color" content="#2F6F5E" />
+<link rel="stylesheet" href="life.css" />
+<script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
+<style>
+  .search{font-size:17px!important;padding:14px 16px!important}
+  .thing{cursor:pointer;align-items:flex-start!important}
+  .thing:hover{background:var(--surface2)}
+  .where{font-size:15px;font-weight:650;color:var(--primary-dark)}
+  mark{background:var(--mark);color:inherit;border-radius:3px;padding:0 1px}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="page-head">
+    <span class="date" id="today"></span>
+    <h1>물건 어디 뒀더라</h1>
+    <p>여권·보증서·계약서·계절 옷처럼 가끔 찾는 물건을 어디 뒀는지 적어두고 검색해요.</p>
+  </header>
+
+  <section class="card">
+    <input id="q" class="search" type="search" placeholder="무엇을 찾나요? (예: 여권, 보증서)" aria-label="물건 찾기" />
+    <div class="chips" id="cats"></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2 id="count">물건</h2><button class="btn sm soft" type="button" id="add">+ 물건</button></div>
+    <ul class="list" id="list"></ul>
+  </section>
+</main>
+
+<script src="firebase.js"></script>
+<script src="sync.js"></script>
+<script src="life-config.js"></script>
+<script src="life.js"></script>
+<script src="shell.js"></script>
+<script>
+(function () {
+  const { h, today, prettyDate, toast, sheet } = Life;
+  const T = Life.store('things');
+  const $ = id => document.getElementById(id);
+  $('today').textContent = prettyDate(today());
+  const CATS = ['서류', '전자기기', '계절용품', '공구', '약·구급', '추억', '기타'];
+  let cat = '', q = '';
+
+  function form(x) {
+    x = x || {};
+    const name = h('input', { type: 'text', maxlength: '30', value: x.name || q || '', placeholder: '예: 여권' });
+    const where = h('input', { type: 'text', maxlength: '50', value: x.where || '', placeholder: '예: 안방 옷장 맨 위 칸, 파란 상자' });
+    const c = h('select', {}, CATS.map(v => h('option', { selected: v === (x.cat || '서류') }, v)));
+    const memo = h('input', { type: 'text', maxlength: '60', value: x.memo || '', placeholder: '예: 2031년 만료, 보증기간 2027년 3월까지' });
+    let armed = false;
+    const del = x.id ? h('button', { class: 'btn ghost', type: 'button', onclick: () => {
+      if (!armed) { armed = true; del.textContent = '한 번 더 누르면 삭제'; del.style.color = 'var(--danger)'; return; }
+      T.remove(x.id); close(); toast('삭제했어요');
+    } }, '삭제') : null;
+    const close = sheet(x.id ? '물건 고치기' : '물건 추가', h('div', { class: 'stack' },
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '무엇'), name),
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '어디에'), where),
+      h('div', { class: 'grid2', style: 'gap:10px' }, h('label', { class: 'field' }, h('span', { class: 'label' }, '종류'), c), h('label', { class: 'field' }, h('span', { class: 'label' }, '메모'), memo)),
+      h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => {
+        if (!name.value.trim() || !where.value.trim()) { toast('무엇을 어디에 뒀는지 적어 주세요'); return; }
+        T.put(Object.assign({}, x, { name: name.value.trim(), where: where.value.trim(), cat: c.value, memo: memo.value.trim(), moved: today() }));
+        close(); toast('저장했어요');
+      } }, '저장'), h('span', { class: 'spacer' }), del)));
+  }
+  $('add').onclick = () => form();
+  $('q').addEventListener('input', e => { q = e.target.value.trim(); render(); });
+
+  function hl(text) { // 찾는 말에 형광펜
+    if (!q) return text;
+    const i = text.toLowerCase().indexOf(q.toLowerCase()); if (i < 0) return text;
+    return [text.slice(0, i), h('mark', {}, text.slice(i, i + q.length)), text.slice(i + q.length)];
+  }
+  function render() {
+    const all = T.items();
+    const used = CATS.filter(c => all.some(x => x.cat === c));
+    $('cats').replaceChildren(...(used.length > 1 ? [''].concat(used).map(c => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(cat === c), onclick: () => { cat = c; render(); } }, c || '전체')) : []));
+    const ql = q.toLowerCase();
+    const list = all.filter(x => (!cat || x.cat === cat) && (!q || [x.name, x.where, x.memo].join(' ').toLowerCase().includes(ql)))
+      .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+    $('count').textContent = q ? '"' + q + '" 찾은 결과 ' + list.length + '개' : '물건 ' + all.length + '개';
+    $('list').replaceChildren(...(list.length ? list.map(x => h('li', { class: 'thing', tabindex: '0', role: 'button', onclick: () => form(x), onkeydown: e => { if (e.key === 'Enter') form(x); } },
+      h('span', { class: 'badge' }, x.cat),
+      h('div', { class: 'grow' }, h('b', {}, hl(x.name)), h('div', { class: 'where' }, hl(x.where)),
+        h('div', { class: 'tiny muted' }, (x.memo ? x.memo + ' · ' : '') + prettyDate(x.moved || today()) + ' 기록'))))
+      : [h('li', { class: 'empty' }, q ? h('span', {}, '"' + q + '"은(는) 기록이 없어요. ', h('button', { class: 'btn sm', type: 'button', onclick: () => form() }, '"' + q + '" 위치 적기')) : '"+ 물건"으로 가끔 찾는 물건이 어디 있는지 적어 보세요.')]));
+  }
+  T.subscribe(render);
+  render();
+})();
+</script>
+</body>
+</html>

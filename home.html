@@ -53,6 +53,11 @@
     </section>
 
     <section class="tile">
+      <div class="tile-head"><h2>챙길 것</h2><span class="small muted" id="c-count"></span></div>
+      <ul class="mini" id="c-list"></ul>
+    </section>
+
+    <section class="tile">
       <div class="tile-head"><h2>오늘 할 일</h2><a href="index.html">열기</a></div>
       <div class="row" style="gap:18px"><div><span class="label">남은 할 일</span><div class="big" id="t-left">0</div></div><div><span class="label">오늘 습관</span><div class="big" id="t-habit">0/0</div></div></div>
       <ul class="mini" id="t-list"></ul>
@@ -91,6 +96,7 @@
 
 <script src="firebase.js"></script>
 <script src="sync.js"></script>
+<script src="lunar.js"></script>
 <script src="life-config.js"></script>
 <script src="life.js"></script>
 <script src="shell.js"></script>
@@ -100,7 +106,7 @@
   const $ = id => document.getElementById(id);
   const t = today();
   $('today').textContent = prettyDate(t);
-  const money = Life.store('money'), meals = Life.store('meals'), pets = Life.store('pets'), petlog = Life.store('petlog'), food = Life.store('food'), shop = Life.store('shop'), supplies = Life.store('supplies');
+  const money = Life.store('money'), meals = Life.store('meals'), pets = Life.store('pets'), petlog = Life.store('petlog'), food = Life.store('food'), shop = Life.store('shop'), supplies = Life.store('supplies'), ddays = Life.store('dday'), contacts = Life.store('contacts'), fridge = Life.store('fridge'), chores = Life.store('chores');
 
   /* 날씨 */
   async function renderWeather(force) {
@@ -154,6 +160,19 @@
     const m = meals.items().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 3);
     $('f-menu').replaceChildren(...(m.length ? m.map(x => h('li', {}, h('span', { class: 't' }, x.menu), h('span', { class: 'tiny muted' }, prettyDate(x.date)))) : [h('li', { class: 'muted' }, '최근에 정한 메뉴가 없어요.')]));
 
+    // 챙길 것: 기념일(30일 안), 연락할 사람, 곧 먹어야 할 음식(3일 안), 오늘 집안일
+    const care = [];
+    ddays.items().forEach(x => { const nx = Life.ddayNext(x); if (x.kind !== 'count' && nx.n >= 0 && nx.n <= 30) care.push({ n: nx.n, tag: nx.n === 0 ? '오늘' : 'D-' + nx.n, cls: nx.n <= 7 ? 'warn' : 'go', text: x.title, href: 'dday.html' });
+      if (x.kind === 'count' && nx.n <= 7) care.push({ n: nx.n, tag: 'D-' + nx.n, cls: 'warn', text: x.title + ' ' + nx.milestone, href: 'dday.html' }); });
+    const addDays = (d, n) => { const z = new Date(d + 'T00:00:00'); z.setDate(z.getDate() + Number(n)); return Life.iso(z); };
+    contacts.items().forEach(x => { const due = x.last ? addDays(x.last, x.every || 14) : t; const n = daysBetween(t, due); if (n <= 0) care.push({ n, tag: '연락', cls: 'go', text: x.name + '님께 연락할 때예요', href: 'contact.html' }); });
+    fridge.items().forEach(x => { if (!x.exp) return; const n = daysBetween(t, x.exp); if (n <= 3) care.push({ n, tag: n < 0 ? '지남' : n === 0 ? '오늘' : 'D-' + n, cls: n < 0 ? 'bad' : 'warn', text: x.name + ' 먹기', href: 'fridge.html' }); });
+    chores.items().forEach(x => { const due = x.last ? addDays(x.last, x.every || 7) : t; const n = daysBetween(t, due); if (n <= 0) care.push({ n, tag: '집안일', cls: n < 0 ? 'bad' : 'go', text: x.name, href: 'chores.html' }); });
+    care.sort((a, b) => a.n - b.n);
+    $('c-count').textContent = care.length ? care.length + '개' : '';
+    $('c-list').replaceChildren(...(care.length ? care.slice(0, 6).map(c => h('li', {}, h('span', { class: 'badge ' + c.cls }, c.tag), h('a', { class: 't', href: c.href, style: 'color:inherit;text-decoration:none' }, c.text)))
+      : [h('li', { class: 'muted' }, '지금 챙길 게 없어요. 기념일·냉장고·집안일·연락을 등록하면 여기 모여요.')]));
+
     // 장보기
     const left = shop.items().filter(x => !x.done);
     $('s-list').replaceChildren(h('li', {}, h('span', { class: 't' }, left.length ? '살 것 ' + left.length + '개' : '살 것이 없어요.')),
@@ -178,7 +197,7 @@
       ...want.map(x => h('li', {}, h('span', { class: 'badge warn' }, '가볼 곳'), h('span', { class: 't' }, x.name))));
 
   }
-  [money, meals, pets, petlog, food, shop, supplies].forEach(s => s.subscribe(render));
+  [money, meals, pets, petlog, food, shop, supplies, ddays, contacts, fridge, chores].forEach(s => s.subscribe(render));
   window.addEventListener('cloudsync', render);
   window.addEventListener('storage', e => { if (e.key === 'todo_habit_tasks_v3') render(); });
   $('login-btn').onclick = () => Life.signIn();
