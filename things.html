@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261009p" />
+<link rel="stylesheet" href="life.css?v=20261009q" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .search{font-size:17px!important;padding:14px 16px!important}
@@ -36,12 +36,12 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261009p"></script>
-<script src="sync.js?v=20261009p"></script>
-<script src="life-config.js?v=20261009p"></script>
-<script src="life.js?v=20261009p"></script>
-<script src="shell.js?v=20261009p"></script>
-<script src="import.js?v=20261009p"></script>
+<script src="firebase.js?v=20261009q"></script>
+<script src="sync.js?v=20261009q"></script>
+<script src="life-config.js?v=20261009q"></script>
+<script src="life.js?v=20261009q"></script>
+<script src="shell.js?v=20261009q"></script>
+<script src="import.js?v=20261009q"></script>
 <script>
 (function () {
   const { h, today, prettyDate, toast, sheet } = Life;
@@ -75,6 +75,7 @@
   }
   $('add').onclick = () => form();
   $('q').addEventListener('input', e => { q = e.target.value.trim(); render(); });
+  const q0 = new URLSearchParams(location.search).get('q'); if (q0) { $('q').value = q0; q = q0.trim(); }
 
   function hl(text) { // 찾는 말에 형광펜
     if (!q) return text;
