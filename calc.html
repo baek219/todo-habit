@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261009t" />
+<link rel="stylesheet" href="life.css?v=20261009u" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .inputs{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
@@ -49,6 +49,16 @@
     <p class="small muted">입력한 숫자는 이 기기에만 저장되고, 클라우드나 가족 공유로 올라가지 않아요.</p>
   </section>
 
+  <section class="card" aria-labelledby="saved-title">
+    <div class="card-head"><h2 id="saved-title">저장해 둔 계산</h2></div>
+    <div class="row" style="gap:8px;flex-wrap:nowrap">
+      <input id="save-name" type="text" maxlength="30" placeholder="이름 (예: 래미안 84)" aria-label="저장할 이름" />
+      <button class="btn primary" type="button" id="save-btn" style="flex:none">지금 조건 저장</button>
+    </div>
+    <ul class="list" id="saved"></ul>
+    <p class="small muted">저장한 계산도 이 기기에만 남아요. 다른 기기에서는 보이지 않아요.</p>
+  </section>
+
   <section class="card" aria-live="polite">
     <h2>계산 결과</h2>
     <div class="result" id="result"></div>
@@ -72,11 +82,11 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261009t"></script>
-<script src="sync.js?v=20261009t"></script>
-<script src="life-config.js?v=20261009t"></script>
-<script src="life.js?v=20261009t"></script>
-<script src="shell.js?v=20261009t"></script>
+<script src="firebase.js?v=20261009u"></script>
+<script src="sync.js?v=20261009u"></script>
+<script src="life-config.js?v=20261009u"></script>
+<script src="life.js?v=20261009u"></script>
+<script src="shell.js?v=20261009u"></script>
 <script>
 (function () {
   const { h, today, prettyDate } = Life;
@@ -96,6 +106,46 @@
     return (neg ? '−' : '') + (eok ? eok + '억' + (rest ? ' ' : '') : '') + (rest ? comma(rest) + '만' : '') + '원';
   }
   const won = n => comma(n) + '원';
+  let last = { loan: 0, first: 0 };
+
+  /* 저장해 둔 계산 (이 기기에만) */
+  const SAVED = 'calc_home_saved_v1';
+  const loadSaved = () => { try { return JSON.parse(localStorage.getItem(SAVED)) || []; } catch (e) { return []; } };
+  const putSaved = list => { try { localStorage.setItem(SAVED, JSON.stringify(list)); } catch (e) { Life.toast('이 기기에 저장 공간이 부족해요.'); } };
+  const stamp = ms => { const d = new Date(ms); return d.getFullYear() + '년 ' + (d.getMonth() + 1) + '월 ' + d.getDate() + '일 ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+  function fill(x) {
+    ['price', 'own', 'extra', 'income', 'monthly'].forEach(k => { $(k).value = x[k] === '' || x[k] == null ? '' : comma(x[k]); });
+    $('rate').value = x.rate; $('years').value = x.years; $('method').value = x.method;
+    calc();
+  }
+  function drawSaved() {
+    const list = loadSaved();
+    $('saved').replaceChildren(...(list.length ? list.map(x => {
+      let armed = false;
+      const del = h('button', { class: 'btn sm ghost', type: 'button', onclick: () => {
+        if (!armed) { armed = true; del.textContent = '한 번 더 누르면 삭제'; del.style.color = 'var(--danger)'; return; }
+        putSaved(loadSaved().filter(o => o.id !== x.id)); drawSaved(); Life.toast('"' + x.name + '"을(를) 지웠어요');
+      } }, '삭제');
+      return h('li', {},
+        h('div', { class: 'grow' },
+          h('b', {}, x.name),
+          h('div', { class: 'small' }, '집값 ' + man(x.v.price) + ' · 대출 ' + man(x.loan) + ' · 매달 ' + won(x.first) + ' · ' + x.v.rate + '% ' + x.v.years + '년'),
+          h('div', { class: 'tiny muted' }, stamp(x.at) + ' 저장')),
+        h('div', { class: 'row', style: 'gap:4px;flex-wrap:nowrap' },
+          h('button', { class: 'btn sm soft', type: 'button', onclick: () => { fill(x.v); window.scrollTo({ top: 0, behavior: 'smooth' }); Life.toast('"' + x.name + '" 조건을 불러왔어요'); } }, '불러오기'),
+          del));
+    }) : [h('li', { class: 'empty' }, '조건을 넣고 "지금 조건 저장"을 누르면 여기 쌓여요. 여러 집을 비교할 때 편해요.')]));
+  }
+  $('save-btn').onclick = () => {
+    calc();
+    if (!v.price) { Life.toast('집값을 먼저 넣어 주세요'); return; }
+    const d = new Date();
+    const name = $('save-name').value.trim() || ('집값 ' + man(v.price) + ' · ' + (d.getMonth() + 1) + '/' + d.getDate());
+    const list = loadSaved();
+    list.unshift({ id: Date.now().toString(36), name, at: Date.now(), v: Object.assign({}, v), loan: last.loan, first: Math.round(last.first) });
+    putSaved(list.slice(0, 50)); $('save-name').value = ''; drawSaved();
+    Life.toast('"' + name + '" 저장했어요');
+  };
 
   // 입력칸 채우기
   ['price', 'own', 'extra', 'income', 'monthly'].forEach(k => { $(k).value = v[k] === '' ? '' : comma(v[k]); });
@@ -149,6 +199,7 @@
     v = { price: num($('price').value), own: num($('own').value), extra: num($('extra').value), rate: num($('rate').value), years: Number($('years').value),
       method: $('method').value, income: $('income').value.trim() === '' ? '' : num($('income').value), monthly: num($('monthly').value) };
     try { localStorage.setItem(KEY, JSON.stringify(v)); } catch (e) {}
+    last = { loan: 0, first: 0 };
     $('price-h').textContent = v.price ? man(v.price) : '';
     $('own-h').textContent = v.own ? man(v.own) : '';
     $('income-h').textContent = v.income ? man(v.income) + ' · 넣으면 소득 대비 얼마나 갚는지 보여줘요' : '넣으면 소득 대비 얼마나 갚는지 보여줘요';
@@ -162,6 +213,7 @@
       note.hidden = true; $('chart').replaceChildren(); $('chart-cap').textContent = '대출이 없어서 갚을 돈이 없어요.'; reverse(); return;
     }
     const sc = schedule(loan * 10000, v.rate, n, v.method);
+    last = { loan, first: sc.first };
     const ratio = loan / v.price * 100;
     const yearly = sc.rows[0].p + sc.rows[0].i;
     const items = [
@@ -188,6 +240,7 @@
     box.replaceChildren(stat('빌릴 수 있는 돈 (계산상)', man(maxLoan), '매달 ' + man(v.monthly) + '씩 ' + v.years + '년'), stat('살 수 있는 집값 (계산상)', man(Math.max(0, maxPrice)), '대출 + 가진 돈 − 부대비용', true));
   }
   calc();
+  drawSaved();
 })();
 </script>
 </body>
