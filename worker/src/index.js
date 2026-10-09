@@ -126,16 +126,20 @@ async function handleMenu(req, env, user) {
   ].join('\n');
 
   const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  const model = env.CLAUDE_MODEL || 'claude-opus-5';
+  const params = {
+    model,
+    max_tokens: 4000,
+    output_config: { format: { type: 'json_schema', schema: MENU_SCHEMA } },
+    messages: [{ role: 'user', content: prompt }]
+  };
+  // 생각하는 양을 줄여 빠르고 싸게 (Haiku 모델은 이 설정을 받지 않음)
+  if (!/haiku/.test(model)) params.output_config.effort = 'low';
+  // Opus 5 / Fable: 안전 검사로 거절되면 다른 모델이 대신 답하게 함
+  if (/^claude-(opus-5|fable-5)/.test(model)) { params.betas = ['server-side-fallback-2026-07-01']; params.fallbacks = 'default'; }
   let res;
   try {
-    res = await client.beta.messages.create({
-      model: env.CLAUDE_MODEL || 'claude-opus-5',
-      max_tokens: 4000,
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
-      output_config: { effort: 'low', format: { type: 'json_schema', schema: MENU_SCHEMA } },
-      messages: [{ role: 'user', content: prompt }]
-    });
+    res = await client.beta.messages.create(params);
   } catch (e) {
     if (e instanceof Anthropic.RateLimitError) return fail(req, env, 503, 'ai_busy', 'AI가 잠시 바빠요. 조금 뒤에 다시 눌러 주세요.');
     if (e instanceof Anthropic.AuthenticationError) return fail(req, env, 503, 'server_setup', 'AI 열쇠가 잘못됐어요. 서버 설정을 확인해 주세요.');
