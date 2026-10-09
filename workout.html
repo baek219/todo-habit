@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261010a" />
+<link rel="stylesheet" href="life.css?v=20261010c" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
@@ -60,6 +60,13 @@
     <div class="cal" id="cal"></div>
   </section>
 
+  <section class="card" aria-labelledby="trend-title">
+    <div class="card-head"><h2 id="trend-title">달마다 운동</h2>
+      <div class="seg" role="group" aria-label="무엇을 볼까요"><button type="button" id="tm-days" aria-pressed="true">운동한 날</button><button type="button" id="tm-min" aria-pressed="false">운동 시간</button></div></div>
+    <div class="trend" id="trend" role="list"></div>
+    <p class="small muted" id="trend-note"></p>
+  </section>
+
   <section class="card">
     <h2>운동 기록 전체</h2>
     <ul class="list" id="list"></ul>
@@ -67,12 +74,13 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261010a"></script>
-<script src="sync.js?v=20261010a"></script>
-<script src="life-config.js?v=20261010a"></script>
-<script src="life.js?v=20261010a"></script>
-<script src="shell.js?v=20261010a"></script>
-<script src="import.js?v=20261010a"></script>
+<script src="firebase.js?v=20261010c"></script>
+<script src="sync.js?v=20261010c"></script>
+<script src="life-config.js?v=20261010c"></script>
+<script src="life.js?v=20261010c"></script>
+<script src="shell.js?v=20261010c"></script>
+<script src="notify.js?v=20261010c"></script>
+<script src="import.js?v=20261010c"></script>
 <script>
 (function () {
   const { h, today, prettyDate, toast, sheet, iso, WD } = Life;
@@ -101,6 +109,29 @@
   function shift(n) { const [y, m] = ym.split('-').map(Number); const d = new Date(y, m - 1 + n, 1); ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); render(); }
   $('prev').onclick = () => shift(-1); $('next').onclick = () => shift(1);
 
+  /* 달마다 운동 (최근 6달, 운동한 날 또는 시간 중 하나만) */
+  let tm = 'days';
+  $('tm-days').onclick = () => { tm = 'days'; render(); }; $('tm-min').onclick = () => { tm = 'min'; render(); };
+  function drawTrend(map) {
+    $('tm-days').setAttribute('aria-pressed', String(tm === 'days')); $('tm-min').setAttribute('aria-pressed', String(tm === 'min'));
+    const [y, m] = ym.split('-').map(Number);
+    const months = Array.from({ length: 6 }, (_, i) => { const d = new Date(y, m - 6 + i, 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); });
+    const vals = months.map(k => { const ds = Object.keys(map).filter(d => d.startsWith(k)); return tm === 'days' ? ds.length : ds.reduce((a, d) => a + map[d], 0); });
+    const max = Math.max(...vals, 1);
+    const fmt = v => tm === 'days' ? v + '일' : v >= 60 ? Math.floor(v / 60) + '시간' + (v % 60 ? ' ' + v % 60 + '분' : '') : v + '분';
+    $('trend').replaceChildren(...months.map((k, i) => h('button', { type: 'button', role: 'listitem', 'aria-current': String(k === ym), 'aria-label': Number(k.slice(5)) + '월 ' + fmt(vals[i]), onclick: () => { ym = k; render(); } },
+      k === ym ? h('span', { class: 'v' }, fmt(vals[i])) : null,
+      h('span', { class: 'tip' }, k.slice(0, 4) + '년 ' + Number(k.slice(5)) + '월 · ' + fmt(vals[i])),
+      h('i', { class: 'col', style: 'height:' + Math.max(1, vals[i] / max * 100) + '%' }))));
+    let x = document.getElementById('trend-x');
+    if (!x) { x = h('div', { class: 'trend-x', id: 'trend-x', 'aria-hidden': 'true' }); $('trend').after(x); }
+    x.replaceChildren(...months.map(k => h('span', { class: k === ym ? 'on' : '' }, Number(k.slice(5)) + '월')));
+    const cur = vals[5], prev = vals[4];
+    $('trend-note').textContent = !cur && !prev ? '운동을 기록하면 달마다 얼마나 했는지 막대로 보여요. 막대를 누르면 그달 달력으로 가요.'
+      : !prev ? '지난달 기록이 없어서 비교할 수 없어요.'
+      : cur > prev ? '지난달보다 ' + fmt(cur - prev) + ' 더 했어요.' : cur < prev ? '지난달보다 ' + fmt(prev - cur) + ' 덜 했어요.' : '지난달과 똑같이 했어요.';
+  }
+
   function dayMap() { const m = {}; W.items().forEach(x => { m[x.date] = (m[x.date] || 0) + (x.min || 0); }); return m; }
   function render() {
     const map = dayMap(), t = today();
@@ -124,6 +155,7 @@
       cells.push(h('button', { type: 'button', class: 'd' + (mins >= 60 ? ' on2' : mins ? ' on' : '') + (ds === t ? ' today' : ''), title: ds + (mins ? ' · ' + mins + '분' : ''), 'aria-label': (d) + '일' + (mins ? ' 운동 ' + mins + '분' : ''), onclick: () => { $('f-date').value = ds; window.scrollTo({ top: 0, behavior: 'smooth' }); } }, d));
     }
     $('cal').replaceChildren(...cells);
+    drawTrend(map);
     $('s-days').textContent = mDays + '일'; $('s-min').textContent = mMin >= 60 ? Math.floor(mMin / 60) + '시간 ' + (mMin % 60) + '분' : mMin + '분';
     let streak = 0; const c = new Date(); if (!map[iso(c)]) c.setDate(c.getDate() - 1);
     while (map[iso(c)]) { streak++; c.setDate(c.getDate() - 1); }

@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261010a" />
+<link rel="stylesheet" href="life.css?v=20261010c" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .amount-input{font-size:22px!important;font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
@@ -82,6 +82,12 @@
     </div>
   </section>
 
+  <section class="card" id="owe-card">
+    <div class="card-head"><h2 id="owe-title">답례 챙기기</h2><span class="small muted">받기만 하고 아직 낸 적 없는 분</span></div>
+    <ul class="list" id="owe"></ul>
+    <div id="owe-pg"></div>
+  </section>
+
   <section class="card">
     <h2 id="people-title">사람별로 보기</h2>
     <ul class="list" id="people"></ul>
@@ -95,12 +101,13 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261010a"></script>
-<script src="sync.js?v=20261010a"></script>
-<script src="life-config.js?v=20261010a"></script>
-<script src="life.js?v=20261010a"></script>
-<script src="shell.js?v=20261010a"></script>
-<script src="import.js?v=20261010a"></script>
+<script src="firebase.js?v=20261010c"></script>
+<script src="sync.js?v=20261010c"></script>
+<script src="life-config.js?v=20261010c"></script>
+<script src="life.js?v=20261010c"></script>
+<script src="shell.js?v=20261010c"></script>
+<script src="notify.js?v=20261010c"></script>
+<script src="import.js?v=20261010c"></script>
 <script>
 (function () {
   const { h, today, won, prettyDate, toast, sheet } = Life;
@@ -202,7 +209,7 @@
   function setTab(t) {
     tab = t; pgP = pgL = 1;
     [['rec', 'tab-rec'], ['find', 'tab-find']].forEach(([k, id]) => { $(id).setAttribute('aria-pressed', String(k === t)); $(id).setAttribute('aria-selected', String(k === t)); });
-    $('rec-pane').hidden = t !== 'rec'; $('find-pane').hidden = t !== 'find'; $('year-card').hidden = t !== 'rec';
+    $('rec-pane').hidden = t !== 'rec'; $('find-pane').hidden = t !== 'find'; $('year-card').hidden = t !== 'rec'; $('owe-card').hidden = t !== 'rec';
     if (t === 'find') setTimeout(() => $('q').focus(), 30);
     render();
   }
@@ -239,6 +246,31 @@
     return [text.slice(0, i), h('mark', {}, t), text.slice(i + t.length)];
   }
 
+  /* 답례 챙기기: 마지막으로 받은 뒤에 내가 낸 기록이 없는 사람 */
+  let pgO = 1;
+  function drawOwe(all) {
+    const per = {};
+    all.forEach(x => { (per[x.person] = per[x.person] || []).push(x); });
+    const owe = Object.entries(per).map(([n, list]) => {
+      const got = list.filter(x => x.dir === 'get' && !x.noReturn).sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0];
+      if (!got) return null;
+      const paid = list.some(x => x.dir === 'give' && (x.date || '') >= (got.date || ''));
+      return paid ? null : { n, got };
+    }).filter(Boolean).sort((a, b) => (b.got.date || '').localeCompare(a.got.date || ''));
+    $('owe-title').textContent = owe.length ? '답례 챙기기 ' + owe.length + '명' : '답례 챙기기';
+    pgO = Math.min(pgO, Math.max(1, Math.ceil(owe.length / 5)));
+    $('owe').replaceChildren(...(owe.length ? owe.slice((pgO - 1) * 5, pgO * 5).map(({ n, got }) => h('li', {},
+      h('div', { class: 'grow' }, h('b', {}, n), h('div', { class: 'tiny muted' }, prettyDate(got.date) + ' · ' + got.ev + ' · ' + won(got.amount) + ' 받음')),
+      h('div', { class: 'row', style: 'gap:4px;flex-wrap:nowrap' },
+        h('button', { class: 'btn sm soft', type: 'button', onclick: () => {
+          setTab('rec'); setDir('give'); $('f-name').value = n; $('f-amt').value = got.amount.toLocaleString('ko-KR'); rel = got.rel || rel; relC.set(rel); say();
+          window.scrollTo({ top: 0, behavior: 'smooth' }); toast(n + '님께 낼 때 무슨 일·날짜만 고르고 저장하세요');
+        } }, '낼 때 기록'),
+        h('button', { class: 'btn sm ghost', type: 'button', title: '이 분은 답례 목록에서 빼요', onclick: () => { S.put(Object.assign({}, got, { noReturn: true })); toast(n + '님은 목록에서 뺐어요'); } }, '빼기'))))
+      : [h('li', { class: 'empty' }, all.some(x => x.dir === 'get') ? '받은 만큼 다 챙기셨어요.' : '"내가 받았어요"로 기록하면, 아직 답례하지 않은 분이 여기 모여요.')]));
+    $('owe-pg').replaceChildren(Life.pager(owe.length, 5, pgO, k => { pgO = k; render(); }));
+  }
+
   function render() {
     const all = S.items().sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0));
     const y = today().slice(0, 4);
@@ -248,6 +280,7 @@
     const by = {};
     all.forEach(x => { const p = by[x.person] = by[x.person] || { give: 0, get: 0, rel: x.rel, last: x.date, n: 0 }; p[x.dir] += x.amount; p.n++; });
     $('s-people').textContent = Object.keys(by).length + '명';
+    drawOwe(all);
     $('names').replaceChildren(...Object.keys(by).map(n => h('option', { value: n })));
     const finding = tab === 'find' && (q || qDir);
     const shown = finding ? all.filter(matches) : all;

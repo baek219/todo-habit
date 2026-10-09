@@ -117,12 +117,14 @@ async function handleMenu(req, env, user) {
     '- 먹는 방법: ' + (clip(b.how, 20) || '상관없음'),
     '- 빼고 싶은 것: ' + (clip(b.avoid, 80) || '없음'),
     '- 최근에 먹어서 피할 메뉴: ' + (list(b.recent).join(', ') || '없음'),
+    ...(list(b.ingredients).length ? ['- 냉장고에 있는 재료: ' + (Array.isArray(b.ingredients) ? b.ingredients : []).map(x => clip(x, 20)).filter(Boolean).slice(0, 25).join(', ')] : []),
     '',
     '규칙',
     '- 가게 이름은 절대 지어내지 말고 메뉴 이름만 써.',
     '- why: 이 조건에 왜 맞는지 존댓말 한 문장 (40자 안팎).',
     '- search: 지도에서 찾을 때 쓸 짧은 검색어 (예: 김치찌개, 마라탕).',
-    '- kind: 한식/중식/일식/양식/분식/아시안/고기/카페·디저트 중 하나.'
+    '- kind: 한식/중식/일식/양식/분식/아시안/고기/카페·디저트 중 하나.',
+    ...(list(b.ingredients).length ? ['- 냉장고 재료가 주어졌으면: 그 재료를 주로 써서 집에서 쉽게 해 먹을 수 있는 메뉴로 추천하고, why에 쓰는 재료와 더 필요한 재료를 짧게 적어. search에는 레시피 검색어(예: 김치볶음밥 레시피)를 넣어.'] : [])
   ].join('\n');
 
   const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });

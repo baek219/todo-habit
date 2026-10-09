@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261010a" />
+<link rel="stylesheet" href="life.css?v=20261010c" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .counts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
@@ -20,7 +20,7 @@
   <header class="page-head">
     <span class="date" id="today"></span>
     <h1>설정·백업</h1>
-    <p>화면 밝기를 바꾸고, 모든 기록을 파일 하나로 내려받거나 다시 불러와요.</p>
+    <p>알림과 화면 밝기를 정하고, 모든 기록을 파일 하나로 내려받거나 다시 불러와요.</p>
   </header>
 
   <section class="card">
@@ -30,6 +30,23 @@
         <button type="button" id="th-dark">어둡게</button>
       </div></div>
     <p class="small muted">왼쪽 메뉴 아래의 버튼으로도 바꿀 수 있어요. 할일·습관 화면도 같이 바뀌어요.</p>
+  </section>
+
+  <section class="card" id="noti-card">
+    <div class="card-head"><h2>알림</h2><span class="badge" id="noti-state">꺼짐</span></div>
+    <p class="small muted">기념일·연락할 날·집안일·유통기한·반려동물 일정이 있는 날, 정한 시간에 폰 알림으로 알려줘요.</p>
+    <div class="row" style="gap:8px">
+      <button class="btn primary" type="button" id="noti-on">알림 켜기</button>
+      <label class="row small" style="gap:6px">알림 시간 <select id="noti-hour" style="width:auto"></select></label>
+      <button class="btn sm ghost" type="button" id="noti-test" hidden>시험 알림 보내기</button>
+    </div>
+    <p class="note" id="noti-note" hidden></p>
+    <div class="note" style="display:grid;gap:4px">
+      <b style="color:var(--fg)">알림이 잘 오게 하려면</b>
+      <span>① 안드로이드 크롬에서 생활노트를 <b>앱으로 설치</b>해 두세요 (홈 화면 아이콘). 설치한 경우 폰이 하루에 몇 번 알아서 확인해서 알려줘요.</span>
+      <span>② 설치하지 않았으면 생활노트를 <b>열었을 때</b> 알려줘요.</span>
+      <span>③ 폰이 배터리를 아끼려고 늦게 확인할 수 있어서, 시간이 조금 어긋날 수 있어요. 할일·습관의 정확한 시간 알림은 안드로이드 앱이 맡아요.</span>
+    </div>
   </section>
 
   <section class="card">
@@ -53,11 +70,13 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261010a"></script>
-<script src="sync.js?v=20261010a"></script>
-<script src="life-config.js?v=20261010a"></script>
-<script src="life.js?v=20261010a"></script>
-<script src="shell.js?v=20261010a"></script>
+<script src="firebase.js?v=20261010c"></script>
+<script src="lunar.js?v=20261010c"></script>
+<script src="sync.js?v=20261010c"></script>
+<script src="life-config.js?v=20261010c"></script>
+<script src="life.js?v=20261010c"></script>
+<script src="shell.js?v=20261010c"></script>
+<script src="notify.js?v=20261010c"></script>
 <script>
 (function () {
   const { h, today, prettyDate, toast } = Life;
@@ -70,6 +89,28 @@
   $('th-dark').onclick = () => { Life.setDark(true); drawTheme(); };
   window.addEventListener('life-dark', drawTheme);
   drawTheme();
+
+  /* 알림 */
+  $('noti-hour').replaceChildren(...[6, 7, 8, 9, 10, 12, 18, 20].map(n => h('option', { value: n, selected: n === Life.notify.pref().hour }, (n < 12 ? '오전 ' + n : n === 12 ? '낮 12' : '오후 ' + (n - 12)) + '시')));
+  function drawNoti(msg) {
+    const p = Life.notify.pref(), ok = Life.notify.supported(), on = p.on && ok && Notification.permission === 'granted';
+    $('noti-state').textContent = on ? '켜짐' : '꺼짐'; $('noti-state').className = 'badge' + (on ? ' go' : '');
+    $('noti-on').textContent = on ? '알림 끄기' : '알림 켜기'; $('noti-on').className = 'btn ' + (on ? '' : 'primary');
+    $('noti-test').hidden = !on;
+    $('noti-note').hidden = !msg && ok; $('noti-note').textContent = msg || (ok ? '' : '이 브라우저는 알림을 지원하지 않아요. 안드로이드 크롬을 써 주세요.');
+  }
+  $('noti-on').onclick = async () => {
+    const p = Life.notify.pref();
+    if (p.on && Notification.permission === 'granted') { Life.notify.disable(); drawNoti(); toast('알림을 껐어요'); return; }
+    try {
+      const bg = await Life.notify.enable(Number($('noti-hour').value));
+      const n = Life.notify.today().length;
+      drawNoti(bg ? '알림을 켰어요. 매일 정한 시간쯤 챙길 것이 있으면 알려드려요.' + (n ? ' 오늘은 ' + n + '개 있어요.' : '') : '알림을 켰어요. 이 브라우저에서는 생활노트를 열 때 알려드려요. 안드로이드 크롬에서 앱으로 설치하면 열지 않아도 알려줘요.');
+    } catch (e) { drawNoti(e.message); }
+  };
+  $('noti-hour').onchange = () => { Life.notify.setHour(Number($('noti-hour').value)); toast('알림 시간을 바꿨어요'); };
+  $('noti-test').onclick = () => Life.notify.test().catch(e => toast(e.message || '알림을 보내지 못했어요'));
+  drawNoti();
 
   /* 백업 */
   const NAMES = { money: '가계부', gifts: '경조사 장부', workout: '운동 기록', shop: '장보기', fridge: '냉장고', chores: '집안일', things: '물건 위치',
