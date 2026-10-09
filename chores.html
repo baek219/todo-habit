@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#2F6F5E" />
-<link rel="stylesheet" href="life.css?v=20261009b" />
+<link rel="stylesheet" href="life.css?v=20261009d" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .chore{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}
@@ -42,11 +42,12 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261009b"></script>
-<script src="sync.js?v=20261009b"></script>
-<script src="life-config.js?v=20261009b"></script>
-<script src="life.js?v=20261009b"></script>
-<script src="shell.js?v=20261009b"></script>
+<script src="firebase.js?v=20261009d"></script>
+<script src="sync.js?v=20261009d"></script>
+<script src="life-config.js?v=20261009d"></script>
+<script src="life.js?v=20261009d"></script>
+<script src="shell.js?v=20261009d"></script>
+<script src="import.js?v=20261009d"></script>
 <script>
 (function () {
   const { h, today, prettyDate, daysBetween, toast, sheet, iso } = Life;
@@ -123,6 +124,19 @@
     try { const g = await Life.group.info(); names = (g && g.names) || {}; } catch (e) { names = {}; }
     render();
   }
+
+  // 엑셀로 넣기·받기
+  Life.excel({ store: C, title: '집안일',
+    fields: [
+      { key: 'name', label: '집안일', type: 'text', required: true, aliases: ['이름', '무슨일', '할일', '항목'] },
+      { key: 'every', label: '주기', type: 'days', aliases: ['얼마나자주', '간격', '반복'], out: x => x.every + '일' },
+      { key: 'last', label: '마지막으로 한 날', type: 'date', aliases: ['마지막', '최근', '한날'] }
+    ],
+    toItem: v => v.name ? { name: v.name, every: v.every || 7, who: 'any', last: v.last || '', log: [] } : { error: '집안일 이름이 없어요' },
+    dupKey: x => x.name,
+    preview: [['집안일', x => x.name], ['주기', x => x.every + '일마다'], ['마지막', x => x.last || '없음']],
+    sample: [['분리수거', '매주', ''], ['이불 빨래', '2주', '2026-10-01']]
+  });
   C.subscribe(render);
   Life.group.onChange(loadNames);
   Life.onUser(() => loadNames());

@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#2F6F5E" />
-<link rel="stylesheet" href="life.css?v=20261009b" />
+<link rel="stylesheet" href="life.css?v=20261009d" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .add-row{display:grid;grid-template-columns:1fr 92px auto;gap:8px}
@@ -43,11 +43,12 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261009b"></script>
-<script src="sync.js?v=20261009b"></script>
-<script src="life-config.js?v=20261009b"></script>
-<script src="life.js?v=20261009b"></script>
-<script src="shell.js?v=20261009b"></script>
+<script src="firebase.js?v=20261009d"></script>
+<script src="sync.js?v=20261009d"></script>
+<script src="life-config.js?v=20261009d"></script>
+<script src="life.js?v=20261009d"></script>
+<script src="shell.js?v=20261009d"></script>
+<script src="import.js?v=20261009d"></script>
 <script>
 (function () {
   const { h, today, prettyDate, toast } = Life;
@@ -109,6 +110,19 @@
     $('freq').replaceChildren(...(freq.length ? freq.map(([n]) => h('button', { type: 'button', class: 'chip', onclick: () => addItem(n, '') }, '+ ' + n))
       : [h('span', { class: 'small muted' }, '자주 담는 물건이 여기에 생겨요. 누르면 바로 담겨요.')]));
   }
+
+  // 엑셀로 넣기·받기
+  Life.excel({ store: S, title: '장보기',
+    fields: [
+      { key: 'name', label: '품목', type: 'text', required: true, aliases: ['이름', '살것', '물건', '상품', '상품명', '항목'] },
+      { key: 'qty', label: '수량', type: 'text', aliases: ['개수', '양', '갯수'] }
+    ],
+    toItem: v => v.name ? { name: v.name, qty: v.qty || '', done: false } : { error: '품목이 없어요' },
+    exportFilter: x => !x.done,
+    dupKey: x => x.done ? 'done' + x.id : x.name,
+    preview: [['품목', x => x.name], ['수량', x => x.qty]],
+    sample: [['우유', '2개'], ['계란', '1판']]
+  });
   S.subscribe(render);
   Life.group.onChange(loadNames);
   Life.onUser(() => loadNames());

@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#2F6F5E" />
-<link rel="stylesheet" href="life.css?v=20261009b" />
+<link rel="stylesheet" href="life.css?v=20261009d" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
@@ -66,11 +66,12 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261009b"></script>
-<script src="sync.js?v=20261009b"></script>
-<script src="life-config.js?v=20261009b"></script>
-<script src="life.js?v=20261009b"></script>
-<script src="shell.js?v=20261009b"></script>
+<script src="firebase.js?v=20261009d"></script>
+<script src="sync.js?v=20261009d"></script>
+<script src="life-config.js?v=20261009d"></script>
+<script src="life.js?v=20261009d"></script>
+<script src="shell.js?v=20261009d"></script>
+<script src="import.js?v=20261009d"></script>
 <script>
 (function () {
   const { h, today, prettyDate, toast, sheet, iso, WD } = Life;
@@ -130,6 +131,21 @@
       h('div', { class: 'grow' }, h('b', {}, x.min + '분'), h('div', { class: 'tiny muted' }, prettyDate(x.date) + (x.memo ? ' · ' + x.memo : ''))),
       h('button', { class: 'icon-btn', type: 'button', 'aria-label': '기록 지우기', onclick: () => W.remove(x.id) }, '✕'))) : [h('li', { class: 'empty' }, '위에서 운동 종류를 고르고 "기록"을 눌러 보세요.')]));
   }
+
+  // 엑셀로 넣기·받기
+  Life.excel({ store: W, title: '운동 기록',
+    fields: [
+      { key: 'date', label: '날짜', type: 'date', aliases: ['일자', '운동일'] },
+      { key: 'type', label: '운동', type: 'choice', aliases: ['종류', '운동종류', '종목'], options: TYPES.map(t => [t]).concat([['달리기', '러닝', '조깅'], ['헬스', '웨이트', '근력'], ['홈트', '홈트레이닝'], ['요가·스트레칭', '요가', '스트레칭', '필라테스']]), other: '기타' },
+      { key: 'min', label: '시간(분)', type: 'number', aliases: ['분', '시간', '운동시간', '몇분'] },
+      { key: 'memo', label: '메모', type: 'text', aliases: ['비고', '내용'] }
+    ],
+    toItem: v => !(v.min > 0) ? { error: '운동 시간(분)이 없어요' } : { type: v.type || '기타', min: Math.round(v.min), date: v.date || today(), memo: v.memo || '' },
+    dupKey: x => [x.date, x.type, x.min].join('|'),
+    exportSort: (a, b) => (a.date || '').localeCompare(b.date || ''),
+    preview: [['날짜', x => x.date], ['운동', x => x.type], ['시간', x => x.min + '분']],
+    sample: [['2026-10-01', '걷기', '30', '동네 한 바퀴'], ['2026-10-02', '헬스', '60', '']]
+  });
   W.subscribe(render);
   render();
 })();

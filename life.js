@@ -158,6 +158,23 @@
         if (i >= 0) state.items[i] = it; else state.items.push(it);
         changed(); return it;
       },
+      putMany(list) { // 엑셀로 여러 개를 한 번에 넣을 때 (저장·동기화는 한 번만)
+        const now = Date.now(), CS = window.CloudSync, out = [];
+        list.forEach((item, k) => {
+          const it = Object.assign({}, item, { id: item.id || newId(), updatedAt: now, createdAt: item.createdAt || now + k });
+          if (!it.by && CS && CS.user) it.by = CS.user.uid;
+          const i = state.items.findIndex(x => x.id === it.id);
+          if (i >= 0) state.items[i] = it; else state.items.push(it);
+          out.push(it);
+        });
+        if (out.length) changed();
+        return out;
+      },
+      removeMany(ids) {
+        const set = new Set(ids), now = Date.now();
+        state.items = state.items.map(x => set.has(x.id) ? { id: x.id, deleted: true, updatedAt: now, createdAt: x.createdAt } : x);
+        changed();
+      },
       remove(id) {
         const i = state.items.findIndex(x => x.id === id);
         if (i >= 0) { state.items[i] = { id, deleted: true, updatedAt: Date.now(), createdAt: state.items[i].createdAt }; changed(); }

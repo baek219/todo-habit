@@ -257,7 +257,7 @@
     const veil = document.createElement('div'); veil.className = 'ln-hveil';
     const box = document.createElement('div'); box.className = 'ln-hs'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-label', hp.title);
     box.innerHTML = '<h2></h2><p class="ln-hsub"></p><ol>' + hp.steps.map(x => '<li><span>' + x + '</span></li>').join('') + '</ol>' +
-      (hp.tips.length ? '<div class="ln-htips">' + hp.tips.map(x => '<span>' + x + '</span>').join('') + '</div>' : '') + '<button type="button" class="ln-hclose">알겠어요</button>';
+      ((tips => tips.length ? '<div class="ln-htips">' + tips.map(x => '<span>' + x + '</span>').join('') + '</div>' : '')(hp.tips.concat(window.Life && window.Life.excel && document.querySelector('.ln-xl') ? ['엑셀이나 구글 시트에 적어둔 게 있으면 제목 아래 <b>엑셀로 넣기·받기</b>로 한 번에 넣을 수 있어요. 지금 기록을 엑셀 파일로 받을 수도 있어요.'] : []))) + '<button type="button" class="ln-hclose">알겠어요</button>';
     box.querySelector('h2').textContent = hp.title; box.querySelector('.ln-hsub').textContent = hp.sub;
     const close = () => { veil.remove(); document.removeEventListener('keydown', onKey); };
     const onKey = e => { if (e.key === 'Escape') close(); };

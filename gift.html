@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#2F6F5E" />
-<link rel="stylesheet" href="life.css?v=20261009b" />
+<link rel="stylesheet" href="life.css?v=20261009d" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .amount-input{font-size:22px!important;font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
@@ -71,11 +71,12 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261009b"></script>
-<script src="sync.js?v=20261009b"></script>
-<script src="life-config.js?v=20261009b"></script>
-<script src="life.js?v=20261009b"></script>
-<script src="shell.js?v=20261009b"></script>
+<script src="firebase.js?v=20261009d"></script>
+<script src="sync.js?v=20261009d"></script>
+<script src="life-config.js?v=20261009d"></script>
+<script src="life.js?v=20261009d"></script>
+<script src="shell.js?v=20261009d"></script>
+<script src="import.js?v=20261009d"></script>
 <script>
 (function () {
   const { h, today, won, prettyDate, toast, sheet } = Life;
@@ -166,6 +167,35 @@
     const shown = all.filter(x => !q || x.person.includes(q));
     $('list').replaceChildren(...(shown.length ? shown.slice(0, 100).map(row) : [h('li', { class: 'empty' }, '아직 기록이 없어요.')]));
   }
+
+  // 엑셀로 넣기·받기
+  Life.excel({ store: S, title: '경조사 장부',
+    fields: [
+      { key: 'date', label: '날짜', type: 'date', aliases: ['일자', '언제', '날'] },
+      { key: 'person', label: '이름', type: 'text', required: true, aliases: ['누구', '성함', '보낸사람', '받은사람', '상대', '대상'] },
+      { key: 'dir', label: '구분', type: 'choice', aliases: ['냄받음', '주고받음', '종류', '내역구분', '입출'], options: [['give', '냈음', '냄', '낸', '보냄', '보낸', '지출', '출금', '나감', '드림', '줌', '준'], ['get', '받음', '받은', '받았', '입금', '들어옴', '수입']], out: x => x.dir === 'get' ? '받음' : '냈음' },
+      { key: 'amount', label: '금액', type: 'amount', aliases: ['액수', '돈', '축의금', '부의금', '봉투'], out: x => x.amount },
+      { key: 'give', label: '낸 돈', type: 'amount', aliases: ['낸금액', '보낸돈', '보낸금액', '지출', '나간돈'], noExport: true },
+      { key: 'get', label: '받은 돈', type: 'amount', aliases: ['받은금액', '들어온돈', '수입'], noExport: true },
+      { key: 'ev', label: '무슨 일', type: 'choice', aliases: ['행사', '경조사', '내용', '종류', '이유', '사유'], options: [['결혼', '결혼식', '웨딩', '축의'], ['장례', '장례식', '부고', '조문', '조의', '부의', '상'], ['돌잔치', '돌', '백일'], ['생일', '칠순', '환갑', '팔순', '회갑'], ['개업·집들이', '개업', '집들이', '이사'], ['병문안', '병원', '입원'], ['기타']], other: '기타' },
+      { key: 'rel', label: '관계', type: 'choice', aliases: ['사이', '구분2'], options: [['가족'], ['친척', '삼촌', '이모', '고모', '사촌'], ['친구', '동창', '동기'], ['회사', '직장', '동료', '팀', '상사'], ['지인', '이웃'], ['기타']], other: '기타' },
+      { key: 'memo', label: '메모', type: 'text', aliases: ['비고', '참고', '설명'] }
+    ],
+    toItem(v) {
+      let amount = v.amount, dir = v.dir;
+      if (!amount && v.give) { amount = v.give; dir = 'give'; }
+      if (!amount && v.get) { amount = v.get; dir = 'get'; }
+      if (!v.person) return { error: '이름이 없어요' };
+      if (!amount) return { error: '금액이 없어요' };
+      if (amount < 0) { amount = -amount; dir = dir || 'give'; }
+      return { person: v.person, dir: dir || 'give', amount, ev: v.ev || '기타', rel: v.rel || '기타', date: v.date || today(), memo: v.memo || '' };
+    },
+    dupKey: x => [x.person, x.dir, x.amount, x.date].join('|'),
+    preview: [['날짜', x => x.date], ['이름', x => x.person], ['구분', x => x.dir === 'get' ? '받음' : '냈음'], ['금액', x => x.amount.toLocaleString('ko-KR') + '원'], ['무슨 일', x => x.ev], ['관계', x => x.rel]],
+    exportSort: (a, b) => (a.date || '').localeCompare(b.date || ''),
+    sample: [['2024-05-18', '김민수', '냈음', '100000', '결혼', '친구', '부부 같이 감'], ['2024-09-02', '박지영', '받음', '50000', '돌잔치', '회사', '']],
+    note: '"낸 돈", "받은 돈"이 따로 열로 나뉘어 있어도 괜찮아요. 날짜가 비어 있으면 오늘 날짜로 넣어요.'
+  });
   S.subscribe(render);
   render();
 })();

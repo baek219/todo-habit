@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#2F6F5E" />
-<link rel="stylesheet" href="life.css?v=20261009b" />
+<link rel="stylesheet" href="life.css?v=20261009d" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .search{font-size:17px!important;padding:14px 16px!important}
@@ -36,11 +36,12 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261009b"></script>
-<script src="sync.js?v=20261009b"></script>
-<script src="life-config.js?v=20261009b"></script>
-<script src="life.js?v=20261009b"></script>
-<script src="shell.js?v=20261009b"></script>
+<script src="firebase.js?v=20261009d"></script>
+<script src="sync.js?v=20261009d"></script>
+<script src="life-config.js?v=20261009d"></script>
+<script src="life.js?v=20261009d"></script>
+<script src="shell.js?v=20261009d"></script>
+<script src="import.js?v=20261009d"></script>
 <script>
 (function () {
   const { h, today, prettyDate, toast, sheet } = Life;
@@ -93,6 +94,20 @@
         h('div', { class: 'tiny muted' }, (x.memo ? x.memo + ' · ' : '') + prettyDate(x.moved || today()) + ' 기록'))))
       : [h('li', { class: 'empty' }, q ? h('span', {}, '"' + q + '"은(는) 기록이 없어요. ', h('button', { class: 'btn sm', type: 'button', onclick: () => form() }, '"' + q + '" 위치 적기')) : '"+ 물건"으로 가끔 찾는 물건이 어디 있는지 적어 보세요.')]));
   }
+
+  // 엑셀로 넣기·받기
+  Life.excel({ store: T, title: '물건 위치',
+    fields: [
+      { key: 'name', label: '물건', type: 'text', required: true, aliases: ['이름', '무엇', '품목'] },
+      { key: 'where', label: '위치', type: 'text', required: true, aliases: ['어디', '어디에', '장소', '보관위치', '둔곳'] },
+      { key: 'cat', label: '종류', type: 'choice', aliases: ['분류', '카테고리'], options: CATS.map(c => [c]), other: '기타' },
+      { key: 'memo', label: '메모', type: 'text', aliases: ['비고', '참고'] }
+    ],
+    toItem: v => !v.name ? { error: '물건 이름이 없어요' } : !v.where ? { error: '위치가 없어요' } : { name: v.name, where: v.where, cat: v.cat || '기타', memo: v.memo || '', moved: today() },
+    dupKey: x => [x.name, x.where].join('|'),
+    preview: [['물건', x => x.name], ['위치', x => x.where], ['종류', x => x.cat]],
+    sample: [['여권', '안방 옷장 맨 위 칸 파란 상자', '서류', '2031년 만료'], ['선풍기', '베란다 창고', '계절용품', '']]
+  });
   T.subscribe(render);
   render();
 })();

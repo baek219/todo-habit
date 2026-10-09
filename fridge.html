@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#2F6F5E" />
-<link rel="stylesheet" href="life.css?v=20261009b" />
+<link rel="stylesheet" href="life.css?v=20261009d" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .add-row{display:grid;grid-template-columns:1fr 90px;gap:8px}
@@ -46,11 +46,12 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261009b"></script>
-<script src="sync.js?v=20261009b"></script>
-<script src="life-config.js?v=20261009b"></script>
-<script src="life.js?v=20261009b"></script>
-<script src="shell.js?v=20261009b"></script>
+<script src="firebase.js?v=20261009d"></script>
+<script src="sync.js?v=20261009d"></script>
+<script src="life-config.js?v=20261009d"></script>
+<script src="life.js?v=20261009d"></script>
+<script src="shell.js?v=20261009d"></script>
+<script src="import.js?v=20261009d"></script>
 <script>
 (function () {
   const { h, today, prettyDate, daysBetween, toast, iso } = Life;
@@ -103,6 +104,20 @@
       box.append(h('div', { class: 'zone-head' }, h('b', {}, z), h('span', { class: 'small muted' }, items.length + '개')), h('ul', { class: 'list' }, items.map(row)));
     });
   }
+
+  // 엑셀로 넣기·받기
+  Life.excel({ store: F, title: '냉장고',
+    fields: [
+      { key: 'name', label: '음식', type: 'text', required: true, aliases: ['이름', '품목', '식재료', '재료', '물건'] },
+      { key: 'qty', label: '양', type: 'text', aliases: ['수량', '개수'] },
+      { key: 'zone', label: '보관', type: 'choice', aliases: ['위치', '보관장소', '칸'], options: [['냉장', '냉장실'], ['냉동', '냉동실'], ['실온', '상온', '팬트리']], other: '냉장' },
+      { key: 'exp', label: '유통기한', type: 'date', aliases: ['기한', '소비기한', '만료', '유효기간'] }
+    ],
+    toItem: v => v.name ? { name: v.name, qty: v.qty || '', zone: v.zone || '냉장', exp: v.exp || '', added: today() } : { error: '음식 이름이 없어요' },
+    dupKey: x => [x.name, x.exp].join('|'),
+    preview: [['음식', x => x.name], ['양', x => x.qty], ['보관', x => x.zone], ['유통기한', x => x.exp || '없음']],
+    sample: [['우유', '1개', '냉장', '2026-10-15'], ['만두', '1봉', '냉동', '2027-03-01']]
+  });
   F.subscribe(render);
   render();
 })();

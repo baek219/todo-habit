@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#2F6F5E" />
-<link rel="stylesheet" href="life.css?v=20261009b" />
+<link rel="stylesheet" href="life.css?v=20261009d" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .p{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center}
@@ -35,11 +35,12 @@
   <p class="small muted">연락처 목록은 나만 볼 수 있어요. 가족 공유를 켜도 같이 보이지 않아요.</p>
 </main>
 
-<script src="firebase.js?v=20261009b"></script>
-<script src="sync.js?v=20261009b"></script>
-<script src="life-config.js?v=20261009b"></script>
-<script src="life.js?v=20261009b"></script>
-<script src="shell.js?v=20261009b"></script>
+<script src="firebase.js?v=20261009d"></script>
+<script src="sync.js?v=20261009d"></script>
+<script src="life-config.js?v=20261009d"></script>
+<script src="life.js?v=20261009d"></script>
+<script src="shell.js?v=20261009d"></script>
+<script src="import.js?v=20261009d"></script>
 <script>
 (function () {
   const { h, today, prettyDate, daysBetween, toast, sheet, iso } = Life;
@@ -92,6 +93,21 @@
     $('due').replaceChildren(...(due.length ? due.map(row) : [h('li', { class: 'empty' }, all.length ? '지금은 연락할 사람이 없어요. 잘 챙기고 계시네요.' : '"+ 사람"으로 자주 연락하고 싶은 사람을 추가해 보세요.')]));
     $('rest').replaceChildren(...(rest.length ? rest.map(row) : [h('li', { class: 'empty' }, '아직 없어요.')]));
   }
+
+  // 엑셀로 넣기·받기
+  Life.excel({ store: P, title: '연락 챙기기',
+    fields: [
+      { key: 'name', label: '이름', type: 'text', required: true, aliases: ['누구', '성함', '사람'] },
+      { key: 'every', label: '주기', type: 'days', aliases: ['얼마나자주', '연락주기', '간격'], out: x => x.every + '일' },
+      { key: 'last', label: '마지막 연락', type: 'date', aliases: ['마지막', '최근연락', '연락한날', '마지막날'] },
+      { key: 'how', label: '메모', type: 'text', aliases: ['비고', '방법'] }
+    ],
+    toItem: v => v.name ? { name: v.name, every: v.every || 14, last: v.last || '', how: v.how || '' } : { error: '이름이 없어요' },
+    dupKey: x => x.name,
+    preview: [['이름', x => x.name], ['주기', x => x.every + '일마다'], ['마지막 연락', x => x.last || '없음']],
+    sample: [['엄마', '매주', '2026-10-01', '쉬는 날 오후에 전화'], ['김민수', '한 달', '', '']],
+    note: '주기는 "매주", "2주", "한 달", "30" 처럼 적으면 알아서 날 수로 바꿔요.'
+  });
   P.subscribe(render);
   render();
 })();
