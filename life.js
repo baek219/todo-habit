@@ -152,7 +152,7 @@
   }
 
   // 가족 공유를 켜면 이 기능들의 기록은 groups/{가족 아이디}/life/{이름} 에 같이 저장돼요
-  const SHARED = ['money', 'shop', 'pets', 'petlog', 'supplies', 'fridge', 'chores', 'dday', 'gifts', 'things'];
+  const SHARED = ['money', 'shop', 'pets', 'petlog', 'supplies', 'fridge', 'chores', 'dday', 'gifts', 'things', 'spots'];
   const GROUP_CACHE = 'life_group_v1';
   function cachedGroup(uid) { try { const g = JSON.parse(localStorage.getItem(GROUP_CACHE)); return g && g.uid === uid ? g.gid : null; } catch (e) { return null; } }
   function setCachedGroup(uid, gid) { try { localStorage.setItem(GROUP_CACHE, JSON.stringify({ uid, gid: gid || null })); } catch (e) {} }

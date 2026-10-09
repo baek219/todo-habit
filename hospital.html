@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>병원 찾기 · 생활노트</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<meta name="theme-color" content="#F3F4F6" />
+<link rel="stylesheet" href="life.css?v=20261009v" />
+<script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
+<style>
+  .tabs{display:grid;grid-template-columns:1fr 1fr;width:100%}
+  .tabs button{padding:11px 14px;font-size:15.5px}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="page-head">
+    <span class="date" id="today"></span>
+    <h1>병원 찾기</h1>
+    <p>내 주변 병원·약국을 진료과별로 찾고, 자주 가는 곳은 저장해 두세요. 전화와 길찾기도 바로 돼요.</p>
+  </header>
+
+  <div class="seg tabs" role="tablist" id="tabs">
+    <button type="button" data-tab="search" aria-pressed="true">찾기</button>
+    <button type="button" data-tab="mine" aria-pressed="false">저장한 곳 <span id="mine-count" class="num"></span></button>
+  </div>
+
+  <section id="tab-search" class="stack" style="gap:16px">
+    <form class="card" id="form" autocomplete="off">
+      <div class="chips" id="chips"></div>
+      <div class="search-row">
+        <input type="search" id="q" maxlength="40" aria-label="찾을 말" placeholder="진료과나 병원 이름 (예: 소아과, 정형외과)" />
+        <button class="btn primary" type="submit">찾기</button>
+      </div>
+      <div class="opts">
+        <div class="seg" role="group" aria-label="어디서">
+          <button type="button" id="loc-me" aria-pressed="true">내 위치 주변</button>
+          <button type="button" id="loc-area" aria-pressed="false">동네 이름으로</button>
+        </div>
+        <input type="text" id="area" placeholder="예: 수지구청역, 판교" maxlength="30" style="width:auto;flex:1 1 140px" hidden aria-label="동네 이름" />
+        <select id="radius" aria-label="거리"></select>
+        <button class="btn sm ghost" type="button" id="loc-help">위치 허용 방법</button>
+      </div>
+      <p class="note" id="note" hidden></p>
+    </form>
+    <div id="results" class="stack" style="gap:10px"></div>
+    <div class="row" id="more-row" hidden><button class="btn" type="button" id="more">더 보기</button></div>
+    <section class="card s-people" style="gap:8px">
+      <h2 style="font-size:16px">밤·주말·공휴일에 문 연 곳</h2>
+      <p class="small muted">지금 진료하는 병원·약국은 응급의료포털에서 확인할 수 있어요. 위급하면 바로 119에 전화하세요.</p>
+      <div class="row"><a class="btn sm soft" href="https://www.e-gen.or.kr/" target="_blank" rel="noopener">문 연 병원·약국 찾기 (응급의료포털)</a><a class="btn sm" href="tel:119">119 전화</a></div>
+    </section>
+  </section>
+
+  <section id="tab-mine" class="stack" style="gap:16px" hidden>
+    <div class="card">
+      <div class="card-head"><div class="seg" role="group" aria-label="거르기" id="mine-filter"></div></div>
+      <div id="mine" class="stack" style="gap:10px"></div>
+    </div>
+  </section>
+</main>
+
+<script src="firebase.js?v=20261009v"></script>
+<script src="sync.js?v=20261009v"></script>
+<script src="life-config.js?v=20261009v"></script>
+<script src="life.js?v=20261009v"></script>
+<script src="shell.js?v=20261009v"></script>
+<script src="nearby.js?v=20261009v"></script>
+<script>
+Nearby({
+  kind: 'hospital',
+  chips: [['내과', 'HP8'], ['소아청소년과', 'HP8'], ['이비인후과', 'HP8'], ['치과', 'HP8'], ['피부과', 'HP8'], ['정형외과', 'HP8'], ['안과', 'HP8'], ['산부인과', 'HP8'], ['한의원', 'HP8'], ['약국', 'PM9'], ['동물병원', '']],
+  kindOf: q => /동물/.test(q) ? '' : /약국/.test(q) ? 'PM9' : 'HP8',
+  radius: [['1000', '1km 안'], ['2000', '2km 안'], ['5000', '5km 안'], ['10000', '10km 안']], radiusDefault: '2000',
+  statuses: null,
+  memoHint: '예: 진료시간 9~18시, 토요일 오전만, 김OO 선생님',
+  emptyMine: '찾기에서 "저장"을 누르면 자주 가는 병원·약국이 여기 모여요. 전화번호를 다시 찾을 필요가 없어요.'
+});
+</script>
+</body>
+</html>

@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261009u" />
+<link rel="stylesheet" href="life.css?v=20261009v" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .counts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
@@ -53,11 +53,11 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261009u"></script>
-<script src="sync.js?v=20261009u"></script>
-<script src="life-config.js?v=20261009u"></script>
-<script src="life.js?v=20261009u"></script>
-<script src="shell.js?v=20261009u"></script>
+<script src="firebase.js?v=20261009v"></script>
+<script src="sync.js?v=20261009v"></script>
+<script src="life-config.js?v=20261009v"></script>
+<script src="life.js?v=20261009v"></script>
+<script src="shell.js?v=20261009v"></script>
 <script>
 (function () {
   const { h, today, prettyDate, toast } = Life;
@@ -73,7 +73,7 @@
 
   /* 백업 */
   const NAMES = { money: '가계부', gifts: '경조사 장부', workout: '운동 기록', shop: '장보기', fridge: '냉장고', chores: '집안일', things: '물건 위치',
-    pets: '반려동물', petlog: '반려동물 기록', supplies: '반려동물 소모품', dday: '기념일', contacts: '연락 챙기기', meals: '먹은 메뉴', food: '내 맛집', settings: '내 설정' };
+    pets: '반려동물', petlog: '반려동물 기록', supplies: '반려동물 소모품', dday: '기념일', contacts: '연락 챙기기', meals: '먹은 메뉴', food: '내 맛집', spots: '병원·가볼 곳', settings: '내 설정' };
   const KEYS = Object.keys(NAMES);
   function drawCounts() {
     $('counts').replaceChildren(...KEYS.filter(k => k !== 'settings').map(k => h('div', {}, h('span', {}, NAMES[k]), h('b', {}, Life.store(k).items().length + '개'))));

@@ -5,7 +5,7 @@
  *  - 하루 사용량 제한: 사람마다, 기능마다 하루에 쓸 수 있는 횟수를 정해 비용 폭탄을 막음
  *  - 비밀 열쇠(API 키)를 숨긴 채로 대신 물어봄
  *      POST /menu        → Claude에게 메뉴 추천
- *      GET  /places      → 카카오 지도에서 음식점 검색
+ *      GET  /places      → 카카오 지도에서 음식점·병원·명소 검색
  *      GET  /place       → 구글 지도에서 평점·후기·영업시간
  *      GET  /lotto/stats → 동행복권 당첨번호 통계
  *
@@ -161,11 +161,14 @@ async function handlePlaces(req, env, user, url) {
   const query = clip(url.searchParams.get('q'), 60).trim();
   if (!query) return fail(req, env, 400, 'bad_request', '검색어를 넣어 주세요.');
   const q = await useQuota(env, 'places', user.uid);
-  if (!q.ok) return quotaFail(req, env, q, '맛집 검색');
+  if (!q.ok) return quotaFail(req, env, q, '장소 검색');
 
   const k = new URL('https://dapi.kakao.com/v2/local/search/keyword.json');
   k.searchParams.set('query', query);
-  const cat = url.searchParams.get('cat') === 'cafe' ? 'CE7' : url.searchParams.get('cat') === 'all' ? '' : 'FD6';
+  // 종류: 음식점(FD6)·카페(CE7) 기본, kind로 병원(HP8)·약국(PM9)·관광명소(AT4)·문화시설(CT1)도 가능
+  const KINDS = { HP8: 1, PM9: 1, AT4: 1, CT1: 1, FD6: 1, CE7: 1 };
+  const kind = url.searchParams.get('kind');
+  const cat = KINDS[kind] ? kind : url.searchParams.get('cat') === 'cafe' ? 'CE7' : url.searchParams.get('cat') === 'all' ? '' : 'FD6';
   if (cat) k.searchParams.set('category_group_code', cat);
   const x = parseFloat(url.searchParams.get('x')), y = parseFloat(url.searchParams.get('y'));
   if (Number.isFinite(x) && Number.isFinite(y)) {
