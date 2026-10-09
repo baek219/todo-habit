@@ -317,12 +317,22 @@
     if (w.feels >= 27) return '더움';
     return '맑음';
   }
-  // 지역 이름으로 찾기 (한국 위주)
+  // 지역 이름으로 찾기: 로그인 + 서버가 있으면 카카오 지도(한국 동네 이름에 정확), 아니면 Open-Meteo
   async function searchPlace(q) {
+    if (hasServer() && window.CloudSync && window.CloudSync.user) {
+      try { const r = await api('geo/search', { query: { q } }); return { list: r.places || [], source: 'kakao' }; }
+      catch (e) { if (e.code === 'daily_limit' || e.code === 'login') throw e; /* 서버가 예전 버전이면 아래로 */ }
+    }
     const r = await fetch('https://geocoding-api.open-meteo.com/v1/search?count=8&language=ko&name=' + encodeURIComponent(q));
     const d = await r.json();
-    return (d.results || []).filter(x => !x.country_code || x.country_code === 'KR')
+    const list = (d.results || []).filter(x => !x.country_code || x.country_code === 'KR')
       .map(x => ({ name: x.name, lat: +x.latitude.toFixed(3), lon: +x.longitude.toFixed(3), sub: [x.admin1, x.admin2].filter(Boolean).join(' ') }));
+    return { list, source: 'open-meteo' };
+  }
+  // 위도·경도 → "동천동 (경기도 용인시 수지구)"
+  async function reversePlace(lat, lon) {
+    if (!(hasServer() && window.CloudSync && window.CloudSync.user)) return null;
+    try { const r = await api('geo/reverse', { query: { x: lon, y: lat } }); return r.found ? { name: r.name, sub: r.sub } : null; } catch (e) { return null; }
   }
 
   /* ---------- 앱처럼 설치 ---------- */
@@ -378,7 +388,7 @@
 
   window.Life = {
     h, iso, today, won, newId, daysBetween, prettyDate, WD, toast, sheet,
-    store, api, hasServer, group, weather, weatherChip, weatherPlaces, setWeatherPlaces, pmGrade, searchPlace,
+    store, api, hasServer, group, weather, weatherChip, weatherPlaces, setWeatherPlaces, pmGrade, searchPlace, reversePlace,
     canInstall: () => !!installEvt, install, standalone,
     onUser(fn) { userSubs.add(fn); try { fn(window.CloudSync && window.CloudSync.user); } catch (e) {} return () => userSubs.delete(fn); },
     user: () => (window.CloudSync && window.CloudSync.user) || null,

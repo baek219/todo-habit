@@ -20,7 +20,7 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 const GOOGLE_JWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com'));
 
-const DEFAULT_LIMITS = { menu: 10, places: 150, google: 30, lotto: 60 };
+const DEFAULT_LIMITS = { menu: 10, places: 150, google: 30, lotto: 60, geo: 200 };
 
 /* ---------- 응답 도우미 ---------- */
 function corsHeaders(req, env) {
@@ -189,6 +189,59 @@ async function handlePlaces(req, env, user, url) {
   return json(req, env, { places, isEnd: !!(d.meta && d.meta.is_end), total: d.meta ? d.meta.pageable_count : places.length, remaining: q.remaining });
 }
 
+/* ---------- 동네 이름 찾기 / 현재 위치 이름 (카카오) ---------- */
+async function kakao(env, path, params) {
+  const u = new URL('https://dapi.kakao.com' + path);
+  Object.entries(params).forEach(([k, v]) => u.searchParams.set(k, v));
+  const r = await fetch(u, { headers: { Authorization: 'KakaoAK ' + env.KAKAO_REST_KEY } });
+  if (!r.ok) throw new Error('kakao ' + r.status);
+  return r.json();
+}
+function splitName(full) {
+  const parts = String(full || '').trim().split(/\s+/);
+  return { name: parts[parts.length - 1] || full, sub: parts.slice(0, -1).join(' ') };
+}
+async function handleGeoSearch(req, env, user, url) {
+  if (!env.KAKAO_REST_KEY) return fail(req, env, 503, 'server_setup', '카카오 열쇠(KAKAO_REST_KEY)가 설정되지 않았어요.');
+  const q = clip(url.searchParams.get('q'), 40).trim();
+  if (!q) return fail(req, env, 400, 'bad_request', '지역 이름을 넣어 주세요.');
+  const quota = await useQuota(env, 'geo', user.uid);
+  if (!quota.ok) return quotaFail(req, env, quota, '지역 찾기');
+  const out = [], seen = new Set();
+  const add = (name, sub, x, y) => {
+    const key = (sub + ' ' + name).trim();
+    if (!name || seen.has(key)) return; seen.add(key);
+    out.push({ name, sub, lat: Math.round(Number(y) * 1000) / 1000, lon: Math.round(Number(x) * 1000) / 1000 });
+  };
+  try {
+    // 1) 주소(시·구·동) 이름으로
+    const a = await kakao(env, '/v2/local/search/address.json', { query: q, size: '10' });
+    (a.documents || []).forEach(d => { const n = splitName(d.address_name); add(n.name, n.sub, d.x, d.y); });
+    // 2) 결과가 적으면 장소 이름(역·건물 등)으로도
+    if (out.length < 3) {
+      const k = await kakao(env, '/v2/local/search/keyword.json', { query: q, size: '8' });
+      (k.documents || []).forEach(d => add(d.place_name, d.address_name, d.x, d.y));
+    }
+  } catch (e) { return fail(req, env, 502, 'kakao_error', '카카오 지도에서 지역을 찾지 못했어요.'); }
+  return json(req, env, { places: out.slice(0, 10) });
+}
+async function handleGeoReverse(req, env, user, url) {
+  if (!env.KAKAO_REST_KEY) return fail(req, env, 503, 'server_setup', '카카오 열쇠(KAKAO_REST_KEY)가 설정되지 않았어요.');
+  const x = parseFloat(url.searchParams.get('x')), y = parseFloat(url.searchParams.get('y'));
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return fail(req, env, 400, 'bad_request', '위치가 필요해요.');
+  const quota = await useQuota(env, 'geo', user.uid);
+  if (!quota.ok) return quotaFail(req, env, quota, '지역 찾기');
+  try {
+    const d = await kakao(env, '/v2/local/geo/coord2regioncode.json', { x: String(x), y: String(y) });
+    const docs = d.documents || [];
+    const r = docs.find(v => v.region_type === 'H') || docs[0];
+    if (!r) return json(req, env, { found: false });
+    const name = r.region_3depth_name || r.region_2depth_name || r.region_1depth_name;
+    const sub = [r.region_1depth_name, r.region_2depth_name].filter(Boolean).join(' ');
+    return json(req, env, { found: true, name, sub });
+  } catch (e) { return fail(req, env, 502, 'kakao_error', '현재 위치 이름을 찾지 못했어요.'); }
+}
+
 /* ---------- 구글 평점·후기 ---------- */
 async function handlePlace(req, env, user, url) {
   if (!env.GOOGLE_PLACES_KEY) return fail(req, env, 503, 'server_setup', '구글 열쇠(GOOGLE_PLACES_KEY)가 설정되지 않았어요.');
@@ -275,6 +328,8 @@ export default {
       if (url.pathname === '/places' && req.method === 'GET') return await handlePlaces(req, env, user, url);
       if (url.pathname === '/place' && req.method === 'GET') return await handlePlace(req, env, user, url);
       if (url.pathname === '/lotto/stats' && req.method === 'GET') return await handleLotto(req, env, user);
+      if (url.pathname === '/geo/search' && req.method === 'GET') return await handleGeoSearch(req, env, user, url);
+      if (url.pathname === '/geo/reverse' && req.method === 'GET') return await handleGeoReverse(req, env, user, url);
       return fail(req, env, 404, 'not_found', '없는 주소예요.');
     } catch (e) {
       return fail(req, env, 500, 'server_error', '서버에서 문제가 생겼어요.');
