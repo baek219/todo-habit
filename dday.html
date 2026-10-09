@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#2F6F5E" />
-<link rel="stylesheet" href="life.css?v=20261009d" />
+<link rel="stylesheet" href="life.css?v=20261009f" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .next{display:grid;gap:4px;padding:18px 20px;border-radius:var(--r);background:var(--fg);color:var(--bg)}
@@ -35,13 +35,13 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261009d"></script>
-<script src="sync.js?v=20261009d"></script>
-<script src="lunar.js?v=20261009d"></script>
-<script src="life-config.js?v=20261009d"></script>
-<script src="life.js?v=20261009d"></script>
-<script src="shell.js?v=20261009d"></script>
-<script src="import.js?v=20261009d"></script>
+<script src="firebase.js?v=20261009f"></script>
+<script src="sync.js?v=20261009f"></script>
+<script src="lunar.js?v=20261009f"></script>
+<script src="life-config.js?v=20261009f"></script>
+<script src="life.js?v=20261009f"></script>
+<script src="shell.js?v=20261009f"></script>
+<script src="import.js?v=20261009f"></script>
 <script>
 (function () {
   const { h, today, prettyDate, daysBetween, toast, sheet, iso } = Life;
@@ -81,7 +81,7 @@
     x = x || {};
     let kind = x.kind || 'yearly';
     const title = h('input', { type: 'text', maxlength: '30', value: x.title || '', placeholder: '예: 와이프 생일, 결혼기념일' });
-    const label = h('select', {}, LABELS.map(l => h('option', { selected: l === (x.label || '생일') }, l)));
+    const label = Life.choice({ options: LABELS, value: x.label || '생일', extra: () => Life.usedValues(D.items(), 'label', LABELS), placeholder: '예: 첫 만남, 입사일, 수능' });
     const date = h('input', { type: 'date', value: x.date || '' });
     const lunar = h('input', { type: 'checkbox', id: 'f-lunar', checked: !!x.lunar });
     const lunarRow = h('label', { class: 'row small', for: 'f-lunar', style: 'gap:6px' }, lunar, '음력이에요 (날짜 칸에 음력 날짜를 넣어 주세요)');
@@ -97,15 +97,14 @@
     const close = sheet(x.id ? '기념일 고치기' : '기념일 추가', h('div', { class: 'stack' },
       h('label', { class: 'field' }, h('span', { class: 'label' }, '이름'), title),
       h('div', { class: 'field' }, h('span', { class: 'label' }, '어떻게 셀까요'), h('div', { class: 'chips' }, seg)),
-      h('div', { class: 'grid2', style: 'gap:10px' },
-        h('label', { class: 'field' }, h('span', { class: 'label' }, '날짜 (처음 그날)'), date),
-        h('label', { class: 'field' }, h('span', { class: 'label' }, '분류'), label)),
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '날짜 (처음 그날)'), date),
+      h('div', { class: 'field' }, h('span', { class: 'label' }, '분류'), label.el),
       lunarRow,
       h('label', { class: 'field' }, h('span', { class: 'label' }, '메모'), memo),
       h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => {
         if (!title.value.trim() || !date.value) { toast('이름과 날짜를 넣어 주세요'); return; }
         if (kind === 'yearly' && lunar.checked) { const [y, m, d] = date.value.split('-').map(Number); if (!lunarToSolar(Math.max(y, 1900), m, d)) { toast('음력 날짜가 맞는지 확인해 주세요'); return; } }
-        D.put(Object.assign({}, x, { title: title.value.trim(), kind, date: date.value, lunar: kind === 'yearly' && lunar.checked, label: label.value, memo: memo.value.trim() }));
+        D.put(Object.assign({}, x, { title: title.value.trim(), kind, date: date.value, lunar: kind === 'yearly' && lunar.checked, label: label.get() || '기념일', memo: memo.value.trim() }));
         close(); toast('저장했어요');
       } }, '저장'), h('span', { class: 'spacer' }), del)));
   }
@@ -136,7 +135,7 @@
       { key: 'date', label: '날짜', type: 'date', required: true, aliases: ['생일', '일자', '처음날'] },
       { key: 'lunar', label: '음력', type: 'bool', aliases: ['음양력', '양력음력', '음력여부'], out: x => x.lunar ? '음력' : '' },
       { key: 'kind', label: '세는 법', type: 'choice', aliases: ['방식', '종류2', '반복'], options: [['yearly', '해마다', '매년', '반복'], ['count', '며칠째', '일수', '날짜세기'], ['once', '한번', '1회', '단발']], other: 'yearly', out: x => x.kind === 'count' ? '며칠째' : x.kind === 'once' ? '한번' : '해마다' },
-      { key: 'label', label: '분류', type: 'choice', aliases: ['종류', '구분'], options: LABELS.map(l => [l]).concat([['생일', '생신', '탄생']]), other: '기타' },
+      { key: 'label', label: '분류', type: 'choice', aliases: ['종류', '구분'], options: LABELS.map(l => [l]).concat([['생일', '생신', '탄생']]), keepRaw: true },
       { key: 'memo', label: '메모', type: 'text', aliases: ['비고'] }
     ],
     toItem(v) {

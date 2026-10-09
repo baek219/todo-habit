@@ -61,6 +61,41 @@
     return close;
   }
 
+  // 버튼(칩)으로 고르되, 없는 건 "+ 직접 쓰기"로 적을 수 있는 선택 칸
+  // choice({ options, value, onChange, extra: () => [예전에 직접 쓴 것들], placeholder })
+  function choice(o) {
+    const chips = h('div', { class: 'chips' });
+    const inp = h('input', { type: 'text', maxlength: String(o.max || 20), placeholder: o.placeholder || '직접 적어 주세요', hidden: true, 'aria-label': '직접 쓰기' });
+    let val = o.value || '', typing = false;
+    const fire = () => { if (o.onChange) o.onChange(val); };
+    function list() {
+      const all = o.options.slice();
+      const extra = typeof o.extra === 'function' ? o.extra() : (o.extra || []);
+      extra.forEach(v => { if (v && !all.includes(v)) all.push(v); });
+      if (val && !typing && !all.includes(val)) all.push(val);
+      return all;
+    }
+    function draw() {
+      chips.replaceChildren(...list().map(v => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(!typing && v === val),
+        onclick: () => { typing = false; val = v; inp.hidden = true; draw(); fire(); } }, v)),
+        h('button', { type: 'button', class: 'chip', 'aria-pressed': String(typing), onclick: () => { typing = true; inp.hidden = false; inp.value = ''; val = ''; draw(); fire(); inp.focus(); } }, '+ 직접 쓰기'));
+    }
+    inp.addEventListener('input', () => { val = inp.value.trim(); fire(); });
+    draw();
+    return {
+      el: h('div', { class: 'stack', style: 'gap:8px' }, chips, inp),
+      get: () => val,
+      set(v) { val = v || ''; typing = false; inp.hidden = true; draw(); },
+      redraw: draw
+    };
+  }
+  // 저장된 기록에서 직접 쓴 값들 모으기 (자주 쓴 순)
+  function usedValues(items, key, base) {
+    const c = {};
+    items.forEach(x => { const v = x[key]; if (v && !base.includes(v)) c[v] = (c[v] || 0) + 1; });
+    return Object.keys(c).sort((a, b) => c[b] - c[a]).slice(0, 12);
+  }
+
   /* ---------- 저장소 ---------- */
   function fp(s) { return JSON.stringify(s); }
   function merge(a, b) {
@@ -424,7 +459,7 @@
   setTimeout(onAuth, 0);
 
   window.Life = {
-    h, iso, today, won, newId, daysBetween, prettyDate, WD, toast, sheet,
+    h, iso, today, won, newId, daysBetween, prettyDate, WD, toast, sheet, choice, usedValues,
     store, api, hasServer, group, weather, weatherChip, weatherPlaces, setWeatherPlaces, pmGrade, searchPlace, reversePlace,
     canInstall: () => !!installEvt, install, standalone, ddayNext,
     onUser(fn) { userSubs.add(fn); try { fn(window.CloudSync && window.CloudSync.user); } catch (e) {} return () => userSubs.delete(fn); },

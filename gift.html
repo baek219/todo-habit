@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#2F6F5E" />
-<link rel="stylesheet" href="life.css?v=20261009d" />
+<link rel="stylesheet" href="life.css?v=20261009f" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .amount-input{font-size:22px!important;font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
@@ -18,6 +18,9 @@
   .tx{cursor:pointer}
   .tx:hover{background:var(--surface2)}
   .tx .amt{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .dir-say{margin:0;font-size:14px;font-weight:650;padding:10px 12px;border-radius:12px;background:var(--surface2)}
+  .dir-say.give{color:var(--danger)}
+  .dir-say.get{color:var(--primary-dark)}
 </style>
 </head>
 <body>
@@ -31,8 +34,8 @@
   <section class="card">
     <div class="card-head"><h2>기록하기</h2>
       <div class="seg" role="group" aria-label="낸 돈·받은 돈">
-        <button type="button" id="d-give" aria-pressed="true">냈어요</button>
-        <button type="button" id="d-get" aria-pressed="false">받았어요</button>
+        <button type="button" id="d-give" aria-pressed="true">내가 냈어요</button>
+        <button type="button" id="d-get" aria-pressed="false">내가 받았어요</button>
       </div></div>
     <form id="form" class="stack" autocomplete="off" style="gap:12px">
       <div class="grid2" style="gap:10px">
@@ -40,9 +43,10 @@
         <label class="field"><span class="label">금액 (원)</span><input id="f-amt" class="amount-input" type="text" inputmode="numeric" placeholder="0" /></label>
       </div>
       <datalist id="names"></datalist>
+      <p class="dir-say" id="say" aria-live="polite"></p>
       <div class="chips" id="quick"></div>
-      <div class="field"><span class="label">관계</span><div class="chips" id="f-rel"></div></div>
-      <div class="field"><span class="label">무슨 일</span><div class="chips" id="f-ev"></div></div>
+      <div class="field"><span class="label">관계</span><div id="f-rel"></div></div>
+      <div class="field"><span class="label">무슨 일</span><div id="f-ev"></div></div>
       <div class="grid2" style="gap:10px">
         <label class="field"><span class="label">날짜</span><input id="f-date" type="date" /></label>
         <label class="field"><span class="label">메모</span><input id="f-memo" type="text" maxlength="60" placeholder="예: 화환도 보냄, 부부 같이 감" /></label>
@@ -53,8 +57,8 @@
 
   <section class="card">
     <div class="stat-row">
-      <div class="stat"><span class="label" id="y-label">올해 낸 돈</span><b id="s-give" class="give">0원</b></div>
-      <div class="stat"><span class="label">올해 받은 돈</span><b id="s-get" class="get">0원</b></div>
+      <div class="stat"><span class="label" id="y-label">올해 내가 낸 돈</span><b id="s-give" class="give">0원</b></div>
+      <div class="stat"><span class="label">올해 내가 받은 돈</span><b id="s-get" class="get">0원</b></div>
       <div class="stat"><span class="label">기록한 사람</span><b id="s-people">0명</b></div>
     </div>
   </section>
@@ -71,12 +75,12 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261009d"></script>
-<script src="sync.js?v=20261009d"></script>
-<script src="life-config.js?v=20261009d"></script>
-<script src="life.js?v=20261009d"></script>
-<script src="shell.js?v=20261009d"></script>
-<script src="import.js?v=20261009d"></script>
+<script src="firebase.js?v=20261009f"></script>
+<script src="sync.js?v=20261009f"></script>
+<script src="life-config.js?v=20261009f"></script>
+<script src="life.js?v=20261009f"></script>
+<script src="shell.js?v=20261009f"></script>
+<script src="import.js?v=20261009f"></script>
 <script>
 (function () {
   const { h, today, won, prettyDate, toast, sheet } = Life;
@@ -89,19 +93,27 @@
   let dir = 'give', rel = '친구', ev = '결혼', q = '';
   const parseAmt = v => parseInt(String(v).replace(/[^\d]/g, ''), 10) || 0;
 
-  function chipsOf(box, list, get, set) {
-    box.replaceChildren(...list.map(v => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(get() === v), onclick: () => { set(v); chipsOf(box, list, get, set); } }, v)));
+  // 관계·무슨 일: 버튼으로 고르거나 "+ 직접 쓰기"로 적기
+  const relC = Life.choice({ options: RELS, value: rel, onChange: v => { rel = v; }, extra: () => Life.usedValues(S.items(), 'rel', RELS), placeholder: '예: 처가, 동호회, 거래처' });
+  const evC = Life.choice({ options: EVS, value: ev, onChange: v => { ev = v; }, extra: () => Life.usedValues(S.items(), 'ev', EVS), placeholder: '예: 칠순, 출산, 승진' });
+  $('f-rel').replaceWith(relC.el); $('f-ev').replaceWith(evC.el);
+  // 누가 누구에게 준 돈인지 문장으로 보여주기
+  function say() {
+    const n = $('f-name').value.trim() || '○○', a = parseAmt($('f-amt').value);
+    const money = a ? won(a) : '돈';
+    $('say').textContent = dir === 'give' ? '👉 내가 ' + n + '님께 ' + money + '을 드렸어요' : '👉 ' + n + '님이 나에게 ' + money + '을 줬어요';
+    $('say').className = 'dir-say ' + dir;
   }
-  chipsOf($('f-rel'), RELS, () => rel, v => rel = v);
-  chipsOf($('f-ev'), EVS, () => ev, v => ev = v);
-  function setDir(d) { dir = d; $('d-give').setAttribute('aria-pressed', String(d === 'give')); $('d-get').setAttribute('aria-pressed', String(d === 'get')); }
+  $('f-name').addEventListener('input', say); $('f-amt').addEventListener('input', say);
+  function setDir(d) { dir = d; $('d-give').setAttribute('aria-pressed', String(d === 'give')); $('d-get').setAttribute('aria-pressed', String(d === 'get')); say(); }
+  say();
   $('d-give').onclick = () => setDir('give'); $('d-get').onclick = () => setDir('get');
   $('f-amt').addEventListener('input', e => { const n = parseAmt(e.target.value); e.target.value = n ? n.toLocaleString('ko-KR') : ''; });
   [50000, 100000, 200000].forEach(n => $('quick').append(h('button', { type: 'button', class: 'chip', onclick: () => { $('f-amt').value = n.toLocaleString('ko-KR'); } }, (n / 10000) + '만원')));
   // 이름을 고르면 지난번 관계를 따라감
   $('f-name').addEventListener('change', () => {
     const last = S.items().filter(x => x.person === $('f-name').value.trim()).sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0];
-    if (last) { rel = last.rel; chipsOf($('f-rel'), RELS, () => rel, v => rel = v); }
+    if (last) { rel = last.rel; relC.set(rel); }
   });
 
   $('form').addEventListener('submit', e => {
@@ -109,17 +121,20 @@
     const person = $('f-name').value.trim(), amount = parseAmt($('f-amt').value);
     if (!person) { toast('누구인지 적어 주세요'); $('f-name').focus(); return; }
     if (!amount) { toast('금액을 넣어 주세요'); $('f-amt').focus(); return; }
+    if (!rel) rel = '기타'; if (!ev) ev = '기타';
     S.put({ dir, person, rel, ev, amount, date: $('f-date').value || today(), memo: $('f-memo').value.trim() });
-    toast(person + ' · ' + won(amount) + (dir === 'give' ? ' 냈어요' : ' 받았어요'));
+    toast(dir === 'give' ? '내가 ' + person + '님께 ' + won(amount) + ' 낸 걸 저장했어요' : person + '님께 ' + won(amount) + ' 받은 걸 저장했어요');
     $('f-name').value = ''; $('f-amt').value = ''; $('f-memo').value = '';
+    relC.set(rel); evC.set(ev); say();
   });
 
   function edit(x) {
     const amt = h('input', { type: 'text', inputmode: 'numeric', class: 'amount-input', value: x.amount.toLocaleString('ko-KR') });
     amt.addEventListener('input', () => { const n = parseAmt(amt.value); amt.value = n ? n.toLocaleString('ko-KR') : ''; });
     const name = h('input', { type: 'text', maxlength: '20', value: x.person });
-    const d = h('select', {}, [['give', '냈어요'], ['get', '받았어요']].map(([v, l]) => h('option', { value: v, selected: v === x.dir }, l)));
-    const evSel = h('select', {}, EVS.map(v => h('option', { selected: v === x.ev }, v)));
+    const d = h('select', {}, [['give', '내가 냈어요 (내가 줌)'], ['get', '내가 받았어요 (상대가 줌)']].map(([v, l]) => h('option', { value: v, selected: v === x.dir }, l)));
+    const evE = Life.choice({ options: EVS, value: x.ev, extra: () => Life.usedValues(S.items(), 'ev', EVS), placeholder: '예: 칠순, 출산' });
+    const relE = Life.choice({ options: RELS, value: x.rel, extra: () => Life.usedValues(S.items(), 'rel', RELS), placeholder: '예: 처가, 거래처' });
     const date = h('input', { type: 'date', value: x.date });
     const memo = h('input', { type: 'text', maxlength: '60', value: x.memo || '' });
     let armed = false;
@@ -128,19 +143,21 @@
       S.remove(x.id); close(); toast('삭제했어요');
     } }, '삭제');
     const close = sheet('기록 고치기', h('div', { class: 'stack' },
-      h('div', { class: 'grid2', style: 'gap:10px' }, h('label', { class: 'field' }, h('span', { class: 'label' }, '누구'), name), h('label', { class: 'field' }, h('span', { class: 'label' }, '냈어요/받았어요'), d)),
+      h('div', { class: 'grid2', style: 'gap:10px' }, h('label', { class: 'field' }, h('span', { class: 'label' }, '누구'), name), h('label', { class: 'field' }, h('span', { class: 'label' }, '누가 냈나요'), d)),
       h('label', { class: 'field' }, h('span', { class: 'label' }, '금액'), amt),
-      h('div', { class: 'grid2', style: 'gap:10px' }, h('label', { class: 'field' }, h('span', { class: 'label' }, '무슨 일'), evSel), h('label', { class: 'field' }, h('span', { class: 'label' }, '날짜'), date)),
+      h('div', { class: 'field' }, h('span', { class: 'label' }, '무슨 일'), evE.el),
+      h('div', { class: 'field' }, h('span', { class: 'label' }, '관계'), relE.el),
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '날짜'), date),
       h('label', { class: 'field' }, h('span', { class: 'label' }, '메모'), memo),
       h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => {
         const a = parseAmt(amt.value); if (!a || !name.value.trim()) { toast('이름과 금액을 넣어 주세요'); return; }
-        S.put(Object.assign({}, x, { person: name.value.trim(), dir: d.value, amount: a, ev: evSel.value, date: date.value || x.date, memo: memo.value.trim() })); close(); toast('고쳤어요');
+        S.put(Object.assign({}, x, { person: name.value.trim(), dir: d.value, amount: a, ev: evE.get() || '기타', rel: relE.get() || '기타', date: date.value || x.date, memo: memo.value.trim() })); close(); toast('고쳤어요');
       } }, '저장'), h('span', { class: 'spacer' }), del)));
   }
 
   function row(x) {
     return h('li', { class: 'tx', tabindex: '0', role: 'button', onclick: () => edit(x), onkeydown: e => { if (e.key === 'Enter') edit(x); } },
-      h('span', { class: 'badge ' + (x.dir === 'give' ? 'bad' : 'go') }, x.dir === 'give' ? '냄' : '받음'),
+      h('span', { class: 'badge ' + (x.dir === 'give' ? 'bad' : 'go') }, x.dir === 'give' ? '내가 냄' : '내가 받음'),
       h('div', { class: 'grow' }, h('div', { style: 'font-weight:650' }, x.person + ' · ' + x.ev), h('div', { class: 'tiny muted' }, prettyDate(x.date) + ' · ' + x.rel + (x.memo ? ' · ' + x.memo : ''))),
       h('span', { class: 'amt ' + x.dir }, won(x.amount)));
   }
@@ -150,7 +167,7 @@
   function render() {
     const all = S.items().sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0));
     const y = today().slice(0, 4);
-    $('y-label').textContent = y + '년 낸 돈';
+    $('y-label').textContent = y + '년 내가 낸 돈';
     $('s-give').textContent = won(all.filter(x => x.dir === 'give' && (x.date || '').startsWith(y)).reduce((s, x) => s + x.amount, 0));
     $('s-get').textContent = won(all.filter(x => x.dir === 'get' && (x.date || '').startsWith(y)).reduce((s, x) => s + x.amount, 0));
     const by = {};
@@ -161,8 +178,8 @@
     $('people').replaceChildren(...(people.length ? people.slice(0, 50).map(([n, p]) => h('li', {},
       h('div', { class: 'grow person' },
         h('div', { class: 'row' }, h('b', {}, n), h('span', { class: 'badge' }, p.rel), h('span', { class: 'tiny muted' }, p.n + '번 · 마지막 ' + prettyDate(p.last))),
-        h('div', { class: 'flow' }, h('span', { class: 'give' }, '낸 돈 ' + won(p.give)), h('span', { class: 'get' }, '받은 돈 ' + won(p.get)))),
-      h('button', { class: 'btn sm soft', type: 'button', onclick: () => { $('f-name').value = n; rel = p.rel; chipsOf($('f-rel'), RELS, () => rel, v => rel = v); window.scrollTo({ top: 0, behavior: 'smooth' }); $('f-amt').focus(); } }, '이 사람 기록')))
+        h('div', { class: 'flow' }, h('span', { class: 'give' }, '내가 낸 돈 ' + won(p.give)), h('span', { class: 'get' }, '내가 받은 돈 ' + won(p.get)))),
+      h('button', { class: 'btn sm soft', type: 'button', onclick: () => { $('f-name').value = n; rel = p.rel; relC.set(rel); say(); window.scrollTo({ top: 0, behavior: 'smooth' }); $('f-amt').focus(); } }, '이 사람 기록')))
       : [h('li', { class: 'empty' }, q ? '"' + q + '"(으)로 기록한 사람이 없어요.' : '위에서 처음 기록하면 사람별로 모여요.')]));
     const shown = all.filter(x => !q || x.person.includes(q));
     $('list').replaceChildren(...(shown.length ? shown.slice(0, 100).map(row) : [h('li', { class: 'empty' }, '아직 기록이 없어요.')]));
@@ -173,12 +190,12 @@
     fields: [
       { key: 'date', label: '날짜', type: 'date', aliases: ['일자', '언제', '날'] },
       { key: 'person', label: '이름', type: 'text', required: true, aliases: ['누구', '성함', '보낸사람', '받은사람', '상대', '대상'] },
-      { key: 'dir', label: '구분', type: 'choice', aliases: ['냄받음', '주고받음', '종류', '내역구분', '입출'], options: [['give', '냈음', '냄', '낸', '보냄', '보낸', '지출', '출금', '나감', '드림', '줌', '준'], ['get', '받음', '받은', '받았', '입금', '들어옴', '수입']], out: x => x.dir === 'get' ? '받음' : '냈음' },
+      { key: 'dir', label: '구분', type: 'choice', aliases: ['냄받음', '주고받음', '종류', '내역구분', '입출'], options: [['give', '내가냄', '내가 냈음', '냈음', '냄', '낸', '보냄', '보낸', '지출', '출금', '나감', '드림', '줌', '준'], ['get', '내가받음', '내가 받았음', '받음', '받은', '받았', '입금', '들어옴', '수입']], out: x => x.dir === 'get' ? '내가 받음' : '내가 냄' },
       { key: 'amount', label: '금액', type: 'amount', aliases: ['액수', '돈', '축의금', '부의금', '봉투'], out: x => x.amount },
       { key: 'give', label: '낸 돈', type: 'amount', aliases: ['낸금액', '보낸돈', '보낸금액', '지출', '나간돈'], noExport: true },
       { key: 'get', label: '받은 돈', type: 'amount', aliases: ['받은금액', '들어온돈', '수입'], noExport: true },
-      { key: 'ev', label: '무슨 일', type: 'choice', aliases: ['행사', '경조사', '내용', '종류', '이유', '사유'], options: [['결혼', '결혼식', '웨딩', '축의'], ['장례', '장례식', '부고', '조문', '조의', '부의', '상'], ['돌잔치', '돌', '백일'], ['생일', '칠순', '환갑', '팔순', '회갑'], ['개업·집들이', '개업', '집들이', '이사'], ['병문안', '병원', '입원'], ['기타']], other: '기타' },
-      { key: 'rel', label: '관계', type: 'choice', aliases: ['사이', '구분2'], options: [['가족'], ['친척', '삼촌', '이모', '고모', '사촌'], ['친구', '동창', '동기'], ['회사', '직장', '동료', '팀', '상사'], ['지인', '이웃'], ['기타']], other: '기타' },
+      { key: 'ev', label: '무슨 일', type: 'choice', aliases: ['행사', '경조사', '내용', '종류', '이유', '사유'], options: [['결혼', '결혼식', '웨딩', '축의'], ['장례', '장례식', '부고', '조문', '조의', '부의', '상'], ['돌잔치', '돌', '백일'], ['생일', '생신'], ['개업·집들이', '개업', '집들이', '이사'], ['병문안', '병원', '입원'], ['기타']], keepRaw: true },
+      { key: 'rel', label: '관계', type: 'choice', aliases: ['사이', '구분2'], options: [['가족'], ['친척'], ['친구'], ['회사', '직장', '회사동료', '직장동료'], ['지인'], ['기타']], keepRaw: true },
       { key: 'memo', label: '메모', type: 'text', aliases: ['비고', '참고', '설명'] }
     ],
     toItem(v) {
@@ -191,9 +208,9 @@
       return { person: v.person, dir: dir || 'give', amount, ev: v.ev || '기타', rel: v.rel || '기타', date: v.date || today(), memo: v.memo || '' };
     },
     dupKey: x => [x.person, x.dir, x.amount, x.date].join('|'),
-    preview: [['날짜', x => x.date], ['이름', x => x.person], ['구분', x => x.dir === 'get' ? '받음' : '냈음'], ['금액', x => x.amount.toLocaleString('ko-KR') + '원'], ['무슨 일', x => x.ev], ['관계', x => x.rel]],
+    preview: [['날짜', x => x.date], ['이름', x => x.person], ['구분', x => x.dir === 'get' ? '내가 받음' : '내가 냄'], ['금액', x => x.amount.toLocaleString('ko-KR') + '원'], ['무슨 일', x => x.ev], ['관계', x => x.rel]],
     exportSort: (a, b) => (a.date || '').localeCompare(b.date || ''),
-    sample: [['2024-05-18', '김민수', '냈음', '100000', '결혼', '친구', '부부 같이 감'], ['2024-09-02', '박지영', '받음', '50000', '돌잔치', '회사', '']],
+    sample: [['2024-05-18', '김민수', '내가 냄', '100000', '결혼', '친구', '부부 같이 감'], ['2024-09-02', '박지영', '내가 받음', '50000', '돌잔치', '회사', '']],
     note: '"낸 돈", "받은 돈"이 따로 열로 나뉘어 있어도 괜찮아요. 날짜가 비어 있으면 오늘 날짜로 넣어요.'
   });
   S.subscribe(render);

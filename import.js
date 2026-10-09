@@ -93,6 +93,7 @@
   function parseChoice(v, f) {
     const s = norm(v); if (!s) return undefined;
     for (const opt of f.options) { const [val, ...names] = opt; if (names.concat([val]).some(n => norm(n) === s)) return val; }
+    if (f.keepRaw) return String(v).trim().slice(0, 20); // 목록에 없는 말은 적힌 그대로
     for (const opt of f.options) { const [val, ...names] = opt; if (names.concat([val]).some(n => { const k = norm(n); return k.length >= 1 && (s.includes(k) || (s.length >= 2 && k.includes(s))); })) return val; }
     return f.other !== undefined ? f.other : undefined;
   }
@@ -282,7 +283,8 @@
       const cols = cfg.preview;
       const btn = h('button', { class: 'btn primary', type: 'button', disabled: !ok.length, onclick: () => {
         btn.disabled = true;
-        const added = cfg.store.putMany(ok);
+        const imp = 'x' + Date.now().toString(36);
+        const added = cfg.store.putMany(ok.map(it => Object.assign({}, it, { imp })));
         result = { ids: added.map(x => x.id), n: added.length };
         drawDone();
       } }, ok.length ? ok.length + '개 넣기' : '넣을 수 있는 줄이 없어요');
@@ -312,11 +314,52 @@
     drawIn();
   }
 
+  /* ---------- 엑셀로 넣은 묶음 찾기·지우기 ---------- */
+  function batches(store) {
+    const g = {};
+    store.items().forEach(x => {
+      // imp 표시가 있으면 그 묶음, 없으면 예전 방식으로 한꺼번에 넣은 것(같은 시각에 2개 이상)
+      const k = x.imp || ((x.createdAt || 0) > (x.updatedAt || 0) ? 'old' + x.updatedAt : null);
+      if (!k) return;
+      (g[k] = g[k] || []).push(x);
+    });
+    return Object.entries(g).filter(([k, l]) => !k.startsWith('old') || l.length >= 2)
+      .map(([k, l]) => ({ key: k, items: l, at: Math.min(...l.map(x => x.imp ? parseInt(x.imp.slice(1), 36) : x.updatedAt)) }))
+      .sort((a, b) => b.at - a.at);
+  }
+  const when = t => { const d = new Date(t); return (d.getMonth() + 1) + '월 ' + d.getDate() + '일 ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+  function openBatches(cfg) {
+    const body = h('div', { class: 'stack', style: 'gap:12px' });
+    const close = sheet('엑셀로 넣은 기록 지우기', body);
+    function draw() {
+      const list = batches(cfg.store);
+      if (!list.length) { body.replaceChildren(h('p', { class: 'muted', style: 'margin:0' }, '엑셀로 넣은 기록이 남아 있지 않아요.'), h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => close() }, '닫기'))); return; }
+      body.replaceChildren(
+        h('p', { class: 'muted', style: 'margin:0' }, '엑셀로 한 번에 넣은 것을 넣은 때마다 묶어서 보여줘요. 잘못 넣은 묶음을 통째로 지울 수 있어요. 직접 하나씩 적은 기록은 지워지지 않아요.'),
+        h('ul', { class: 'list' }, list.map(b => {
+          let armed = false;
+          const del = h('button', { class: 'btn sm', type: 'button', onclick: () => {
+            if (!armed) { armed = true; del.textContent = '한 번 더 누르면 ' + b.items.length + '개 삭제'; del.style.color = 'var(--danger)'; del.style.borderColor = 'var(--danger)'; return; }
+            cfg.store.removeMany(b.items.map(x => x.id)); toast(b.items.length + '개를 지웠어요'); draw();
+          } }, '모두 지우기');
+          const col = cfg.preview.find(c => ['이름', '품목', '음식', '물건', '집안일', '운동', '내용'].includes(c[0])) || cfg.preview[0];
+          const names = b.items.slice(0, 3).map(x => col[1](x)).filter(Boolean).join(', ');
+          return h('li', {}, h('div', { class: 'grow' }, h('b', {}, when(b.at) + '에 넣은 ' + b.items.length + '개'), h('div', { class: 'tiny muted' }, names + (b.items.length > 3 ? ' 외' : ''))), del);
+        })),
+        h('div', { class: 'row' }, h('button', { class: 'btn ghost', type: 'button', onclick: () => close() }, '닫기')));
+    }
+    draw();
+  }
+
   L.excel = function (cfg) {
     const head = document.querySelector('.page-head'); if (!head) return;
-    const btn = h('button', { class: 'btn sm soft ln-xl', type: 'button', style: 'justify-self:start;margin-top:4px', onclick: () => open(cfg) },
+    const btn = h('button', { class: 'btn sm soft ln-xl', type: 'button', onclick: () => open(cfg) },
       h('span', { 'aria-hidden': 'true' }, '⇅ '), '엑셀로 넣기·받기');
-    head.append(btn);
+    const delBtn = h('button', { class: 'btn sm ghost', type: 'button', onclick: () => openBatches(cfg) }, '엑셀로 넣은 것 지우기');
+    const wrap = h('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap;justify-self:start;margin-top:4px' }, btn, delBtn);
+    head.append(wrap);
+    const sync = () => { delBtn.hidden = !batches(cfg.store).length; };
+    cfg.store.subscribe(sync); sync();
     return { open: () => open(cfg) };
   };
   L.excel._test = { parseText, parseDate, parseAmount, parseDays, parseChoice };

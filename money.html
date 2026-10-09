@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#2F6F5E" />
-<link rel="stylesheet" href="life.css?v=20261009d" />
+<link rel="stylesheet" href="life.css?v=20261009f" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .month-nav{display:flex;align-items:center;gap:6px}
@@ -45,7 +45,7 @@
       <label class="field"><span class="label">금액 (원)</span>
         <input class="amount-input" id="f-amount" type="text" inputmode="numeric" placeholder="0" required /></label>
       <div class="quick-amts" id="quick-amts"></div>
-      <div class="field"><span class="label">분류</span><div class="chips" id="f-cats"></div></div>
+      <div class="field"><span class="label">분류</span><div id="f-cats"></div></div>
       <div class="grid2" style="gap:10px">
         <label class="field"><span class="label">내용</span><input id="f-memo" type="text" maxlength="60" placeholder="예: 점심 김치찌개" /></label>
         <label class="field"><span class="label">날짜</span><input id="f-date" type="date" /></label>
@@ -91,12 +91,12 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261009d"></script>
-<script src="sync.js?v=20261009d"></script>
-<script src="life-config.js?v=20261009d"></script>
-<script src="life.js?v=20261009d"></script>
-<script src="shell.js?v=20261009d"></script>
-<script src="import.js?v=20261009d"></script>
+<script src="firebase.js?v=20261009f"></script>
+<script src="sync.js?v=20261009f"></script>
+<script src="life-config.js?v=20261009f"></script>
+<script src="life.js?v=20261009f"></script>
+<script src="shell.js?v=20261009f"></script>
+<script src="import.js?v=20261009f"></script>
 <script>
 (function () {
   const { h, today, won, prettyDate, toast, sheet } = Life;
@@ -117,10 +117,12 @@
   const parseAmt = v => parseInt(String(v).replace(/[^\d]/g, ''), 10) || 0;
   $('f-amount').addEventListener('input', e => { const n = parseAmt(e.target.value); e.target.value = n ? n.toLocaleString('ko-KR') : ''; });
   [5000, 10000, 30000, 50000].forEach(n => $('quick-amts').append(h('button', { type: 'button', class: 'chip', onclick: () => { $('f-amount').value = (parseAmt($('f-amount').value) + n).toLocaleString('ko-KR'); } }, '+' + (n / 10000 >= 1 ? n / 10000 + '만' : n / 1000 + '천'))));
+  // 분류: 버튼으로 고르거나 "+ 직접 쓰기"
+  const usedCats = k => Life.usedValues(S.items().filter(t => (k === 'out' ? t.kind !== 'in' : t.kind === 'in')), 'cat', (k === 'out' ? CATS : IN_CATS).map(c => c[0]));
   function drawCats() {
-    const list = kind === 'out' ? CATS : IN_CATS;
-    if (!list.some(c => c[0] === cat)) cat = list[0][0];
-    $('f-cats').replaceChildren(...list.map(([c]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(c === cat), onclick: () => { cat = c; drawCats(); } }, c)));
+    const list = (kind === 'out' ? CATS : IN_CATS).map(c => c[0]), used = usedCats(kind);
+    if (!list.includes(cat) && !used.includes(cat)) cat = list[0];
+    $('f-cats').replaceChildren(Life.choice({ options: list, value: cat, onChange: v => { cat = v; }, extra: used, placeholder: kind === 'out' ? '예: 육아, 술·모임, 자동차' : '예: 중고 판매, 이자' }).el);
   }
   function setKind(k) { kind = k; $('t-out').setAttribute('aria-pressed', String(k === 'out')); $('t-in').setAttribute('aria-pressed', String(k === 'in')); drawCats(); }
   $('t-out').onclick = () => setKind('out'); $('t-in').onclick = () => setKind('in');
@@ -129,10 +131,11 @@
     const amount = parseAmt($('f-amount').value);
     if (!amount) { toast('금액을 넣어 주세요'); $('f-amount').focus(); return; }
     const date = $('f-date').value || today();
+    if (!cat) cat = kind === 'out' ? '기타' : '환급·기타';
     S.put({ kind, amount, cat, memo: $('f-memo').value.trim(), date });
     toast(won(amount) + ' ' + (kind === 'out' ? '지출' : '수입') + ' 저장했어요');
     $('f-amount').value = ''; $('f-memo').value = '';
-    ym = date.slice(0, 7); render();
+    ym = date.slice(0, 7); drawCats(); render();
   });
 
   /* 달 이동 */
@@ -153,8 +156,8 @@
   function edit(t) {
     const amt = h('input', { type: 'text', inputmode: 'numeric', class: 'amount-input', value: t.amount.toLocaleString('ko-KR') });
     amt.addEventListener('input', () => { const n = parseAmt(amt.value); amt.value = n ? n.toLocaleString('ko-KR') : ''; });
-    const list = t.kind === 'in' ? IN_CATS : CATS;
-    const sel = h('select', {}, list.map(([c]) => h('option', { value: c, selected: c === t.cat }, c)));
+    const list = (t.kind === 'in' ? IN_CATS : CATS).map(c => c[0]);
+    const sel = Life.choice({ options: list, value: t.cat, extra: usedCats(t.kind === 'in' ? 'in' : 'out'), placeholder: '예: 육아' });
     const memo = h('input', { type: 'text', maxlength: '60', value: t.memo || '' });
     const date = h('input', { type: 'date', value: t.date });
     let armed = false;
@@ -164,12 +167,12 @@
     } }, '삭제');
     const close = sheet('내역 고치기', h('div', { class: 'stack' },
       h('label', { class: 'field' }, h('span', { class: 'label' }, '금액'), amt),
-      h('label', { class: 'field' }, h('span', { class: 'label' }, '분류'), sel),
+      h('div', { class: 'field' }, h('span', { class: 'label' }, '분류'), sel.el),
       h('label', { class: 'field' }, h('span', { class: 'label' }, '내용'), memo),
       h('label', { class: 'field' }, h('span', { class: 'label' }, '날짜'), date),
       h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => {
         const a = parseAmt(amt.value); if (!a) { toast('금액을 넣어 주세요'); return; }
-        S.put(Object.assign({}, t, { amount: a, cat: sel.value, memo: memo.value.trim(), date: date.value || t.date })); close(); toast('고쳤어요');
+        S.put(Object.assign({}, t, { amount: a, cat: sel.get() || (t.kind === 'in' ? '환급·기타' : '기타'), memo: memo.value.trim(), date: date.value || t.date })); close(); toast('고쳤어요');
       } }, '저장'), h('span', { class: 'spacer' }), del)));
   }
 
@@ -180,7 +183,7 @@
     const name = h('input', { type: 'text', maxlength: '30', value: f.name || '', placeholder: '예: 휴대폰 요금, 넷플릭스' });
     const amt = h('input', { type: 'text', inputmode: 'numeric', class: 'amount-input', value: f.amount ? f.amount.toLocaleString('ko-KR') : '' });
     amt.addEventListener('input', () => { const n = parseAmt(amt.value); amt.value = n ? n.toLocaleString('ko-KR') : ''; });
-    const sel = h('select', {}, CATS.map(([c]) => h('option', { value: c, selected: c === (f.cat || '생활·주거') }, c)));
+    const sel = Life.choice({ options: CATS.map(c => c[0]), value: f.cat || '생활·주거', extra: usedCats('out'), placeholder: '예: 구독, 보험' });
     const day = h('select', {}, Array.from({ length: 31 }, (_, i) => h('option', { value: i + 1, selected: (i + 1) === (f.day || 25) }, (i + 1) + '일' + (i + 1 >= 29 ? ' (없는 달은 말일)' : ''))));
     let armed = false;
     const del = f.id ? h('button', { class: 'btn ghost', type: 'button', onclick: () => {
@@ -190,13 +193,12 @@
     const close = sheet(f.id ? '고정 지출 고치기' : '고정 지출 추가', h('div', { class: 'stack' },
       h('label', { class: 'field' }, h('span', { class: 'label' }, '이름'), name),
       h('label', { class: 'field' }, h('span', { class: 'label' }, '금액 (원)'), amt),
-      h('div', { class: 'grid2', style: 'gap:10px' },
-        h('label', { class: 'field' }, h('span', { class: 'label' }, '분류'), sel),
-        h('label', { class: 'field' }, h('span', { class: 'label' }, '매달 나가는 날'), day)),
+      h('div', { class: 'field' }, h('span', { class: 'label' }, '분류'), sel.el),
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '매달 나가는 날'), day),
       h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => {
         const a = parseAmt(amt.value);
         if (!name.value.trim() || !a) { toast('이름과 금액을 넣어 주세요'); return; }
-        S.put(Object.assign({}, f, { kind: 'fixed', name: name.value.trim(), amount: a, cat: sel.value, day: Number(day.value), start: f.start || today() }));
+        S.put(Object.assign({}, f, { kind: 'fixed', name: name.value.trim(), amount: a, cat: sel.get() || '기타', day: Number(day.value), start: f.start || today() }));
         close(); toast('저장했어요. 매달 ' + day.value + '일에 자동으로 들어가요');
       } }, '저장'), h('span', { class: 'spacer' }), del)));
   }

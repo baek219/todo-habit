@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#2F6F5E" />
-<link rel="stylesheet" href="life.css?v=20261009d" />
+<link rel="stylesheet" href="life.css?v=20261009f" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .search{font-size:17px!important;padding:14px 16px!important}
@@ -36,12 +36,12 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261009d"></script>
-<script src="sync.js?v=20261009d"></script>
-<script src="life-config.js?v=20261009d"></script>
-<script src="life.js?v=20261009d"></script>
-<script src="shell.js?v=20261009d"></script>
-<script src="import.js?v=20261009d"></script>
+<script src="firebase.js?v=20261009f"></script>
+<script src="sync.js?v=20261009f"></script>
+<script src="life-config.js?v=20261009f"></script>
+<script src="life.js?v=20261009f"></script>
+<script src="shell.js?v=20261009f"></script>
+<script src="import.js?v=20261009f"></script>
 <script>
 (function () {
   const { h, today, prettyDate, toast, sheet } = Life;
@@ -55,7 +55,7 @@
     x = x || {};
     const name = h('input', { type: 'text', maxlength: '30', value: x.name || q || '', placeholder: '예: 여권' });
     const where = h('input', { type: 'text', maxlength: '50', value: x.where || '', placeholder: '예: 안방 옷장 맨 위 칸, 파란 상자' });
-    const c = h('select', {}, CATS.map(v => h('option', { selected: v === (x.cat || '서류') }, v)));
+    const c = Life.choice({ options: CATS, value: x.cat || '서류', extra: () => Life.usedValues(T.items(), 'cat', CATS), placeholder: '예: 캠핑용품, 아기용품' });
     const memo = h('input', { type: 'text', maxlength: '60', value: x.memo || '', placeholder: '예: 2031년 만료, 보증기간 2027년 3월까지' });
     let armed = false;
     const del = x.id ? h('button', { class: 'btn ghost', type: 'button', onclick: () => {
@@ -65,10 +65,11 @@
     const close = sheet(x.id ? '물건 고치기' : '물건 추가', h('div', { class: 'stack' },
       h('label', { class: 'field' }, h('span', { class: 'label' }, '무엇'), name),
       h('label', { class: 'field' }, h('span', { class: 'label' }, '어디에'), where),
-      h('div', { class: 'grid2', style: 'gap:10px' }, h('label', { class: 'field' }, h('span', { class: 'label' }, '종류'), c), h('label', { class: 'field' }, h('span', { class: 'label' }, '메모'), memo)),
+      h('div', { class: 'field' }, h('span', { class: 'label' }, '종류'), c.el),
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '메모'), memo),
       h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => {
         if (!name.value.trim() || !where.value.trim()) { toast('무엇을 어디에 뒀는지 적어 주세요'); return; }
-        T.put(Object.assign({}, x, { name: name.value.trim(), where: where.value.trim(), cat: c.value, memo: memo.value.trim(), moved: today() }));
+        T.put(Object.assign({}, x, { name: name.value.trim(), where: where.value.trim(), cat: c.get() || '기타', memo: memo.value.trim(), moved: today() }));
         close(); toast('저장했어요');
       } }, '저장'), h('span', { class: 'spacer' }), del)));
   }
@@ -82,7 +83,7 @@
   }
   function render() {
     const all = T.items();
-    const used = CATS.filter(c => all.some(x => x.cat === c));
+    const used = CATS.concat(Life.usedValues(all, 'cat', CATS)).filter(c => all.some(x => x.cat === c));
     $('cats').replaceChildren(...(used.length > 1 ? [''].concat(used).map(c => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(cat === c), onclick: () => { cat = c; render(); } }, c || '전체')) : []));
     const ql = q.toLowerCase();
     const list = all.filter(x => (!cat || x.cat === cat) && (!q || [x.name, x.where, x.memo].join(' ').toLowerCase().includes(ql)))
@@ -100,7 +101,7 @@
     fields: [
       { key: 'name', label: '물건', type: 'text', required: true, aliases: ['이름', '무엇', '품목'] },
       { key: 'where', label: '위치', type: 'text', required: true, aliases: ['어디', '어디에', '장소', '보관위치', '둔곳'] },
-      { key: 'cat', label: '종류', type: 'choice', aliases: ['분류', '카테고리'], options: CATS.map(c => [c]), other: '기타' },
+      { key: 'cat', label: '종류', type: 'choice', aliases: ['분류', '카테고리'], options: CATS.map(c => [c]), keepRaw: true },
       { key: 'memo', label: '메모', type: 'text', aliases: ['비고', '참고'] }
     ],
     toItem: v => !v.name ? { error: '물건 이름이 없어요' } : !v.where ? { error: '위치가 없어요' } : { name: v.name, where: v.where, cat: v.cat || '기타', memo: v.memo || '', moved: today() },

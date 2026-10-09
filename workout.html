@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#2F6F5E" />
-<link rel="stylesheet" href="life.css?v=20261009d" />
+<link rel="stylesheet" href="life.css?v=20261009f" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
@@ -33,7 +33,7 @@
   <section class="card">
     <h2>오늘 운동</h2>
     <form id="form" class="stack" autocomplete="off" style="gap:12px">
-      <div class="chips" id="types"></div>
+      <div id="types"></div>
       <div class="grid2" style="gap:10px">
         <label class="field"><span class="label">몇 분</span><input id="f-min" type="number" min="1" max="600" inputmode="numeric" value="30" /></label>
         <label class="field"><span class="label">날짜</span><input id="f-date" type="date" /></label>
@@ -66,12 +66,12 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261009d"></script>
-<script src="sync.js?v=20261009d"></script>
-<script src="life-config.js?v=20261009d"></script>
-<script src="life.js?v=20261009d"></script>
-<script src="shell.js?v=20261009d"></script>
-<script src="import.js?v=20261009d"></script>
+<script src="firebase.js?v=20261009f"></script>
+<script src="sync.js?v=20261009f"></script>
+<script src="life-config.js?v=20261009f"></script>
+<script src="life.js?v=20261009f"></script>
+<script src="shell.js?v=20261009f"></script>
+<script src="import.js?v=20261009f"></script>
 <script>
 (function () {
   const { h, today, prettyDate, toast, sheet, iso, WD } = Life;
@@ -81,15 +81,17 @@
   $('f-date').value = today();
   const TYPES = ['걷기', '달리기', '헬스', '홈트', '자전거', '등산', '수영', '요가·스트레칭', '기타'];
   let type = '걷기', ym = today().slice(0, 7);
-  function drawTypes() { $('types').replaceChildren(...TYPES.map(t => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(t === type), onclick: () => { type = t; drawTypes(); } }, t))); }
+  // 운동 종류: 버튼으로 고르거나 "+ 직접 쓰기"
+  function drawTypes() { $('types').replaceChildren(Life.choice({ options: TYPES, value: type, onChange: v => { type = v; }, extra: Life.usedValues(W.items(), 'type', TYPES), placeholder: '예: 배드민턴, 클라이밍, 골프' }).el); }
   drawTypes();
 
   $('form').addEventListener('submit', e => {
     e.preventDefault();
     const min = parseInt($('f-min').value, 10);
     if (!(min > 0)) { toast('몇 분 했는지 넣어 주세요'); return; }
+    if (!type) type = '기타';
     W.put({ type, min, date: $('f-date').value || today(), memo: $('f-memo').value.trim() });
-    $('f-memo').value = ''; toast(type + ' ' + min + '분 기록했어요');
+    $('f-memo').value = ''; toast(type + ' ' + min + '분 기록했어요'); drawTypes();
   });
   $('goal-btn').onclick = () => {
     const sel = h('select', {}, [1, 2, 3, 4, 5, 6, 7].map(n => h('option', { value: n, selected: n === (W.meta().goal || 3) }, '일주일에 ' + n + '번')));
@@ -136,7 +138,7 @@
   Life.excel({ store: W, title: '운동 기록',
     fields: [
       { key: 'date', label: '날짜', type: 'date', aliases: ['일자', '운동일'] },
-      { key: 'type', label: '운동', type: 'choice', aliases: ['종류', '운동종류', '종목'], options: TYPES.map(t => [t]).concat([['달리기', '러닝', '조깅'], ['헬스', '웨이트', '근력'], ['홈트', '홈트레이닝'], ['요가·스트레칭', '요가', '스트레칭', '필라테스']]), other: '기타' },
+      { key: 'type', label: '운동', type: 'choice', aliases: ['종류', '운동종류', '종목'], options: TYPES.map(t => [t]).concat([['달리기', '러닝', '조깅'], ['헬스', '웨이트', '근력'], ['홈트', '홈트레이닝'], ['요가·스트레칭', '요가', '스트레칭']]), keepRaw: true },
       { key: 'min', label: '시간(분)', type: 'number', aliases: ['분', '시간', '운동시간', '몇분'] },
       { key: 'memo', label: '메모', type: 'text', aliases: ['비고', '내용'] }
     ],
