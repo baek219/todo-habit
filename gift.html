@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#2F6F5E" />
-<link rel="stylesheet" href="life.css?v=20261009f" />
+<link rel="stylesheet" href="life.css?v=20261009h" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .amount-input{font-size:22px!important;font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
@@ -75,12 +75,12 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261009f"></script>
-<script src="sync.js?v=20261009f"></script>
-<script src="life-config.js?v=20261009f"></script>
-<script src="life.js?v=20261009f"></script>
-<script src="shell.js?v=20261009f"></script>
-<script src="import.js?v=20261009f"></script>
+<script src="firebase.js?v=20261009h"></script>
+<script src="sync.js?v=20261009h"></script>
+<script src="life-config.js?v=20261009h"></script>
+<script src="life.js?v=20261009h"></script>
+<script src="shell.js?v=20261009h"></script>
+<script src="import.js?v=20261009h"></script>
 <script>
 (function () {
   const { h, today, won, prettyDate, toast, sheet } = Life;
@@ -190,7 +190,7 @@
     fields: [
       { key: 'date', label: '날짜', type: 'date', aliases: ['일자', '언제', '날'] },
       { key: 'person', label: '이름', type: 'text', required: true, aliases: ['누구', '성함', '보낸사람', '받은사람', '상대', '대상'] },
-      { key: 'dir', label: '구분', type: 'choice', aliases: ['냄받음', '주고받음', '종류', '내역구분', '입출'], options: [['give', '내가냄', '내가 냈음', '냈음', '냄', '낸', '보냄', '보낸', '지출', '출금', '나감', '드림', '줌', '준'], ['get', '내가받음', '내가 받았음', '받음', '받은', '받았', '입금', '들어옴', '수입']], out: x => x.dir === 'get' ? '내가 받음' : '내가 냄' },
+      { key: 'dir', label: '구분', type: 'choice', aliases: ['냄받음', '주고받음', '종류', '내역구분', '입출'], options: [['give', '내가냄', '내가 냈음', '냈음', '냄', '낸', '보냄', '보낸', '지출', '출금', '나감', '드림', '줌', '준'], ['get', '내가받음', '내가 받았음', '받음', '받은', '받았', '입금', '들어옴', '수입']], out: x => x.dir === 'get' ? '내가 받음' : '내가 냄', fixedOptions: ['내가 냄', '내가 받음'] },
       { key: 'amount', label: '금액', type: 'amount', aliases: ['액수', '돈', '축의금', '부의금', '봉투'], out: x => x.amount },
       { key: 'give', label: '낸 돈', type: 'amount', aliases: ['낸금액', '보낸돈', '보낸금액', '지출', '나간돈'], noExport: true },
       { key: 'get', label: '받은 돈', type: 'amount', aliases: ['받은금액', '들어온돈', '수입'], noExport: true },
@@ -211,7 +211,7 @@
     preview: [['날짜', x => x.date], ['이름', x => x.person], ['구분', x => x.dir === 'get' ? '내가 받음' : '내가 냄'], ['금액', x => x.amount.toLocaleString('ko-KR') + '원'], ['무슨 일', x => x.ev], ['관계', x => x.rel]],
     exportSort: (a, b) => (a.date || '').localeCompare(b.date || ''),
     sample: [['2024-05-18', '김민수', '내가 냄', '100000', '결혼', '친구', '부부 같이 감'], ['2024-09-02', '박지영', '내가 받음', '50000', '돌잔치', '회사', '']],
-    note: '"낸 돈", "받은 돈"이 따로 열로 나뉘어 있어도 괜찮아요. 날짜가 비어 있으면 오늘 날짜로 넣어요.'
+    note: '"낸 돈", "받은 돈"이 따로 열로 나뉘어 있어도 괜찮아요. 날짜가 없으면 오늘 날짜로, 무슨 일이 없으면 "기타"로 넣어요.'
   });
   S.subscribe(render);
   render();

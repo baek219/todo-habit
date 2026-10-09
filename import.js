@@ -9,9 +9,11 @@
   .xl-cols{display:flex;flex-wrap:wrap;gap:6px}
   .xl-cols span{font-size:12.5px;font-weight:650;background:var(--surface2);border-radius:999px;padding:4px 10px}
   .xl-cols span.req{background:var(--primary-soft);color:var(--primary-dark)}
-  .xl-map{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
-  .xl-map label{display:grid;gap:4px;font-size:13px;font-weight:650}
-  .xl-map select{font-size:14px;padding:8px 10px}
+  .xl-map{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px 8px;align-items:start}
+  .xl-map label{display:grid;gap:4px;font-size:13px;font-weight:650;align-content:start}
+  .xl-map select,.xl-map input{font-size:14px;padding:8px 10px}
+  .xl-map label.fix{background:var(--mark);border-radius:12px;padding:6px;margin:-6px}
+  .xl-map label.fix>span{color:#4A3B00}
   .xl-prev{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
   .xl-prev table{border-collapse:collapse;width:100%;font-size:13px;white-space:nowrap}
   .xl-prev th,.xl-prev td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left}
@@ -240,12 +242,14 @@
       if (rows.length) drawMap();
     }
 
+    let fixed = {}; // 표에 없는 칸: 모든 줄에 똑같이 넣을 값
     function setRows(r) {
       rows = r || []; result = null;
       if (!rows.length) { header = null; map = {}; mapBox.replaceChildren(); return; }
       const inFields = fields.filter(f => !f.noImport);
       if (looksLikeHeader(rows[0], inFields)) { header = rows[0]; map = autoMap(header, inFields); }
       else { header = null; map = {}; inFields.filter(f => !f.noExport).forEach((f, i) => { if (i < rows[0].length) map[f.key] = i; }); }
+      Object.keys(fixed).forEach(k => { if (map[k] != null) delete fixed[k]; });
       drawMap();
     }
 
@@ -256,12 +260,16 @@
       data.forEach((r, n) => {
         const v = {}, bad = [];
         fields.forEach(f => {
-          if (f.noImport || map[f.key] == null) return;
-          const val = readCell(r[map[f.key]], f);
-          if (val && val.bad) bad.push(f.label); else if (val !== undefined) v[f.key] = val;
+          if (f.noImport) return;
+          let raw;
+          if (map[f.key] != null) raw = r[map[f.key]];
+          else if (fixed[f.key] != null && fixed[f.key] !== '') raw = fixed[f.key];
+          else return;
+          const val = readCell(raw, f);
+          if (val && val.bad) bad.push(f.label + ' (' + raw + ')'); else if (val !== undefined) v[f.key] = val;
         });
         const line = n + (header ? 2 : 1);
-        if (bad.length) { errs.push(line + '번째 줄: ' + bad.join(', ') + ' 칸을 읽을 수 없어요 (' + bad.map(b => r[map[fields.find(f => f.label === b).key]]).join(', ') + ')'); return; }
+        if (bad.length) { errs.push(line + '번째 줄: ' + bad.join(', ') + ' 칸을 읽을 수 없어요'); return; }
         const item = cfg.toItem(v, r);
         if (!item || item.error) { errs.push(line + '번째 줄: ' + ((item && item.error) || '비어 있어요')); return; }
         if (cfg.dupKey) { const k = cfg.dupKey(item); if (seen.has(k)) { dup++; return; } seen.add(k); }
@@ -270,15 +278,47 @@
       return { ok, errs, dup };
     }
 
+    // 직접 적는 칸 (날짜는 달력, 정해진 보기는 고르기, 나머지는 글자)
+    function fixedInput(f) {
+      const set = v => { fixed[f.key] = v; drawPreview(); };
+      if (f.type === 'date') { const i = h('input', { type: 'date', value: fixed[f.key] || '' }); i.addEventListener('input', () => set(i.value)); return i; }
+      if (f.type === 'choice' && !f.keepRaw) {
+        const labels = f.fixedOptions || f.options.map(o => /^[a-z]+$/.test(o[0]) ? o[1] : o[0]);
+        if (fixed[f.key] == null) fixed[f.key] = labels[0];
+        const sl = h('select', {}, labels.map(l => h('option', { selected: l === fixed[f.key] }, l)));
+        sl.addEventListener('change', () => set(sl.value)); return sl;
+      }
+      const id = 'xl-dl-' + f.key;
+      const i = h('input', { type: 'text', value: fixed[f.key] || '', placeholder: f.type === 'choice' ? '예: ' + f.options[0][0] : f.type === 'amount' ? '예: 100000' : '모든 줄에 넣을 값', list: f.type === 'choice' ? id : null });
+      i.addEventListener('input', () => set(i.value.trim()));
+      return f.type === 'choice' ? h('div', { class: 'stack', style: 'gap:0' }, i, h('datalist', { id }, f.options.map(o => h('option', { value: o[0] })))) : i;
+    }
+
+    const prevBox = h('div', { class: 'stack', style: 'gap:10px' });
     function drawMap() {
       const width = Math.max(...rows.slice(0, 50).map(r => r.length));
       const colLabel = i => colName(i) + '열' + (header && header[i] ? ' · ' + header[i] : rows[0][i] ? ' · ' + String(rows[0][i] instanceof Date ? iso(rows[0][i]) : rows[0][i]).slice(0, 12) : '');
       const sel = fields.filter(f => !f.noImport).map(f => {
-        const s = h('select', { onchange: () => { if (s.value === '') delete map[f.key]; else map[f.key] = Number(s.value); drawMap(); } },
-          h('option', { value: '' }, '— 안 씀 —'),
-          Array.from({ length: width }, (_, i) => h('option', { value: i, selected: map[f.key] === i }, colLabel(i))));
-        return h('label', {}, h('span', {}, f.label + (f.required ? ' *' : '')), s);
+        const cur = map[f.key] != null ? String(map[f.key]) : (fixed[f.key] != null ? 'fix' : '');
+        const s = h('select', { onchange: () => {
+            delete map[f.key]; delete fixed[f.key];
+            if (s.value === 'fix') fixed[f.key] = ''; else if (s.value !== '') map[f.key] = Number(s.value);
+            drawMap();
+          } },
+          h('option', { value: '', selected: cur === '' }, '— 안 씀 —'),
+          h('option', { value: 'fix', selected: cur === 'fix' }, '✏️ 직접 적기'),
+          Array.from({ length: width }, (_, i) => h('option', { value: i, selected: cur === String(i) }, colLabel(i))));
+        return h('label', { class: cur === 'fix' ? 'fix' : '' }, h('span', {}, f.label + (f.required ? ' *' : '')), s, cur === 'fix' ? fixedInput(f) : null);
       });
+      mapBox.replaceChildren(
+        h('div', { class: 'stack', style: 'gap:6px' },
+          h('span', { class: 'label' }, header ? '엑셀의 어느 열이 어떤 내용인지 맞춰봤어요. 틀리면 바꿔 주세요.' : '제목 줄이 없어서 왼쪽 열부터 차례로 맞췄어요. 틀리면 바꿔 주세요.'),
+          h('p', { class: 'small muted', style: 'margin:0' }, '엑셀에 없는 칸은 "✏️ 직접 적기"를 고르면 모든 줄에 같은 값을 넣을 수 있어요. 예) 결혼식 때 받은 축의금 명단이면 구분 → "내가 받음", 무슨 일 → "결혼", 날짜 → 결혼한 날.'),
+          h('div', { class: 'xl-map' }, sel)),
+        prevBox);
+      drawPreview();
+    }
+    function drawPreview() {
       const { ok, errs, dup } = convert();
       const cols = cfg.preview;
       const btn = h('button', { class: 'btn primary', type: 'button', disabled: !ok.length, onclick: () => {
@@ -288,10 +328,7 @@
         result = { ids: added.map(x => x.id), n: added.length };
         drawDone();
       } }, ok.length ? ok.length + '개 넣기' : '넣을 수 있는 줄이 없어요');
-      mapBox.replaceChildren(
-        h('div', { class: 'stack', style: 'gap:6px' },
-          h('span', { class: 'label' }, header ? '엑셀의 어느 열이 어떤 내용인지 맞춰봤어요. 틀리면 바꿔 주세요.' : '제목 줄이 없어서 왼쪽 열부터 차례로 맞췄어요. 틀리면 바꿔 주세요.'),
-          h('div', { class: 'xl-map' }, sel)),
+      prevBox.replaceChildren(...[
         ok.length ? h('div', { class: 'xl-prev' }, h('table', {},
           h('thead', {}, h('tr', {}, cols.map(c => h('th', {}, c[0])))),
           h('tbody', {}, ok.slice(0, 5).map(it => h('tr', {}, cols.map(c => h('td', {}, c[1](it)))))))) : null,
@@ -299,7 +336,7 @@
           (dup ? ' · 이미 있는 ' + dup + '개는 건너뛰어요' : '') + (errs.length ? ' · 못 읽은 ' + errs.length + '줄' : '')),
         errs.length ? h('ul', { class: 'xl-err' }, errs.slice(0, 4).map(e => h('li', {}, e)), errs.length > 4 ? h('li', {}, '…외 ' + (errs.length - 4) + '줄') : null) : null,
         cfg.note ? h('p', { class: 'small muted', style: 'margin:0' }, cfg.note) : null,
-        h('div', { class: 'row' }, btn));
+        h('div', { class: 'row' }, btn)].filter(Boolean));
     }
 
     function drawDone() {
