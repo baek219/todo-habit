@@ -1,0 +1,13 @@
+# Cloudflare 설정 파일 (명령어로 올릴 때 사용 — 대시보드에 붙여넣을 때는 필요 없어요)
+name = "life-note"
+main = "dist/worker.js"
+compatibility_date = "2026-06-01"
+
+[vars]
+FIREBASE_PROJECT_ID = "checklist-3164e"
+ALLOWED_ORIGIN = "https://baek219.github.io"
+
+# KV 저장소: 대시보드에서 만든 뒤 아래 두 줄 앞의 #을 지우고 id를 넣어요
+# [[kv_namespaces]]
+# binding = "LIFE_KV"
+# id = "여기에_KV_ID"

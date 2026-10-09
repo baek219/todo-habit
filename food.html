@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>맛집 찾기 · 생활노트</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<meta name="theme-color" content="#2F6F5E" />
+<link rel="stylesheet" href="life.css" />
+<script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
+<style>
+  .search-row{display:grid;grid-template-columns:1fr auto;gap:8px}
+  .opts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .opts select{width:auto}
+  .place{border:1.5px solid var(--line);border-radius:14px;padding:14px;display:grid;gap:8px;background:var(--surface)}
+  .place-top{display:flex;gap:10px;align-items:flex-start}
+  .place h3{font-size:17px}
+  .meta{font-size:13px;color:var(--muted);display:flex;gap:6px 12px;flex-wrap:wrap}
+  .meta .phone{user-select:all}
+  .links{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .save-btn[aria-pressed="true"]{background:var(--primary-soft);border-color:var(--primary);color:var(--primary-dark)}
+  .gpanel{border-top:1px dashed var(--line);padding-top:10px;display:grid;gap:10px}
+  .grate{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .grate b{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums}
+  .review{background:var(--surface2);border-radius:11px;padding:10px 12px;display:grid;gap:4px;font-size:14px}
+  .review .who{font-size:12px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap}
+  details summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--muted)}
+  details ul{margin:6px 0 0;padding-left:18px;font-size:13px}
+  .attr{font-size:11px;color:var(--muted)}
+  .tabs{display:flex;gap:6px}
+  .myrate{display:inline-flex;gap:2px}
+  .myrate button{border:0;background:transparent;font-size:24px;line-height:1;cursor:pointer;color:var(--line);padding:2px}
+  .myrate button[aria-pressed="true"]{color:var(--gold)}
+  .share-link{display:grid;grid-template-columns:1fr auto;gap:8px}
+  .share-link input{font-size:13px}
+</style>
+</head>
+<body>
+<main class="page" id="page">
+  <header class="page-head" id="head">
+    <span class="date" id="today"></span>
+    <h1>맛집 찾기</h1>
+    <p>카카오 지도로 가게를 찾고, 구글 평점·후기까지 한 번에 확인해요. 마음에 들면 내 맛집에 담아두세요.</p>
+  </header>
+
+  <div class="seg tabs" role="tablist" aria-label="맛집 보기" id="tabs">
+    <button type="button" data-tab="search" aria-pressed="true">검색</button>
+    <button type="button" data-tab="mine" aria-pressed="false">내 맛집 <span id="mine-count" class="num"></span></button>
+  </div>
+
+  <!-- 검색 -->
+  <section id="tab-search" class="stack" style="gap:16px">
+    <form class="card" id="search-form" autocomplete="off">
+      <div class="search-row">
+        <input type="search" id="q" placeholder="메뉴나 가게 이름 (예: 김치찌개, 마라탕)" maxlength="40" aria-label="검색어" />
+        <button class="btn primary" type="submit">찾기</button>
+      </div>
+      <div class="opts">
+        <div class="seg" role="group" aria-label="어디서">
+          <button type="button" id="loc-me" aria-pressed="true">내 위치 주변</button>
+          <button type="button" id="loc-area" aria-pressed="false">동네 이름으로</button>
+        </div>
+        <input type="text" id="area" placeholder="예: 수지구청역, 판교" maxlength="30" style="width:auto;flex:1 1 140px" hidden aria-label="동네 이름" />
+        <select id="radius" aria-label="거리"><option value="500">500m 안</option><option value="1000">1km 안</option><option value="2000" selected>2km 안</option><option value="5000">5km 안</option></select>
+        <select id="cat" aria-label="종류"><option value="food">음식점</option><option value="cafe">카페</option><option value="all">전체</option></select>
+        <select id="sort" aria-label="정렬"><option value="distance">가까운 순</option><option value="accuracy">정확도 순</option></select>
+      </div>
+      <p class="note" id="search-note" hidden></p>
+    </form>
+    <div id="results" class="stack" style="gap:10px"></div>
+    <div class="row" id="more-row" hidden><button class="btn" type="button" id="more">더 보기</button></div>
+  </section>
+
+  <!-- 내 맛집 -->
+  <section id="tab-mine" class="stack" style="gap:16px" hidden>
+    <div class="card">
+      <div class="card-head">
+        <div class="seg" role="group" aria-label="내 맛집 거르기" id="mine-filter">
+          <button type="button" data-f="" aria-pressed="true">전체</button>
+          <button type="button" data-f="want" aria-pressed="false">가볼 곳</button>
+          <button type="button" data-f="been" aria-pressed="false">가본 곳</button>
+        </div>
+        <div class="row">
+          <button class="btn sm" type="button" id="add-manual">+ 직접 추가</button>
+          <button class="btn sm primary" type="button" id="share-btn">목록 공유하기</button>
+        </div>
+      </div>
+      <div id="mine" class="stack" style="gap:10px"></div>
+    </div>
+    <div class="card" id="shares-card" hidden>
+      <h2>공유 중인 목록</h2>
+      <ul class="list" id="shares"></ul>
+    </div>
+  </section>
+</main>
+
+<script src="firebase.js"></script>
+<script src="sync.js"></script>
+<script src="life-config.js"></script>
+<script src="life.js"></script>
+<script src="shell.js"></script>
+<script>
+(function () {
+  const { h, today, prettyDate, toast, sheet } = Life;
+  const F = Life.store('food');
+  const $ = id => document.getElementById(id);
+  $('today').textContent = prettyDate(today());
+  const params = new URLSearchParams(location.search);
+
+  /* ---------- 공통 조각 ---------- */
+  const enc = encodeURIComponent;
+  const naverUrl = p => 'https://map.naver.com/p/search/' + enc((p.address ? p.address.split(' ').slice(0, 3).join(' ') + ' ' : '') + p.name);
+  const kakaoUrl = p => p.kakaoUrl || 'https://map.kakao.com/?q=' + enc(p.name);
+  const dist = m => m == null ? '' : m < 1000 ? m + 'm' : (m / 1000).toFixed(1) + 'km';
+  const stars = n => '★★★★★'.slice(0, Math.round(n)) + '☆☆☆☆☆'.slice(0, 5 - Math.round(n));
+  function savedOf(p) { return F.items().find(x => (p.id && x.kakaoId === p.id) || (!p.id && x.name === p.name && x.address === p.address)) || null; }
+
+  /* ---------- 구글 평점·후기 ---------- */
+  async function loadGoogle(p, panel, btn) {
+    if (panel.dataset.loaded) { panel.hidden = !panel.hidden; btn.textContent = panel.hidden ? '구글 평점·후기' : '접기'; return; }
+    if (!Life.user()) { toast('구글 후기는 로그인한 뒤 볼 수 있어요'); Life.signIn(); return; }
+    btn.disabled = true; btn.textContent = '불러오는 중…';
+    panel.hidden = false; panel.replaceChildren(h('p', { class: 'small muted' }, '구글 지도에서 찾는 중…'));
+    try {
+      const g = await Life.api('place', { query: { name: p.name, x: p.x, y: p.y } });
+      panel.dataset.loaded = '1';
+      if (!g.found) { panel.replaceChildren(h('p', { class: 'small muted' }, '구글 지도에서 같은 가게를 찾지 못했어요.')); return; }
+      panel.replaceChildren(
+        h('div', { class: 'grate' }, g.rating ? h('b', {}, g.rating.toFixed(1)) : null, g.rating ? h('span', { class: 'stars' }, stars(g.rating)) : h('span', { class: 'muted' }, '평점 없음'),
+          h('span', { class: 'small muted' }, '리뷰 ' + (g.ratingCount || 0).toLocaleString('ko-KR') + '개'),
+          g.price ? h('span', { class: 'badge' }, '가격 ' + g.price) : null,
+          g.openNow === true ? h('span', { class: 'badge go' }, '지금 영업 중') : g.openNow === false ? h('span', { class: 'badge bad' }, '지금 영업 안 함') : null),
+        g.hours.length ? h('details', {}, h('summary', {}, '영업시간 보기'), h('ul', {}, g.hours.map(x => h('li', {}, x)))) : null,
+        g.reviews.length ? h('div', { class: 'stack' }, g.reviews.map(v => h('div', { class: 'review' },
+          h('div', { class: 'who' }, h('span', { class: 'stars' }, stars(v.rating || 0)), v.authorUrl ? h('a', { href: v.authorUrl, target: '_blank', rel: 'noopener' }, v.author || '구글 사용자') : h('span', {}, v.author || '구글 사용자'), h('span', {}, v.when || '')),
+          h('p', {}, v.text || '(내용 없음)')))) : h('p', { class: 'small muted' }, '등록된 후기가 없어요.'),
+        h('div', { class: 'row' }, g.googleUrl ? h('a', { class: 'btn sm', href: g.googleUrl, target: '_blank', rel: 'noopener' }, '구글 지도에서 보기') : null, h('span', { class: 'attr' }, '평점·후기 출처: Google 지도')));
+      btn.textContent = '접기';
+    } catch (e) {
+      panel.replaceChildren(h('p', { class: 'small', style: 'color:var(--danger)' }, e.message || '구글 정보를 가져오지 못했어요.'));
+      btn.textContent = '구글 평점·후기';
+    } finally { btn.disabled = false; }
+  }
+
+  function placeCard(p) {
+    const saved = savedOf(p);
+    const panel = h('div', { class: 'gpanel', hidden: true });
+    const gbtn = h('button', { class: 'btn sm', type: 'button', onclick: () => loadGoogle(p, panel, gbtn) }, '구글 평점·후기');
+    const save = h('button', { class: 'btn sm save-btn', type: 'button', 'aria-pressed': String(!!saved), onclick: () => {
+      const s = savedOf(p);
+      if (s) { F.remove(s.id); toast('내 맛집에서 뺐어요'); }
+      else { F.put({ kakaoId: p.id || null, name: p.name, category: p.category || '', address: p.address || '', phone: p.phone || '', x: p.x || null, y: p.y || null, kakaoUrl: p.kakaoUrl || '', status: 'want', myRating: 0, memo: '', visits: [] }); toast('"가볼 곳"에 담았어요'); }
+      const now = savedOf(p); save.setAttribute('aria-pressed', String(!!now)); save.textContent = now ? '★ 담김' : '☆ 담기';
+    } }, saved ? '★ 담김' : '☆ 담기');
+    return h('article', { class: 'place' },
+      h('div', { class: 'place-top' }, h('div', { class: 'grow' }, h('h3', {}, p.name),
+        h('div', { class: 'meta' }, p.category ? h('span', {}, p.category) : null, p.distance != null ? h('span', { class: 'num' }, dist(p.distance)) : null)), save),
+      h('div', { class: 'meta' }, p.address ? h('span', {}, p.address) : null, p.phone ? h('span', { class: 'phone num' }, p.phone) : null),
+      h('div', { class: 'links' }, gbtn,
+        h('a', { class: 'btn sm ghost', href: kakaoUrl(p), target: '_blank', rel: 'noopener' }, '카카오맵'),
+        h('a', { class: 'btn sm ghost', href: naverUrl(p), target: '_blank', rel: 'noopener' }, '네이버지도'),
+        p.phone ? h('a', { class: 'btn sm ghost', href: 'tel:' + p.phone.replace(/[^\d]/g, '') }, '전화') : null),
+      panel);
+  }
+
+  /* ---------- 검색 ---------- */
+  let locMode = 'me', page = 1, lastQuery = null, coords = null;
+  function setLoc(m) {
+    locMode = m;
+    $('loc-me').setAttribute('aria-pressed', String(m === 'me')); $('loc-area').setAttribute('aria-pressed', String(m === 'area'));
+    $('area').hidden = m !== 'area'; $('radius').hidden = m !== 'me'; $('sort').hidden = m !== 'me';
+    try { localStorage.setItem('food_loc_mode', m); } catch (e) {}
+  }
+  $('loc-me').onclick = () => setLoc('me'); $('loc-area').onclick = () => { setLoc('area'); $('area').focus(); };
+  try { const m = localStorage.getItem('food_loc_mode'); if (m) setLoc(m); $('area').value = localStorage.getItem('food_area') || ''; } catch (e) {}
+
+  function getCoords() {
+    return new Promise((res, rej) => {
+      if (!navigator.geolocation) return rej(new Error('이 기기에서는 위치를 쓸 수 없어요.'));
+      navigator.geolocation.getCurrentPosition(p => res({ x: p.coords.longitude, y: p.coords.latitude }),
+        e => rej(new Error(e.code === 1 ? '위치 사용이 거부됐어요. 브라우저 설정에서 위치를 허용하거나 "동네 이름으로"를 써 주세요.' : '현재 위치를 찾지 못했어요. "동네 이름으로"를 써 주세요.')),
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 });
+    });
+  }
+  function note(msg, kind) { const n = $('search-note'); n.hidden = !msg; n.className = 'note' + (kind === 'warn' ? ' warn' : ''); if (typeof msg === 'string') n.textContent = msg; else if (msg) n.replaceChildren(msg); }
+
+  async function search(more) {
+    const q = $('q').value.trim();
+    if (!q) { $('q').focus(); return; }
+    if (!Life.hasServer()) { note('맛집 검색은 서버 연결 후에 쓸 수 있어요. 지금은 아래 지도 링크로 찾아보세요.', 'warn'); showFallback(q); return; }
+    if (!Life.user()) { note(h('span', {}, '맛집 검색은 로그인한 분만 쓸 수 있어요. ', h('button', { class: 'btn sm', type: 'button', onclick: () => Life.signIn() }, 'Google로 로그인'))); showFallback(q); return; }
+    note('');
+    if (!more) { page = 1; $('results').replaceChildren(h('p', { class: 'empty' }, '찾는 중…')); }
+    const query = { q, cat: $('cat').value, page };
+    try {
+      if (locMode === 'me') {
+        if (!more || !coords) coords = await getCoords();
+        Object.assign(query, coords, { radius: $('radius').value, sort: $('sort').value });
+      } else {
+        const area = $('area').value.trim();
+        if (!area) { note('동네 이름을 넣어 주세요. (예: 수지구청역)', 'warn'); $('area').focus(); $('results').replaceChildren(); return; }
+        try { localStorage.setItem('food_area', area); } catch (e) {}
+        query.q = area + ' ' + q;
+      }
+      const r = await Life.api('places', { query });
+      lastQuery = q;
+      if (!more) $('results').replaceChildren();
+      if (!r.places.length && !more) $('results').append(h('p', { class: 'empty' }, '"' + q + '" 검색 결과가 없어요. 거리를 넓히거나 다른 말로 찾아보세요.'));
+      r.places.forEach(p => $('results').append(placeCard(p)));
+      $('more-row').hidden = r.isEnd || !r.places.length;
+    } catch (e) {
+      if (!more) $('results').replaceChildren();
+      note(e.message || '검색하지 못했어요.', 'warn');
+    }
+  }
+  function showFallback(q) {
+    const area = locMode === 'area' ? $('area').value.trim() + ' ' : '';
+    $('results').replaceChildren(h('div', { class: 'card' }, h('h3', {}, '"' + q + '" 지도에서 바로 찾기'),
+      h('div', { class: 'links' },
+        h('a', { class: 'btn sm', href: 'https://map.kakao.com/?q=' + enc(area + q), target: '_blank', rel: 'noopener' }, '카카오맵'),
+        h('a', { class: 'btn sm', href: 'https://map.naver.com/p/search/' + enc(area + q), target: '_blank', rel: 'noopener' }, '네이버지도'),
+        h('a', { class: 'btn sm', href: 'https://www.google.com/maps/search/' + enc(area + q), target: '_blank', rel: 'noopener' }, '구글맵'))));
+    $('more-row').hidden = true;
+  }
+  $('search-form').addEventListener('submit', e => { e.preventDefault(); search(false); });
+  $('more').onclick = () => { page++; search(true); };
+
+  /* ---------- 내 맛집 ---------- */
+  let mineFilter = '';
+  document.querySelectorAll('#mine-filter button').forEach(b => b.onclick = () => {
+    mineFilter = b.dataset.f; document.querySelectorAll('#mine-filter button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); renderMine();
+  });
+
+  function rateWidget(val, onChange) {
+    const box = h('span', { class: 'myrate', role: 'group', 'aria-label': '내 평점' });
+    const draw = v => box.replaceChildren(...[1, 2, 3, 4, 5].map(n => h('button', { type: 'button', 'aria-pressed': String(n <= v), 'aria-label': n + '점', onclick: () => { const nv = n === v ? 0 : n; draw(nv); onChange(nv); } }, '★')));
+    draw(val); return box;
+  }
+
+  function editMine(it) {
+    let status = it.status || 'want', rating = it.myRating || 0;
+    const seg = h('div', { class: 'seg', role: 'group', 'aria-label': '상태' });
+    const drawSeg = () => seg.replaceChildren(...[['want', '가볼 곳'], ['been', '가본 곳']].map(([v, l]) => h('button', { type: 'button', 'aria-pressed': String(status === v), onclick: () => { status = v; drawSeg(); } }, l)));
+    drawSeg();
+    const name = h('input', { type: 'text', maxlength: '40', value: it.name || '' });
+    const memo = h('textarea', { maxlength: '200', placeholder: '예: 김치찌개 맛집, 주말 웨이팅 20분, 주차 2대' }, it.memo || '');
+    let armed = false;
+    const del = it.id ? h('button', { class: 'btn ghost', type: 'button', onclick: () => {
+      if (!armed) { armed = true; del.textContent = '한 번 더 누르면 삭제'; del.style.color = 'var(--danger)'; return; }
+      F.remove(it.id); close(); toast('삭제했어요');
+    } }, '삭제') : null;
+    const visits = (it.visits || []).slice().sort().reverse();
+    const close = sheet(it.id ? '내 맛집 고치기' : '맛집 직접 추가', h('div', { class: 'stack' },
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '가게 이름'), name),
+      it.id ? null : h('p', { class: 'small muted' }, '주소 없이 저장돼요. 검색으로 찾은 가게는 "☆ 담기"를 쓰면 주소·지도까지 같이 저장돼요.'),
+      h('div', { class: 'field' }, h('span', { class: 'label' }, '상태'), seg),
+      h('div', { class: 'field' }, h('span', { class: 'label' }, '내 평점'), rateWidget(rating, v => { rating = v; })),
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '메모'), memo),
+      it.id ? h('div', { class: 'field' }, h('span', { class: 'label' }, '다녀온 날 ' + visits.length + '번'), h('p', { class: 'small muted' }, visits.slice(0, 6).map(d => prettyDate(d)).join(', ') || '아직 없어요')) : null,
+      h('div', { class: 'row' },
+        h('button', { class: 'btn primary', type: 'button', onclick: () => {
+          if (!name.value.trim()) { toast('가게 이름을 넣어 주세요'); return; }
+          F.put(Object.assign({ visits: [] }, it, { name: name.value.trim(), status, myRating: rating, memo: memo.value.trim() })); close(); toast('저장했어요');
+        } }, '저장'),
+        it.id ? h('button', { class: 'btn soft', type: 'button', onclick: () => {
+          const v = Array.from(new Set([...(it.visits || []), today()]));
+          F.put(Object.assign({}, it, { name: name.value.trim() || it.name, status: 'been', myRating: rating, memo: memo.value.trim(), visits: v })); close(); toast('오늘 다녀온 걸로 기록했어요');
+        } }, '오늘 다녀옴') : null,
+        h('span', { class: 'spacer' }), del)));
+  }
+  $('add-manual').onclick = () => editMine({});
+
+  function renderMine() {
+    const all = F.items();
+    $('mine-count').textContent = all.length ? all.length : '';
+    const list = all.filter(x => !mineFilter || x.status === mineFilter).sort((a, b) => (b.myRating || 0) - (a.myRating || 0) || (b.updatedAt || 0) - (a.updatedAt || 0));
+    const box = $('mine'); box.replaceChildren();
+    renderShares();
+    if (!list.length) { box.append(h('p', { class: 'empty' }, all.length ? '이 조건에 맞는 맛집이 없어요.' : '검색 결과에서 "☆ 담기"를 누르거나 "+ 직접 추가"로 맛집을 모아 보세요.')); return; }
+    list.forEach(it => {
+      const gpanel = h('div', { class: 'gpanel', hidden: true });
+      const gb = it.x && it.y ? h('button', { class: 'btn sm', type: 'button', onclick: () => loadGoogle({ name: it.name, x: it.x, y: it.y }, gpanel, gb) }, '구글 평점·후기') : null;
+      box.append(h('article', { class: 'place' },
+      h('div', { class: 'place-top' }, h('div', { class: 'grow' }, h('h3', {}, it.name),
+        h('div', { class: 'meta' }, h('span', { class: 'badge ' + (it.status === 'been' ? 'go' : 'warn') }, it.status === 'been' ? '가본 곳' : '가볼 곳'),
+          it.myRating ? h('span', { class: 'stars' }, stars(it.myRating)) : null, it.category ? h('span', {}, it.category) : null,
+          (it.visits || []).length ? h('span', {}, (it.visits || []).length + '번 방문') : null)),
+        h('button', { class: 'btn sm', type: 'button', onclick: () => editMine(it) }, '고치기')),
+      it.memo ? h('p', { class: 'small' }, it.memo) : null,
+      it.address || it.phone ? h('div', { class: 'meta' }, it.address ? h('span', {}, it.address) : null, it.phone ? h('span', { class: 'phone num' }, it.phone) : null) : null,
+      h('div', { class: 'links' }, gb,
+        h('a', { class: 'btn sm ghost', href: kakaoUrl(it), target: '_blank', rel: 'noopener' }, '카카오맵'),
+        h('a', { class: 'btn sm ghost', href: naverUrl(it), target: '_blank', rel: 'noopener' }, '네이버지도')),
+      gpanel));
+    });
+    renderShares();
+  }
+
+  /* ---------- 공유 ---------- */
+  function shareUrl(id) { return location.origin + location.pathname + '?share=' + id; }
+  function copyBox(url) {
+    const inp = h('input', { type: 'text', readonly: true, value: url, 'aria-label': '공유 주소' });
+    return h('div', { class: 'share-link' }, inp, h('button', { class: 'btn sm', type: 'button', onclick: async () => {
+      try { await navigator.clipboard.writeText(url); toast('주소를 복사했어요'); } catch (e) { inp.select(); toast('주소를 길게 눌러 복사해 주세요'); }
+    } }, '복사'));
+  }
+  $('share-btn').onclick = () => {
+    const CS = window.CloudSync;
+    if (!Life.user()) { toast('공유하려면 먼저 로그인해 주세요'); Life.signIn(); return; }
+    const list = F.items().filter(x => !mineFilter || x.status === mineFilter);
+    if (!list.length) { toast('공유할 맛집이 없어요'); return; }
+    const title = h('input', { type: 'text', maxlength: '40', value: (Life.user().displayName ? Life.user().displayName + '의 ' : '') + (mineFilter === 'been' ? '가본 맛집' : mineFilter === 'want' ? '가볼 맛집' : '맛집 목록') });
+    const out = h('div', { class: 'stack' });
+    const go = h('button', { class: 'btn primary', type: 'button', onclick: async () => {
+      go.disabled = true;
+      const id = Life.newId() + Math.random().toString(36).slice(2, 6);
+      const items = list.slice(0, 100).map(x => ({ name: x.name, category: x.category || '', address: x.address || '', phone: x.phone || '', kakaoUrl: x.kakaoUrl || '', x: x.x || null, y: x.y || null, myRating: x.myRating || 0, memo: x.memo || '', status: x.status || 'want' }));
+      try {
+        await CS.K.setDoc(CS.K.doc(CS.db, 'shares', id), { owner: CS.user.uid, title: title.value.trim() || '맛집 목록', items, createdAt: Date.now(), deleted: false });
+        const shares = (F.meta().shares || []).concat([{ id, title: title.value.trim() || '맛집 목록', count: items.length, createdAt: Date.now() }]);
+        F.setMeta({ shares });
+        out.replaceChildren(h('p', { class: 'small' }, '이 주소를 보내면 로그인 없이도 목록을 볼 수 있어요. (맛집 ' + items.length + '곳, 지금 모습 그대로 저장돼요)'), copyBox(shareUrl(id)));
+        go.hidden = true;
+      } catch (e) {
+        out.replaceChildren(h('p', { class: 'small', style: 'color:var(--danger)' }, '공유하지 못했어요. 설정 안내서의 "Firebase 규칙"을 적용했는지 확인해 주세요. (' + (e.code || e.message) + ')'));
+        go.disabled = false;
+      }
+    } }, '공유 주소 만들기');
+    sheet('맛집 목록 공유', h('div', { class: 'stack' },
+      h('p', { class: 'small muted' }, '지금 보고 있는 목록(' + list.length + '곳)의 이름·주소·내 평점·메모가 공유돼요.'),
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '목록 제목'), title), go, out));
+  };
+  function renderShares() {
+    const shares = F.meta().shares || [];
+    $('shares-card').hidden = !shares.length;
+    $('shares').replaceChildren(...shares.slice().reverse().map(s => h('li', {},
+      h('div', { class: 'grow' }, h('b', {}, s.title), h('div', { class: 'tiny muted' }, s.count + '곳 · ' + new Date(s.createdAt).toLocaleDateString('ko-KR'))),
+      h('button', { class: 'btn sm', type: 'button', onclick: () => sheet(s.title, h('div', { class: 'stack' }, copyBox(shareUrl(s.id)))) }, '주소'),
+      h('button', { class: 'btn sm ghost', type: 'button', onclick: async () => {
+        const CS = window.CloudSync;
+        if (!Life.user()) { toast('로그인해야 공유를 끌 수 있어요'); return; }
+        try { await CS.K.setDoc(CS.K.doc(CS.db, 'shares', s.id), { owner: CS.user.uid, title: s.title, items: [], createdAt: s.createdAt, deleted: true }); } catch (e) { toast('공유를 끄지 못했어요'); return; }
+        F.setMeta({ shares: (F.meta().shares || []).filter(x => x.id !== s.id) }); toast('공유를 껐어요');
+      } }, '공유 끄기'))));
+  }
+
+  /* ---------- 공유받은 목록 보기 ---------- */
+  async function showShared(id) {
+    $('tabs').hidden = true; $('tab-search').hidden = true; $('tab-mine').hidden = true;
+    const head = $('head');
+    head.querySelector('h1').textContent = '공유받은 맛집 목록';
+    head.querySelector('p').textContent = '불러오는 중…';
+    const box = h('section', { class: 'stack', style: 'gap:10px' }); $('page').append(box);
+    const CS = window.CloudSync;
+    let wait = 0; while ((!CS || !CS.db) && wait++ < 40) await new Promise(r => setTimeout(r, 100));
+    try {
+      const snap = await CS.K.getDoc(CS.K.doc(CS.db, 'shares', id));
+      const d = snap.exists() ? snap.data() : null;
+      if (!d || d.deleted) { head.querySelector('p').textContent = '공유가 끝났거나 없는 주소예요.'; return; }
+      head.querySelector('h1').textContent = d.title || '맛집 목록';
+      head.querySelector('p').textContent = (d.items || []).length + '곳 · ' + new Date(d.createdAt).toLocaleDateString('ko-KR') + '에 공유됨';
+      (d.items || []).forEach(it => box.append(h('article', { class: 'place' },
+        h('div', { class: 'place-top' }, h('div', { class: 'grow' }, h('h3', {}, it.name),
+          h('div', { class: 'meta' }, h('span', { class: 'badge ' + (it.status === 'been' ? 'go' : 'warn') }, it.status === 'been' ? '가본 곳' : '가볼 곳'),
+            it.myRating ? h('span', { class: 'stars' }, stars(it.myRating)) : null, it.category ? h('span', {}, it.category) : null)),
+          h('button', { class: 'btn sm', type: 'button', onclick: e => {
+            if (savedOf({ name: it.name, address: it.address })) { toast('이미 내 맛집에 있어요'); return; }
+            F.put({ kakaoId: null, name: it.name, category: it.category, address: it.address, phone: it.phone, x: it.x, y: it.y, kakaoUrl: it.kakaoUrl, status: 'want', myRating: 0, memo: it.memo ? '공유받은 메모: ' + it.memo : '', visits: [] });
+            e.currentTarget.textContent = '★ 담김'; toast('내 맛집 "가볼 곳"에 담았어요');
+          } }, '☆ 내 맛집에 담기')),
+        it.memo ? h('p', { class: 'small' }, it.memo) : null,
+        it.address ? h('div', { class: 'meta' }, h('span', {}, it.address)) : null,
+        h('div', { class: 'links' },
+          h('a', { class: 'btn sm ghost', href: kakaoUrl(it), target: '_blank', rel: 'noopener' }, '카카오맵'),
+          h('a', { class: 'btn sm ghost', href: naverUrl(it), target: '_blank', rel: 'noopener' }, '네이버지도')))));
+      box.append(h('div', { class: 'row' }, h('a', { class: 'btn', href: 'food.html' }, '나도 맛집 찾아보기')));
+    } catch (e) { head.querySelector('p').textContent = '목록을 불러오지 못했어요. (' + (e.code || e.message) + ')'; }
+  }
+
+  /* ---------- 탭 ---------- */
+  function tab(t) {
+    document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tab === t)));
+    $('tab-search').hidden = t !== 'search'; $('tab-mine').hidden = t !== 'mine';
+    if (t === 'mine') renderMine();
+  }
+  document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => tab(b.dataset.tab));
+
+  F.subscribe(() => { renderMine(); });
+  renderMine();
+  if (params.get('share')) showShared(params.get('share'));
+  else {
+    if (params.get('tab') === 'mine') tab('mine');
+    if (params.get('q')) { $('q').value = params.get('q'); Life.onUser(u => { if (u && lastQuery === null) search(false); }); if (!Life.hasServer()) showFallback(params.get('q')); }
+    if (!params.get('q')) $('results').replaceChildren(h('p', { class: 'empty' }, '먹고 싶은 메뉴나 가게 이름을 넣고 "찾기"를 눌러 보세요.'));
+  }
+})();
+</script>
+</body>
+</html>

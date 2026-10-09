@@ -672,6 +672,7 @@
 <script src="lunar.js"></script>
 <script src="repeat.js"></script>
 <script src="quick.js"></script>
+<script src="shell.js"></script>
 <script>
 (function () {
   const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -3703,6 +3704,8 @@
   renderNav();
   renderAll();
   if (appSettings.startTab && appSettings.startTab !== 'checklist' && ['calendar', 'notes'].includes(appSettings.startTab)) switchTab(appSettings.startTab);
+  // 생활노트 왼쪽 메뉴에서 '달력'·'메모장'을 눌러 들어온 경우 (index.html?tab=calendar)
+  try { const qt = new URLSearchParams(location.search).get('tab'); if (qt && ['checklist', 'calendar', 'notes', 'stats', 'settings'].includes(qt)) switchTab(qt); } catch (e) {}
   document.getElementById('cal-prev').addEventListener('click', () => { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } calSelectedDate = null; renderCalendar(); });
   document.getElementById('cal-next').addEventListener('click', () => { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } calSelectedDate = null; renderCalendar(); });
 })();

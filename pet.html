@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>반려동물 · 생활노트</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<meta name="theme-color" content="#2F6F5E" />
+<link rel="stylesheet" href="life.css" />
+<script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
+<style>
+  .pets{display:flex;gap:8px;flex-wrap:wrap}
+  .pet-tab{font:inherit;display:flex;align-items:center;gap:8px;border:1.5px solid var(--line);background:var(--surface);color:var(--fg);border-radius:14px;padding:8px 14px 8px 8px;cursor:pointer;text-align:left}
+  .pet-tab[aria-pressed="true"]{border-color:var(--primary);background:var(--primary-soft)}
+  .pet-face{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--surface2);font-weight:800;color:var(--primary-dark);flex:none}
+  .pet-tab b{display:block;font-size:15px}
+  .pet-tab small{color:var(--muted);font-size:12px}
+  .due li .d{min-width:62px;text-align:center}
+  .rec-type{font-size:12px;font-weight:700;color:var(--muted)}
+  .chart{width:100%;height:auto;display:block}
+  .chart text{fill:var(--muted);font-size:11px;font-family:var(--font)}
+  .chart .grid{stroke:var(--line);stroke-width:1}
+  .chart .line{stroke:var(--primary);stroke-width:2.5;fill:none}
+  .chart .area{fill:var(--primary-soft)}
+  .chart .pt{fill:var(--surface);stroke:var(--primary);stroke-width:2}
+  .chart .last{fill:var(--primary)}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="page-head">
+    <span class="date" id="today"></span>
+    <h1>반려동물 수첩</h1>
+    <p>병원, 접종, 사료, 몸무게를 한곳에 적고 다음 일정을 놓치지 마세요.</p>
+  </header>
+
+  <section class="card">
+    <div class="card-head"><h2>우리 아이들</h2><button class="btn sm soft" type="button" id="add-pet">+ 아이 추가</button></div>
+    <div class="pets" id="pets"></div>
+  </section>
+
+  <div id="main" class="page" style="padding:0;gap:16px"></div>
+</main>
+
+<script src="firebase.js"></script>
+<script src="sync.js"></script>
+<script src="life-config.js"></script>
+<script src="life.js"></script>
+<script src="shell.js"></script>
+<script>
+(function () {
+  const { h, today, won, prettyDate, daysBetween, toast, sheet } = Life;
+  const P = Life.store('pets');      // 아이 정보
+  const R = Life.store('petlog');    // 기록
+  const M = Life.store('money');     // 비용을 가계부에도 남길 때
+  const TYPES = ['병원', '예방접종', '구충·심장사상충', '사료·간식', '체중', '미용·목욕', '약', '기타'];
+  const KINDS = ['고양이', '강아지', '기타'];
+  let sel = null, filter = '';
+  const $ = id => document.getElementById(id);
+  $('today').textContent = prettyDate(today());
+
+  function age(birth) {
+    if (!birth) return '';
+    const b = new Date(birth + 'T00:00:00'), n = new Date();
+    let m = (n.getFullYear() - b.getFullYear()) * 12 + n.getMonth() - b.getMonth(); if (n.getDate() < b.getDate()) m--;
+    if (m < 0) return '';
+    return m < 12 ? m + '개월' : Math.floor(m / 12) + '살' + (m % 12 ? ' ' + (m % 12) + '개월' : '');
+  }
+  const dday = d => { const n = daysBetween(today(), d); return n === 0 ? '오늘' : n > 0 ? 'D-' + n : (-n) + '일 지남'; };
+
+  /* 아이 추가·고치기 */
+  function petForm(p) {
+    p = p || {};
+    const name = h('input', { type: 'text', maxlength: '20', value: p.name || '', placeholder: '이름' });
+    const kind = h('select', {}, KINDS.map(k => h('option', { selected: k === (p.kind || '고양이') }, k)));
+    const breed = h('input', { type: 'text', maxlength: '30', value: p.breed || '', placeholder: '예: 코리안숏헤어, 말티즈' });
+    const birth = h('input', { type: 'date', value: p.birth || '' });
+    const memo = h('input', { type: 'text', maxlength: '80', value: p.memo || '', placeholder: '예: 닭고기 알레르기, 중성화 완료' });
+    let armed = false;
+    const del = p.id ? h('button', { class: 'btn ghost', type: 'button', onclick: () => {
+      if (!armed) { armed = true; del.textContent = '한 번 더 누르면 삭제'; del.style.color = 'var(--danger)'; return; }
+      P.remove(p.id); if (sel === p.id) sel = null; close(); toast('삭제했어요');
+    } }, '삭제') : null;
+    const close = sheet(p.id ? p.name + ' 정보 고치기' : '아이 추가', h('div', { class: 'stack' },
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '이름'), name),
+      h('div', { class: 'grid2', style: 'gap:10px' },
+        h('label', { class: 'field' }, h('span', { class: 'label' }, '종류'), kind),
+        h('label', { class: 'field' }, h('span', { class: 'label' }, '품종'), breed)),
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '생일 (모르면 대략)'), birth),
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '메모'), memo),
+      h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => {
+        if (!name.value.trim()) { toast('이름을 넣어 주세요'); return; }
+        const it = P.put(Object.assign({}, p, { name: name.value.trim(), kind: kind.value, breed: breed.value.trim(), birth: birth.value, memo: memo.value.trim() }));
+        sel = it.id; close(); toast('저장했어요');
+      } }, '저장'), h('span', { class: 'spacer' }), del)));
+  }
+  $('add-pet').onclick = () => petForm();
+
+  /* 기록 추가·고치기 */
+  function recForm(r, presetType) {
+    r = r || {};
+    const pet = P.get(r.petId || sel); if (!pet) return;
+    let type = r.type || presetType || '병원';
+    const chips = h('div', { class: 'chips' });
+    const date = h('input', { type: 'date', value: r.date || today() });
+    const memo = h('input', { type: 'text', maxlength: '80', value: r.memo || '', placeholder: '예: 종합백신 2차, 귀 청소' });
+    const weight = h('input', { type: 'number', step: '0.01', min: '0', inputmode: 'decimal', value: r.weight || '', placeholder: '예: 4.25' });
+    const cost = h('input', { type: 'text', inputmode: 'numeric', value: r.cost ? Number(r.cost).toLocaleString('ko-KR') : '', placeholder: '0' });
+    cost.addEventListener('input', () => { const n = parseInt(cost.value.replace(/[^\d]/g, ''), 10) || 0; cost.value = n ? n.toLocaleString('ko-KR') : ''; });
+    const next = h('input', { type: 'date', value: r.next || '' });
+    const toMoney = h('input', { type: 'checkbox', id: 'to-money', checked: !r.id });
+    const wField = h('label', { class: 'field' }, h('span', { class: 'label' }, '몸무게 (kg)'), weight);
+    const nextQuick = h('div', { class: 'chips' }, [['2주 뒤', 14], ['1달 뒤', 30], ['3달 뒤', 91], ['1년 뒤', 365]].map(([l, n]) => h('button', { type: 'button', class: 'chip', onclick: () => {
+      const d = new Date((date.value || today()) + 'T00:00:00'); d.setDate(d.getDate() + n); next.value = Life.iso(d);
+    } }, l)));
+    function drawChips() {
+      chips.replaceChildren(...TYPES.map(t => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(t === type), onclick: () => { type = t; drawChips(); } }, t)));
+      wField.hidden = type !== '체중';
+    }
+    drawChips();
+    let armed = false;
+    const del = r.id ? h('button', { class: 'btn ghost', type: 'button', onclick: () => {
+      if (!armed) { armed = true; del.textContent = '한 번 더 누르면 삭제'; del.style.color = 'var(--danger)'; return; }
+      R.remove(r.id); close(); toast('삭제했어요');
+    } }, '삭제') : null;
+    const close = sheet(pet.name + ' 기록' + (r.id ? ' 고치기' : ' 추가'), h('div', { class: 'stack' },
+      h('div', { class: 'field' }, h('span', { class: 'label' }, '무슨 기록'), chips),
+      h('div', { class: 'grid2', style: 'gap:10px' }, h('label', { class: 'field' }, h('span', { class: 'label' }, '날짜'), date), wField),
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '내용'), memo),
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '비용 (원, 선택)'), cost),
+      r.id ? null : h('label', { class: 'row small', for: 'to-money', style: 'gap:6px' }, toMoney, '비용을 가계부(반려동물)에도 적기'),
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '다음 일정 (선택)'), next), nextQuick,
+      h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => {
+        const c = parseInt(cost.value.replace(/[^\d]/g, ''), 10) || 0;
+        const w = parseFloat(weight.value);
+        if (type === '체중' && !(w > 0)) { toast('몸무게를 넣어 주세요'); return; }
+        R.put(Object.assign({}, r, { petId: pet.id, type, date: date.value || today(), memo: memo.value.trim(), cost: c, weight: type === '체중' ? w : null, next: next.value || '' }));
+        if (!r.id && c && toMoney.checked) M.put({ kind: 'out', amount: c, cat: '반려동물', memo: pet.name + ' ' + type + (memo.value.trim() ? ' · ' + memo.value.trim() : ''), date: date.value || today() });
+        close(); toast('기록했어요');
+      } }, '저장'), h('span', { class: 'spacer' }), del)));
+  }
+
+  /* 몸무게 그래프 */
+  function weightChart(recs) {
+    const pts = recs.filter(r => r.type === '체중' && r.weight > 0).sort((a, b) => a.date.localeCompare(b.date)).slice(-12);
+    if (pts.length < 2) return h('p', { class: 'empty' }, pts.length ? '최근 몸무게 ' + pts[0].weight + 'kg · 두 번 이상 적으면 그래프가 그려져요.' : '"체중" 기록을 남기면 변화가 그래프로 보여요.');
+    const W = 600, H = 200, L = 44, Rr = 16, T = 16, B = 30;
+    const ws = pts.map(p => p.weight); let lo = Math.min(...ws), hi = Math.max(...ws);
+    const padv = Math.max(0.1, (hi - lo) * 0.25); lo = Math.max(0, lo - padv); hi = hi + padv;
+    const step = (hi - lo) / 3;
+    const X = i => L + i * (W - L - Rr) / (pts.length - 1);
+    const Y = v => T + (hi - v) / (hi - lo) * (H - T - B);
+    const NS = 'http://www.w3.org/2000/svg';
+    const s = (tag, a, txt) => { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); if (txt != null) e.textContent = txt; return e; };
+    const svgEl = s('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'chart', role: 'img', 'aria-label': '몸무게 변화 그래프' });
+    for (let i = 0; i <= 3; i++) { const v = lo + step * i; svgEl.append(s('line', { x1: L, x2: W - Rr, y1: Y(v), y2: Y(v), class: 'grid' }), s('text', { x: L - 6, y: Y(v) + 4, 'text-anchor': 'end' }, v.toFixed(1))); }
+    const d = pts.map((p, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(p.weight).toFixed(1)).join(' ');
+    svgEl.append(s('path', { d: d + ' L' + X(pts.length - 1) + ' ' + (H - B) + ' L' + X(0) + ' ' + (H - B) + ' Z', class: 'area', opacity: '0.6' }), s('path', { d, class: 'line' }));
+    pts.forEach((p, i) => {
+      const last = i === pts.length - 1;
+      svgEl.append(s('circle', { cx: X(i), cy: Y(p.weight), r: last ? 5 : 3.5, class: last ? 'last' : 'pt' }));
+      if (i === 0 || last || pts.length <= 6) svgEl.append(s('text', { x: X(i), y: H - 10, 'text-anchor': i === 0 ? 'start' : last ? 'end' : 'middle' }, p.date.slice(5).replace('-', '/')));
+    });
+    const lastP = pts[pts.length - 1], diff = lastP.weight - pts[pts.length - 2].weight;
+    svgEl.append(s('text', { x: X(pts.length - 1) - 8, y: Y(lastP.weight) - 10, 'text-anchor': 'end', style: 'fill:var(--fg);font-weight:700;font-size:13px' }, lastP.weight + 'kg'));
+    return h('div', { class: 'stack' }, svgEl, h('p', { class: 'small muted' }, '지난번보다 ' + (diff === 0 ? '변화 없음' : (diff > 0 ? '+' : '') + diff.toFixed(2) + 'kg')));
+  }
+
+  /* 그리기 */
+  function render() {
+    const pets = P.items();
+    if (!sel || !P.get(sel)) sel = pets[0] ? pets[0].id : null;
+    $('pets').replaceChildren(...(pets.length ? pets.map(p => h('button', { type: 'button', class: 'pet-tab', 'aria-pressed': String(p.id === sel), onclick: () => { sel = p.id; render(); } },
+      h('span', { class: 'pet-face', 'aria-hidden': 'true' }, p.name.slice(0, 1)),
+      h('span', {}, h('b', {}, p.name), h('small', {}, [p.kind, p.breed, age(p.birth)].filter(Boolean).join(' · '))))) : [h('p', { class: 'empty' }, '"+ 아이 추가"를 눌러 첫 아이를 등록해 주세요.')]));
+
+    const main = $('main'); main.replaceChildren();
+    // 모든 아이의 다가오는 일정
+    const all = R.items();
+    const upcoming = all.filter(r => r.next && P.get(r.petId) && daysBetween(today(), r.next) >= -14)
+      .filter(r => !all.some(o => o.petId === r.petId && o.type === r.type && o.date >= r.next && o.id !== r.id)) // 이미 다녀온 일정은 뺌
+      .sort((a, b) => a.next.localeCompare(b.next)).slice(0, 8);
+    main.append(h('section', { class: 'card' }, h('h2', {}, '다가오는 일정'),
+      upcoming.length ? h('ul', { class: 'list due' }, upcoming.map(r => {
+        const n = daysBetween(today(), r.next);
+        return h('li', {}, h('span', { class: 'badge d ' + (n < 0 ? 'bad' : n <= 7 ? 'warn' : 'go') }, dday(r.next)),
+          h('div', { class: 'grow' }, h('b', {}, P.get(r.petId).name + ' · ' + r.type), h('div', { class: 'tiny muted' }, prettyDate(r.next) + (r.memo ? ' · 지난번: ' + r.memo : ''))),
+          h('button', { class: 'btn sm soft', type: 'button', onclick: () => { sel = r.petId; recForm(null, r.type); } }, '다녀옴'));
+      })) : h('p', { class: 'empty' }, '기록할 때 "다음 일정"을 넣으면 여기서 날짜를 알려줘요.')));
+
+    if (!sel) return;
+    const pet = P.get(sel);
+    const recs = all.filter(r => r.petId === sel);
+    const yearCost = recs.filter(r => r.date && r.date.slice(0, 4) === today().slice(0, 4)).reduce((s, r) => s + (r.cost || 0), 0);
+    const lastVisit = recs.filter(r => r.type === '병원').sort((a, b) => b.date.localeCompare(a.date))[0];
+
+    main.append(h('section', { class: 'card' },
+      h('div', { class: 'card-head' }, h('h2', {}, pet.name), h('div', { class: 'row' },
+        h('button', { class: 'btn sm', type: 'button', onclick: () => petForm(pet) }, '정보 고치기'),
+        h('button', { class: 'btn sm primary', type: 'button', onclick: () => recForm() }, '+ 기록'))),
+      pet.memo ? h('p', { class: 'note' }, pet.memo) : null,
+      h('div', { class: 'stat-row' },
+        h('div', { class: 'stat' }, h('span', { class: 'label' }, '나이'), h('b', {}, age(pet.birth) || '-')),
+        h('div', { class: 'stat' }, h('span', { class: 'label' }, '올해 쓴 비용'), h('b', {}, won(yearCost))),
+        h('div', { class: 'stat' }, h('span', { class: 'label' }, '마지막 병원'), h('b', { style: 'font-size:17px' }, lastVisit ? lastVisit.date.slice(5).replace('-', '/') : '-')))));
+
+    main.append(h('section', { class: 'card' }, h('h2', {}, '몸무게'), weightChart(recs),
+      h('div', { class: 'row' }, h('button', { class: 'btn sm soft', type: 'button', onclick: () => recForm(null, '체중') }, '+ 몸무게 적기'))));
+
+    const fsel = h('select', { style: 'width:auto', 'aria-label': '기록 종류로 거르기', onchange: e => { filter = e.target.value; render(); } },
+      h('option', { value: '' }, '전체'), TYPES.map(t => h('option', { value: t, selected: t === filter }, t)));
+    const shown = recs.filter(r => !filter || r.type === filter).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
+    main.append(h('section', { class: 'card' }, h('div', { class: 'card-head' }, h('h2', {}, '기록'), fsel),
+      shown.length ? h('ul', { class: 'list' }, shown.slice(0, 60).map(r => h('li', { style: 'cursor:pointer', tabindex: '0', role: 'button', onclick: () => recForm(r), onkeydown: e => { if (e.key === 'Enter') recForm(r); } },
+        h('div', { class: 'grow' }, h('div', { class: 'rec-type' }, r.type + ' · ' + prettyDate(r.date)),
+          h('div', { style: 'font-weight:600' }, r.type === '체중' ? r.weight + 'kg' + (r.memo ? ' · ' + r.memo : '') : (r.memo || r.type)),
+          r.next ? h('div', { class: 'tiny muted' }, '다음: ' + prettyDate(r.next)) : null),
+        r.cost ? h('span', { class: 'num small' }, won(r.cost)) : null))) : h('p', { class: 'empty' }, '"+ 기록"을 눌러 병원·접종·사료 기록을 남겨 보세요.')));
+  }
+  P.subscribe(render); R.subscribe(render);
+  render();
+})();
+</script>
+</body>
+</html>

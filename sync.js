@@ -98,7 +98,10 @@
   };
   let auth, db, K, unsub = null, pushTimer = null, lastFp = null, firstLoginPending = false, firstSnapDone = false, triedOld = false;
 
-  function emit() { try { CS.onStatus && CS.onStatus(CS); } catch (e) {} }
+  function emit() {
+    try { CS.onStatus && CS.onStatus(CS); } catch (e) {}
+    try { window.dispatchEvent(new CustomEvent('cloudsync', { detail: CS })); } catch (e) {} // 왼쪽 메뉴의 로그인 표시용
+  }
   function setStatus(st, err) { CS.status = st; CS.error = err || ''; emit(); }
 
   CS.init = function () {
@@ -109,6 +112,7 @@
       auth = K.initializeAuth(app, { persistence: [K.indexedDBLocalPersistence, K.browserLocalPersistence], popupRedirectResolver: K.browserPopupRedirectResolver });
       db = K.initializeFirestore(app, {});
       CS.ready = true;
+      CS.db = db; CS.K = K; // 생활노트의 다른 페이지(가계부·반려동물 등)도 같은 로그인·저장소를 씀
     } catch (e) { setStatus('error', '연결 준비 실패: ' + (e.message || e)); return; }
     K.onAuthStateChanged(auth, (user) => {
       CS.user = user;
