@@ -8,7 +8,7 @@
 <link rel="icon" href="icon-192.png" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261009x" />
+<link rel="stylesheet" href="life.css?v=20261010a" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .hello{display:grid;gap:6px}
@@ -172,7 +172,7 @@
 
     <section class="tile s-tool" data-key="calc">
       <div class="tile-head"><h2>내 집 마련 계산기</h2><a href="calc.html">열기</a></div>
-      <p class="small muted">대출 한도, 매달 갚을 돈, 취득세를 한 번에 계산해요.</p>
+      <p class="small muted">필요한 대출, 매달 갚을 돈, 총 이자를 한 번에 계산해요.</p>
     </section>
 
     <section class="tile s-tool" data-key="family">
@@ -184,12 +184,12 @@
   <div class="row" style="justify-content:center"><button class="btn" type="button" id="edit-home">홈 꾸미기 · 칸 추가·빼기·순서</button></div>
 </main>
 
-<script src="firebase.js?v=20261009x"></script>
-<script src="sync.js?v=20261009x"></script>
-<script src="lunar.js?v=20261009x"></script>
-<script src="life-config.js?v=20261009x"></script>
-<script src="life.js?v=20261009x"></script>
-<script src="shell.js?v=20261009x"></script>
+<script src="firebase.js?v=20261010a"></script>
+<script src="sync.js?v=20261010a"></script>
+<script src="lunar.js?v=20261010a"></script>
+<script src="life-config.js?v=20261010a"></script>
+<script src="life.js?v=20261010a"></script>
+<script src="shell.js?v=20261010a"></script>
 <script>
 (function () {
   const { h, today, won, prettyDate, daysBetween } = Life;
@@ -264,7 +264,7 @@
     fridge.items().forEach(x => { if (!x.exp) return; const n = daysBetween(t, x.exp); if (n <= 3) care.push({ n, tag: n < 0 ? '지남' : n === 0 ? '오늘' : 'D-' + n, cls: n < 0 ? 'bad' : 'warn', text: x.name + ' 먹기', href: 'fridge.html' }); });
     chores.items().forEach(x => { const due = choreDue(x); const n = daysBetween(t, due); if (n <= 0) care.push({ n, tag: '집안일', cls: n < 0 ? 'bad' : 'go', text: x.name, href: 'chores.html' }); });
     // 반려동물: 다음 병원·접종 일정(2주 안), 사료·모래 떨어질 때(1주 안)
-    petlog.items().filter(r => r.next && pets.get(r.petId) && !petlog.items().some(o => o.petId === r.petId && o.type === r.type && o.date >= r.next && o.id !== r.id)).forEach(r => {
+    petlog.items().filter(r => r.next && pets.get(r.petId) && !petlog.items().some(o => o.petId === r.petId && o.type === r.type && o.date > r.date && o.id !== r.id)).forEach(r => {
       const n = daysBetween(t, r.next); if (n <= 14) care.push({ n, tag: ddTag(n), cls: n < 0 ? 'bad' : n <= 7 ? 'warn' : 'go', text: pets.get(r.petId).name + ' ' + r.type, href: 'pet.html' });
     });
     supplies.items().filter(x => x.last && x.days).forEach(x => { const n = daysBetween(t, addDays(x.last, x.days)); if (n <= 7) care.push({ n, tag: n < 0 ? '떨어짐' : ddTag(n), cls: n <= 2 ? 'bad' : 'warn', text: x.name + ' 떨어질 때', href: 'pet.html' }); });
@@ -322,7 +322,7 @@
     $('s-list').replaceChildren(h('li', {}, h('span', { class: 't' }, left.length ? '살 것 ' + left.length + '개' : '살 것이 없어요.')),
       ...left.slice(0, 3).map(x => h('li', {}, h('span', { class: 't' }, '· ' + x.name + (x.qty ? ' ' + x.qty : '')))));
 
-    const pl = petlog.items(), all = pl.filter(r => r.next && pets.get(r.petId) && daysBetween(t, r.next) >= -14 && !pl.some(o => o.petId === r.petId && o.type === r.type && o.date >= r.next && o.id !== r.id))
+    const pl = petlog.items(), all = pl.filter(r => r.next && pets.get(r.petId) && daysBetween(t, r.next) >= -14 && !pl.some(o => o.petId === r.petId && o.type === r.type && o.date > r.date && o.id !== r.id))
       .sort((a, b) => a.next.localeCompare(b.next)).slice(0, 4);
     const dd = n => n === 0 ? '오늘' : n > 0 ? 'D-' + n : -n + '일 지남';
     const rows = all.map(r => ({ n: daysBetween(t, r.next), text: pets.get(r.petId).name + ' · ' + r.type }));
@@ -342,6 +342,7 @@
 
   }
   [money, meals, pets, petlog, food, shop, supplies, ddays, contacts, fridge, chores, gifts, workout, things, spots].forEach(s => s.subscribe(render));
+  money.subscribe(() => Life.ensureFixed(money)); Life.ensureFixed(money); // 고정 지출을 홈에서도 채움
   $('th-q').addEventListener('input', render);
   $('th-form').addEventListener('submit', e => { e.preventDefault(); location.href = 'things.html' + ($('th-q').value.trim() ? '?q=' + encodeURIComponent($('th-q').value.trim()) : ''); });
 
@@ -424,6 +425,9 @@
   // 할일 기록이 클라우드에서 새로 들어오면 다시 그림
   if (window.CloudSync) window.CloudSync.onRemoteApplied = render;
   render(); renderWeather(false); renderInstall();
+  // 다른 기기에서 바꾼 날씨 지역이 들어오면 다시 그림
+  let wxKey = JSON.stringify(Life.weatherPlaces()[0] || null);
+  settings.subscribe(() => { const k = JSON.stringify(Life.weatherPlaces()[0] || null); if (k !== wxKey) { wxKey = k; renderWeather(true); } });
 })();
 </script>
 </body>

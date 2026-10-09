@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261009x" />
+<link rel="stylesheet" href="life.css?v=20261010a" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .next{display:grid;gap:4px;padding:18px 20px;border-radius:var(--r);background:var(--fg);color:var(--bg)}
@@ -35,13 +35,13 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261009x"></script>
-<script src="sync.js?v=20261009x"></script>
-<script src="lunar.js?v=20261009x"></script>
-<script src="life-config.js?v=20261009x"></script>
-<script src="life.js?v=20261009x"></script>
-<script src="shell.js?v=20261009x"></script>
-<script src="import.js?v=20261009x"></script>
+<script src="firebase.js?v=20261010a"></script>
+<script src="sync.js?v=20261010a"></script>
+<script src="lunar.js?v=20261010a"></script>
+<script src="life-config.js?v=20261010a"></script>
+<script src="life.js?v=20261010a"></script>
+<script src="shell.js?v=20261010a"></script>
+<script src="import.js?v=20261010a"></script>
 <script>
 (function () {
   const { h, today, prettyDate, daysBetween, toast, sheet, iso } = Life;
@@ -65,11 +65,12 @@
     if (x.kind === 'once') return { date: x.date, n: daysBetween(t, x.date) };
     if (x.kind === 'count') {
       const days = daysBetween(x.date, t) + 1; // 시작한 날이 1일째
-      const nextHundred = Math.ceil((days + 1) / 100) * 100;
+      if (days <= 0) return { date: x.date, n: daysBetween(t, x.date), days: 0, milestone: '시작' };
+      const nextHundred = Math.max(100, Math.ceil(days / 100) * 100); // 100일째 되는 날 당일도 '오늘'
       const d = new Date(x.date + 'T00:00:00'); d.setDate(d.getDate() + nextHundred - 1);
       return { date: iso(d), n: daysBetween(t, iso(d)), days, milestone: nextHundred + '일' };
     }
-    for (let y = ty; y <= ty + 1; y++) {
+    for (let y = ty - 1; y <= ty + 1; y++) {
       const date = x.lunar ? lunarToSolar(y, om, od) : solarOn(y, om, od);
       if (date && date >= t) return { date, n: daysBetween(t, date), years: y - oy };
     }
@@ -111,7 +112,7 @@
   $('add').onclick = () => form();
 
   function sub(x, nx) {
-    if (x.kind === 'count') return nx.days + '일째 · 다음 ' + nx.milestone + '은 ' + prettyDate(nx.date);
+    if (x.kind === 'count') return nx.days <= 0 ? prettyDate(x.date) + '부터 세기 시작' : nx.days + '일째 · ' + (nx.n === 0 ? '오늘이 ' + nx.milestone + '!' : '다음 ' + nx.milestone + '은 ' + prettyDate(nx.date));
     if (x.kind === 'once') return prettyDate(x.date);
     return prettyDate(nx.date) + (x.lunar ? ' (음력 ' + x.date.slice(5).replace('-', '/') + ')' : '') + (nx.years > 0 ? ' · ' + (x.label === '생일' ? nx.years + '번째 생일' : nx.years + '주년') : '');
   }
@@ -122,7 +123,7 @@
     $('next').replaceChildren(...(first ? [h('section', { class: 'next', 'aria-label': '가장 가까운 기념일' },
       h('span', { class: 's' }, '가장 가까운 날'), h('span', { class: 'big' }, ddText(first.nx.n)), h('span', { class: 't' }, first.x.title), h('span', { class: 's' }, sub(first.x, first.nx)))] : []));
     $('list').replaceChildren(...(all.length ? all.map(({ x, nx }) => h('li', { class: 'tx', tabindex: '0', role: 'button', onclick: () => form(x), onkeydown: e => { if (e.key === 'Enter') form(x); } },
-      h('span', { class: 'badge dd ' + (nx.n < 0 ? '' : nx.n <= 7 ? 'warn' : 'go') }, x.kind === 'count' ? nx.days + '일째' : ddText(nx.n)),
+      h('span', { class: 'badge dd ' + (nx.n < 0 ? '' : nx.n <= 7 ? 'warn' : 'go') }, x.kind === 'count' ? (nx.days <= 0 ? ddText(nx.n) : nx.days + '일째') : ddText(nx.n)),
       h('div', { class: 'grow' }, h('div', { class: 'row', style: 'gap:6px' }, h('b', {}, x.title), h('span', { class: 'badge' }, x.label || '기념일')),
         h('div', { class: 'tiny muted' }, sub(x, nx) + (x.memo ? ' · ' + x.memo : '')))))
       : [h('li', { class: 'empty' }, '"+ 기념일"로 가족 생일, 결혼기념일 같은 날을 등록해 보세요.')]));

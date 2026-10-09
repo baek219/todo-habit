@@ -5,7 +5,8 @@
   const { h, toast, sheet, today, prettyDate } = L;
   const enc = encodeURIComponent;
   const dist = m => m == null ? '' : m < 1000 ? m + 'm' : (m / 1000).toFixed(1) + 'km';
-  const kakaoUrl = p => p.kakaoUrl || 'https://map.kakao.com/?q=' + enc(p.name);
+  const safeUrl = u => /^https:\/\//i.test(String(u || '')) ? String(u) : '';
+  const kakaoUrl = p => safeUrl(p.kakaoUrl) || 'https://map.kakao.com/?q=' + enc(p.name);
   const naverUrl = p => 'https://map.naver.com/p/search/' + enc((p.address ? p.address.split(' ').slice(0, 3).join(' ') + ' ' : '') + p.name);
   const routeUrl = p => p.x && p.y ? 'https://map.kakao.com/link/to/' + enc(p.name) + ',' + p.y + ',' + p.x : kakaoUrl(p);
 

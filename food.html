@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261009x" />
+<link rel="stylesheet" href="life.css?v=20261010a" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .meta .phone{user-select:all}
@@ -88,12 +88,12 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261009x"></script>
-<script src="sync.js?v=20261009x"></script>
-<script src="life-config.js?v=20261009x"></script>
-<script src="life.js?v=20261009x"></script>
-<script src="shell.js?v=20261009x"></script>
-<script src="locmap.js?v=20261009x"></script>
+<script src="firebase.js?v=20261010a"></script>
+<script src="sync.js?v=20261010a"></script>
+<script src="life-config.js?v=20261010a"></script>
+<script src="life.js?v=20261010a"></script>
+<script src="shell.js?v=20261010a"></script>
+<script src="locmap.js?v=20261010a"></script>
 <script>
 (function () {
   const { h, today, prettyDate, toast, sheet } = Life;
@@ -105,7 +105,8 @@
   /* ---------- 공통 조각 ---------- */
   const enc = encodeURIComponent;
   const naverUrl = p => 'https://map.naver.com/p/search/' + enc((p.address ? p.address.split(' ').slice(0, 3).join(' ') + ' ' : '') + p.name);
-  const kakaoUrl = p => p.kakaoUrl || 'https://map.kakao.com/?q=' + enc(p.name);
+  const safeUrl = u => /^https:\/\//i.test(String(u || '')) ? String(u) : ''; // 공유받은 목록에 이상한 링크가 섞여도 안전하게
+  const kakaoUrl = p => safeUrl(p.kakaoUrl) || 'https://map.kakao.com/?q=' + enc(p.name);
   const dist = m => m == null ? '' : m < 1000 ? m + 'm' : (m / 1000).toFixed(1) + 'km';
   const stars = n => '★★★★★'.slice(0, Math.round(n)) + '☆☆☆☆☆'.slice(0, 5 - Math.round(n));
   function savedOf(p) { return F.items().find(x => (p.id && x.kakaoId === p.id) || (!p.id && x.name === p.name && x.address === p.address)) || null; }
@@ -144,7 +145,7 @@
     const save = h('button', { class: 'btn sm save-btn', type: 'button', 'aria-pressed': String(!!saved), onclick: () => {
       const s = savedOf(p);
       if (s) { F.remove(s.id); toast('내 맛집에서 뺐어요'); }
-      else { F.put({ kakaoId: p.id || null, name: p.name, category: p.category || '', address: p.address || '', phone: p.phone || '', x: p.x || null, y: p.y || null, kakaoUrl: p.kakaoUrl || '', status: 'want', myRating: 0, memo: '', visits: [] }); toast('"가볼 곳"에 담았어요'); }
+      else { F.put({ kakaoId: p.id || null, name: p.name, category: p.category || '', address: p.address || '', phone: p.phone || '', x: p.x || null, y: p.y || null, kakaoUrl: safeUrl(p.kakaoUrl), status: 'want', myRating: 0, memo: '', visits: [] }); toast('"가볼 곳"에 담았어요'); }
       const now = savedOf(p); save.setAttribute('aria-pressed', String(!!now)); save.textContent = now ? '★ 담김' : '☆ 담기';
     } }, saved ? '★ 담김' : '☆ 담기');
     return h('article', { class: 'place' },
@@ -343,7 +344,7 @@
     const go = h('button', { class: 'btn primary', type: 'button', onclick: async () => {
       go.disabled = true;
       const id = Life.newId() + Math.random().toString(36).slice(2, 6);
-      const items = list.slice(0, 100).map(x => ({ name: x.name, category: x.category || '', address: x.address || '', phone: x.phone || '', kakaoUrl: x.kakaoUrl || '', x: x.x || null, y: x.y || null, myRating: x.myRating || 0, memo: x.memo || '', status: x.status || 'want' }));
+      const items = list.slice(0, 100).map(x => ({ name: x.name, category: x.category || '', address: x.address || '', phone: x.phone || '', kakaoUrl: safeUrl(x.kakaoUrl), x: x.x || null, y: x.y || null, myRating: x.myRating || 0, memo: x.memo || '', status: x.status || 'want' }));
       try {
         await CS.K.setDoc(CS.K.doc(CS.db, 'shares', id), { owner: CS.user.uid, title: title.value.trim() || '맛집 목록', items, createdAt: Date.now(), deleted: false });
         const shares = (F.meta().shares || []).concat([{ id, title: title.value.trim() || '맛집 목록', count: items.length, createdAt: Date.now() }]);
@@ -394,7 +395,7 @@
             it.myRating ? h('span', { class: 'stars' }, stars(it.myRating)) : null, it.category ? h('span', {}, it.category) : null)),
           h('button', { class: 'btn sm', type: 'button', onclick: e => {
             if (savedOf({ name: it.name, address: it.address })) { toast('이미 내 맛집에 있어요'); return; }
-            F.put({ kakaoId: null, name: it.name, category: it.category, address: it.address, phone: it.phone, x: it.x, y: it.y, kakaoUrl: it.kakaoUrl, status: 'want', myRating: 0, memo: it.memo ? '공유받은 메모: ' + it.memo : '', visits: [] });
+            F.put({ kakaoId: null, name: it.name, category: it.category, address: it.address, phone: it.phone, x: it.x, y: it.y, kakaoUrl: safeUrl(it.kakaoUrl), status: 'want', myRating: 0, memo: it.memo ? '공유받은 메모: ' + it.memo : '', visits: [] });
             e.currentTarget.textContent = '★ 담김'; toast('내 맛집 "가볼 곳"에 담았어요');
           } }, '☆ 내 맛집에 담기')),
         it.memo ? h('p', { class: 'small' }, it.memo) : null,

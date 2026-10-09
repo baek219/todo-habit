@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261009x" />
+<link rel="stylesheet" href="life.css?v=20261010a" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .counts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
@@ -53,11 +53,11 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261009x"></script>
-<script src="sync.js?v=20261009x"></script>
-<script src="life-config.js?v=20261009x"></script>
-<script src="life.js?v=20261009x"></script>
-<script src="shell.js?v=20261009x"></script>
+<script src="firebase.js?v=20261010a"></script>
+<script src="sync.js?v=20261010a"></script>
+<script src="life-config.js?v=20261010a"></script>
+<script src="life.js?v=20261010a"></script>
+<script src="shell.js?v=20261010a"></script>
 <script>
 (function () {
   const { h, today, prettyDate, toast } = Life;
@@ -113,7 +113,8 @@
         plan.forEach(p => {
           const s = Life.store(p.k);
           if (p.add.length) s.putMany(p.add);
-          if (p.meta && Object.keys(p.meta).length && !Object.keys(s.meta()).length) s.setMeta(p.meta);
+          // 설정값은 지금 없는 것만 채움 (가족 공유 정보는 백업에서 가져오지 않음)
+          if (p.meta) { const cur = s.meta(), add = {}; Object.keys(p.meta).forEach(k => { if (k !== 'groupId' && !(k in cur)) add[k] = p.meta[k]; }); if (Object.keys(add).length) s.setMeta(add); }
         });
         $('restore').replaceChildren(h('p', { class: 'note' }, h('b', {}, total + '개를 불러왔어요.'), ' 로그인해 있으면 다른 기기에도 곧 보여요.'));
         toast(total + '개를 불러왔어요');

@@ -153,7 +153,7 @@
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
   function iso(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
-  function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
   function load() {
     try { tasks = JSON.parse(localStorage.getItem(KEY_TASKS) || '[]') || []; } catch (e) { tasks = []; }
     try { dayLogs = JSON.parse(localStorage.getItem(KEY_LOGS) || '{}') || {}; } catch (e) { dayLogs = {}; }

@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261009x" />
+<link rel="stylesheet" href="life.css?v=20261010a" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .month-nav{display:flex;align-items:center;gap:6px}
@@ -112,12 +112,12 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261009x"></script>
-<script src="sync.js?v=20261009x"></script>
-<script src="life-config.js?v=20261009x"></script>
-<script src="life.js?v=20261009x"></script>
-<script src="shell.js?v=20261009x"></script>
-<script src="import.js?v=20261009x"></script>
+<script src="firebase.js?v=20261010a"></script>
+<script src="sync.js?v=20261010a"></script>
+<script src="life-config.js?v=20261010a"></script>
+<script src="life.js?v=20261010a"></script>
+<script src="shell.js?v=20261010a"></script>
+<script src="import.js?v=20261010a"></script>
 <script>
 (function () {
   const { h, today, won, prettyDate, toast, sheet } = Life;
@@ -225,20 +225,7 @@
   }
   $('fixed-add').onclick = () => fixedForm();
   // 이번 달·지난달 중 날짜가 지난 고정 지출을 내역에 넣음 (같은 달엔 한 번만, 지운 건 다시 안 넣음)
-  function ensureFixed() {
-    const now = today(), cur = now.slice(0, 7);
-    fixedItems().forEach(f => {
-      [prevYm(cur), cur].forEach(m => {
-        const [y, mm] = m.split('-').map(Number);
-        const d = Math.min(f.day || 1, new Date(y, mm, 0).getDate());
-        const date = m + '-' + String(d).padStart(2, '0');
-        if (date > now || (f.start && date < f.start)) return; // 등록한 날 이후부터만
-        const id = 'fx_' + f.id + '_' + m;
-        if (S.exists(id)) return;
-        S.put({ id, kind: 'out', amount: f.amount, cat: f.cat, memo: f.name + ' (매달)', date, fixedId: f.id });
-      });
-    });
-  }
+  const ensureFixed = () => Life.ensureFixed(S);
 
   /* 그리기 */
   function monthItems(m) { return S.items().filter(t => (t.date || '').slice(0, 7) === m); }

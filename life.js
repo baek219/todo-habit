@@ -147,8 +147,14 @@
     const cutoff = Date.now() - 90 * 86400000; // 지운 표시는 90일 뒤 정리
     const items = Object.values(by).filter(it => !(it.deleted && (it.updatedAt || 0) < cutoff))
       .sort((x, y) => (x.createdAt || 0) - (y.createdAt || 0) || String(x.id).localeCompare(String(y.id)));
-    const useA = (a.metaAt || 0) >= (b.metaAt || 0);
-    return { items, meta: useA ? (a.meta || {}) : (b.meta || {}), metaAt: Math.max(a.metaAt || 0, b.metaAt || 0) };
+    // 설정값(meta)은 항목마다 따로 최신 것을 고름 (한 기기에서 홈 꾸미기만 바꿔도 가족 공유·날씨 지역이 지워지지 않게)
+    const ma = a.meta || {}, mb = b.meta || {}, ta = a.metaTs || {}, tb = b.metaTs || {};
+    const meta = {}, metaTs = {};
+    new Set(Object.keys(ma).concat(Object.keys(mb))).forEach(k => {
+      const x = ta[k] || a.metaAt || 0, y = tb[k] || b.metaAt || 0;
+      if (k in ma && (!(k in mb) || x >= y)) { meta[k] = ma[k]; metaTs[k] = x; } else { meta[k] = mb[k]; metaTs[k] = y; }
+    });
+    return { items, meta, metaTs, metaAt: Math.max(a.metaAt || 0, b.metaAt || 0) };
   }
 
   // 가족 공유를 켜면 이 기능들의 기록은 groups/{가족 아이디}/life/{이름} 에 같이 저장돼요
@@ -160,12 +166,12 @@
   function makeStore(name) {
     const shared = SHARED.includes(name);
     const subs = new Set();
-    let scope = 'local', LK = keyFor('local'), state = load(), ref = null, unsub = null, pushTimer = null, remoteFp = null;
+    let scope = 'local', LK = keyFor('local'), state = load(), ref = null, unsub = null, pushTimer = null, remoteFp = null, synced = false;
 
     function keyFor(sc) { return sc.startsWith('g:') ? 'life_g_' + sc.slice(2) + '_' + name + '_v1' : 'life_' + name + '_v1'; }
     function load(key) {
-      try { const v = JSON.parse(localStorage.getItem(key || LK)); if (v && Array.isArray(v.items)) return { items: v.items, meta: v.meta || {}, metaAt: v.metaAt || 0 }; } catch (e) {}
-      return { items: [], meta: {}, metaAt: 0 };
+      try { const v = JSON.parse(localStorage.getItem(key || LK)); if (v && Array.isArray(v.items)) return { items: v.items, meta: v.meta || {}, metaTs: v.metaTs || {}, metaAt: v.metaAt || 0 }; } catch (e) {}
+      return { items: [], meta: {}, metaTs: {}, metaAt: 0 };
     }
     function persist() { try { localStorage.setItem(LK, JSON.stringify(state)); } catch (e) { toast('이 기기에 저장 공간이 부족해요.'); } }
     function notify() { subs.forEach(f => { try { f(api); } catch (e) { console.error(e); } }); }
@@ -203,24 +209,27 @@
       }
       if (prevKey !== LK) notify();
       ref = gid ? K.doc(CS.db, 'groups', gid, 'life', name) : K.doc(CS.db, 'users', uid, 'life', name);
+      synced = false;
       unsub = K.onSnapshot(ref, snap => {
         if (snap.metadata.hasPendingWrites) return;
+        const first = !synced; synced = true;
         let remote = null;
         if (snap.exists()) { try { remote = JSON.parse(snap.data().data); } catch (e) { remote = null; } }
         remoteFp = remote ? fp(remote) : null;
         const merged = remote ? merge(state, remote) : state;
         const localChanged = fp(merged) !== fp(state);
         state = merged; persist();
-        if (localChanged) notify();
+        if (localChanged || first) notify();
         if (!remote || fp(merged) !== remoteFp) schedulePush(300);
       }, err => toast(err.code === 'permission-denied' ? (gid ? '가족 공유 기록을 읽을 수 없어요. Firebase 규칙을 확인해 주세요.' : '동기화 권한이 없어요.') : '동기화 오류: ' + (err.code || err.message || err)));
     }
     function detach() { if (unsub) unsub(); unsub = null; ref = null; clearTimeout(pushTimer); }
-    function reset() { state = { items: [], meta: {}, metaAt: 0 }; persist(); notify(); }
+    function reset() { state = { items: [], meta: {}, metaTs: {}, metaAt: 0 }; persist(); notify(); }
 
     const api = {
       name, shared,
       isShared: () => scope.startsWith('g:'),
+      synced: () => !ref || synced, // 클라우드에서 처음 받아오기를 마쳤는지 (로그인 안 했으면 항상 true)
       items: () => state.items.filter(i => !i.deleted),
       get: id => state.items.find(i => i.id === id && !i.deleted) || null,
       exists: id => state.items.some(i => i.id === id), // 지운 기록 포함 (자동 입력이 지운 걸 되살리지 않게)
@@ -233,10 +242,10 @@
         if (i >= 0) state.items[i] = it; else state.items.push(it);
         changed(); return it;
       },
-      putMany(list) { // 엑셀로 여러 개를 한 번에 넣을 때 (저장·동기화는 한 번만)
+      putMany(list, opts) { // 엑셀로 여러 개를 한 번에 넣을 때 (저장·동기화는 한 번만)
         const now = Date.now(), CS = window.CloudSync, out = [];
         list.forEach((item, k) => {
-          const it = Object.assign({}, item, { id: item.id || newId(), updatedAt: now, createdAt: item.createdAt || now + k });
+          const it = Object.assign({}, item, { id: item.id || newId(), updatedAt: opts && opts.keepTime && item.updatedAt ? item.updatedAt : now, createdAt: item.createdAt || now + k });
           if (!it.by && CS && CS.user) it.by = CS.user.uid;
           const i = state.items.findIndex(x => x.id === it.id);
           if (i >= 0) state.items[i] = it; else state.items.push(it);
@@ -255,7 +264,13 @@
         if (i >= 0) { state.items[i] = { id, deleted: true, updatedAt: Date.now(), createdAt: state.items[i].createdAt }; changed(); }
       },
       meta: () => state.meta,
-      setMeta(patch) { state.meta = Object.assign({}, state.meta, patch); state.metaAt = Date.now(); changed(); },
+      setMeta(patch) {
+        const now = Date.now();
+        state.meta = Object.assign({}, state.meta, patch);
+        state.metaTs = Object.assign({}, state.metaTs);
+        Object.keys(patch).forEach(k => { state.metaTs[k] = now; });
+        state.metaAt = now; changed();
+      },
       subscribe(fn) { subs.add(fn); return () => subs.delete(fn); },
       _attach: attach, _detach: detach, _reset: reset
     };
@@ -352,7 +367,9 @@
   const DEFAULT_PLACE = { name: '서울', lat: 37.5665, lon: 126.978 };
   // 저장해 둔 지역 목록 (첫 번째가 홈·메뉴 추천에 쓰이는 기본 지역)
   function weatherPlaces() {
-    const m = (stores.settings ? stores.settings.meta() : null) || {};
+    // 로그인했으면 계정에 저장된 목록(다른 기기와 같음), 아니면 이 기기 목록이 먼저
+    const loggedIn = !!(window.CloudSync && window.CloudSync.user);
+    const m = (loggedIn ? settingsStore().meta() : null) || {};
     if (Array.isArray(m.weatherPlaces) && m.weatherPlaces.length) return m.weatherPlaces;
     let local = null; try { local = JSON.parse(localStorage.getItem('life_weather_places_v1')); } catch (e) {}
     if (Array.isArray(local) && local.length) return local;
@@ -432,11 +449,13 @@
     const t = today(), [oy, om, od] = String(x.date).split('-').map(Number), ty = Number(t.slice(0, 4));
     if (x.kind === 'once') return { date: x.date, n: daysBetween(t, x.date) };
     if (x.kind === 'count') {
-      const days = daysBetween(x.date, t) + 1, nh = Math.ceil((days + 1) / 100) * 100;
+      const days = daysBetween(x.date, t) + 1;
+      if (days <= 0) return { date: x.date, n: daysBetween(t, x.date), days: 0, milestone: '시작' };
+      const nh = Math.max(100, Math.ceil(days / 100) * 100); // 100일째 되는 날 당일도 '오늘'로
       const d = new Date(x.date + 'T00:00:00'); d.setDate(d.getDate() + nh - 1);
       return { date: iso(d), n: daysBetween(t, iso(d)), days, milestone: nh + '일' };
     }
-    for (let y = ty; y <= ty + 1; y++) {
+    for (let y = ty - 1; y <= ty + 1; y++) { // 음력 11·12월 생일은 양력으로 올해 1·2월일 수 있어서 작년 음력부터 봄
       let date = null;
       if (x.lunar && window.KoreanLunarCalendar) {
         const lc = new window.KoreanLunarCalendar();
@@ -491,6 +510,32 @@
     return j;
   }
 
+  /* ---------- 가계부 고정 지출: 날짜가 된 달의 지출을 자동으로 넣음 (가계부·홈 공용) ---------- */
+  // 클라우드에서 처음 받아오기 전에는 하지 않음 (다른 기기에서 지운 걸 되살리지 않게).
+  // 자동 기록의 시각을 '그 달 그날'로 두어서, 나중에 누가 지우면 지운 쪽이 항상 이김.
+  function ensureFixed(S) {
+    if (!S.synced()) return;
+    const now = today(), rows = [];
+    S.items().filter(t => t.kind === 'fixed').forEach(f => {
+      const start = f.start || now;
+      let [y, m] = start.slice(0, 7).split('-').map(Number);
+      const [cy, cm] = now.slice(0, 7).split('-').map(Number);
+      if ((cy - y) * 12 + (cm - m) > 24) { const d = new Date(cy, cm - 25, 1); y = d.getFullYear(); m = d.getMonth() + 1; } // 최대 2년 전까지
+      while (y < cy || (y === cy && m <= cm)) {
+        const ym = y + '-' + String(m).padStart(2, '0');
+        const d = Math.min(f.day || 1, new Date(y, m, 0).getDate());
+        const date = ym + '-' + String(d).padStart(2, '0');
+        const id = 'fx_' + f.id + '_' + ym;
+        if (date <= now && !(f.start && date < f.start) && !S.exists(id)) {
+          const at = new Date(date + 'T09:00:00').getTime();
+          rows.push({ id, kind: 'out', amount: f.amount, cat: f.cat, memo: f.name + ' (매달)', date, fixedId: f.id, createdAt: at, updatedAt: at });
+        }
+        m++; if (m > 12) { m = 1; y++; }
+      }
+    });
+    if (rows.length) S.putMany(rows, { keepTime: true });
+  }
+
   /* ---------- 화면 밝기 (할일·습관과 같은 저장값) ---------- */
   function isDark() { try { return localStorage.getItem('dark_mode_v1') === '1'; } catch (e) { return false; } }
   function setDark(on) {
@@ -509,7 +554,7 @@
   window.Life = {
     h, iso, today, won, newId, daysBetween, prettyDate, WD, toast, sheet, choice, usedValues, pager, daysChoice, everyText,
     store, api, hasServer, group, weather, weatherChip, weatherPlaces, setWeatherPlaces, pmGrade, searchPlace, reversePlace,
-    isDark, setDark,
+    isDark, setDark, ensureFixed,
     canInstall: () => !!installEvt, install, standalone, ddayNext,
     onUser(fn) { userSubs.add(fn); try { fn(window.CloudSync && window.CloudSync.user); } catch (e) {} return () => userSubs.delete(fn); },
     user: () => (window.CloudSync && window.CloudSync.user) || null,

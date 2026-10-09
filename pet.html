@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261009x" />
+<link rel="stylesheet" href="life.css?v=20261010a" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .pets{display:flex;gap:8px;flex-wrap:wrap}
@@ -43,11 +43,11 @@
   <div id="main" class="page" style="padding:0;gap:16px"></div>
 </main>
 
-<script src="firebase.js?v=20261009x"></script>
-<script src="sync.js?v=20261009x"></script>
-<script src="life-config.js?v=20261009x"></script>
-<script src="life.js?v=20261009x"></script>
-<script src="shell.js?v=20261009x"></script>
+<script src="firebase.js?v=20261010a"></script>
+<script src="sync.js?v=20261010a"></script>
+<script src="life-config.js?v=20261010a"></script>
+<script src="life.js?v=20261010a"></script>
+<script src="shell.js?v=20261010a"></script>
 <script>
 (function () {
   const { h, today, won, prettyDate, daysBetween, toast, sheet } = Life;
@@ -240,7 +240,7 @@
     // 모든 아이의 다가오는 일정
     const all = R.items();
     const upcoming = all.filter(r => r.next && P.get(r.petId) && daysBetween(today(), r.next) >= -14)
-      .filter(r => !all.some(o => o.petId === r.petId && o.type === r.type && o.date >= r.next && o.id !== r.id)) // 이미 다녀온 일정은 뺌
+      .filter(r => !all.some(o => o.petId === r.petId && o.type === r.type && o.date > r.date && o.id !== r.id)) // 이미 다녀온 일정은 뺌
       .sort((a, b) => a.next.localeCompare(b.next)).slice(0, 8);
     main.append(h('section', { class: 'card' }, h('h2', {}, '다가오는 일정'),
       upcoming.length ? h('ul', { class: 'list due' }, upcoming.map(r => {
