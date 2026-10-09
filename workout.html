@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#2F6F5E" />
-<link rel="stylesheet" href="life.css?v=20261009i" />
+<link rel="stylesheet" href="life.css?v=20261009k" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
@@ -61,17 +61,18 @@
   </section>
 
   <section class="card">
-    <h2>최근 기록</h2>
+    <h2>운동 기록 전체</h2>
     <ul class="list" id="list"></ul>
+    <div id="list-pg"></div>
   </section>
 </main>
 
-<script src="firebase.js?v=20261009i"></script>
-<script src="sync.js?v=20261009i"></script>
-<script src="life-config.js?v=20261009i"></script>
-<script src="life.js?v=20261009i"></script>
-<script src="shell.js?v=20261009i"></script>
-<script src="import.js?v=20261009i"></script>
+<script src="firebase.js?v=20261009k"></script>
+<script src="sync.js?v=20261009k"></script>
+<script src="life-config.js?v=20261009k"></script>
+<script src="life.js?v=20261009k"></script>
+<script src="shell.js?v=20261009k"></script>
+<script src="import.js?v=20261009k"></script>
 <script>
 (function () {
   const { h, today, prettyDate, toast, sheet, iso, WD } = Life;
@@ -80,7 +81,7 @@
   $('today').textContent = prettyDate(today());
   $('f-date').value = today();
   const TYPES = ['걷기', '달리기', '헬스', '홈트', '자전거', '등산', '수영', '요가·스트레칭', '기타'];
-  let type = '걷기', ym = today().slice(0, 7);
+  let type = '걷기', ym = today().slice(0, 7), pg = 1;
   // 운동 종류: 버튼으로 고르거나 "+ 직접 쓰기"
   function drawTypes() { $('types').replaceChildren(Life.choice({ options: TYPES, value: type, onChange: v => { type = v; }, extra: Life.usedValues(W.items(), 'type', TYPES), placeholder: '예: 배드민턴, 클라이밍, 골프' }).el); }
   drawTypes();
@@ -127,8 +128,10 @@
     let streak = 0; const c = new Date(); if (!map[iso(c)]) c.setDate(c.getDate() - 1);
     while (map[iso(c)]) { streak++; c.setDate(c.getDate() - 1); }
     $('s-streak').textContent = streak + '일';
-    const recent = W.items().sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 15);
-    $('list').replaceChildren(...(recent.length ? recent.map(x => h('li', {},
+    const recent = W.items().sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0));
+    pg = Math.min(pg, Math.max(1, Math.ceil(recent.length / 15)));
+    $('list-pg').replaceChildren(Life.pager(recent.length, 15, pg, n => { pg = n; render(); }));
+    $('list').replaceChildren(...(recent.length ? recent.slice((pg - 1) * 15, pg * 15).map(x => h('li', {},
       h('span', { class: 'badge go' }, x.type),
       h('div', { class: 'grow' }, h('b', {}, x.min + '분'), h('div', { class: 'tiny muted' }, prettyDate(x.date) + (x.memo ? ' · ' + x.memo : ''))),
       h('button', { class: 'icon-btn', type: 'button', 'aria-label': '기록 지우기', onclick: () => W.remove(x.id) }, '✕'))) : [h('li', { class: 'empty' }, '위에서 운동 종류를 고르고 "기록"을 눌러 보세요.')]));

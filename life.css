@@ -129,3 +129,14 @@ html.ln-dark .note.warn{background:#2E2914}
 .sheet::before{content:"";justify-self:center;width:40px;height:4px;border-radius:9px;background:var(--line);margin:-8px 0 2px}
 @media (min-width:700px){.sheet-veil{align-items:center}.sheet{border-radius:24px}.sheet::before{display:none}}
 @media (prefers-reduced-motion:reduce){.life-toast,.btn,.chip,input,select,textarea{transition:none}}
+
+/* 쪽 넘기기 */
+.pager{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;margin-top:14px}
+.pager button{font:inherit;font-size:14px;font-weight:650;min-width:38px;height:38px;padding:0 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer}
+.pager button:hover:not(:disabled):not([aria-current]){background:var(--surface2)}
+.pager button:disabled{opacity:.35;cursor:default}
+.pager button[aria-current="page"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.pager .gap{color:var(--muted);padding:0 2px}
+.pager .info{flex-basis:100%;text-align:center;font-size:12.5px;color:var(--muted)}
+.pager .now{display:none;font-weight:750;font-variant-numeric:tabular-nums;min-width:72px;text-align:center}
+@media (max-width:560px){.pager .num,.pager .gap{display:none}.pager .now{display:inline-block}.pager button{padding:0 16px}}

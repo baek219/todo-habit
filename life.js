@@ -96,6 +96,25 @@
     return Object.keys(c).sort((a, b) => c[b] - c[a]).slice(0, 12);
   }
 
+  // 쪽 넘기기: ◀ 이전 · 1 2 3 · 다음 ▶   pager(전체 개수, 한 쪽 개수, 지금 쪽, 쪽을 바꿀 때 할 일)
+  function pager(total, size, page, go) {
+    const pages = Math.ceil(total / size);
+    if (pages <= 1) return h('div', { hidden: true });
+    page = Math.min(Math.max(1, page), pages);
+    let from = Math.max(1, page - 2), to = Math.min(pages, from + 4); from = Math.max(1, to - 4);
+    const nums = [];
+    if (from > 1) { nums.push(1); if (from > 2) nums.push('…'); }
+    for (let i = from; i <= to; i++) nums.push(i);
+    if (to < pages) { if (to < pages - 1) nums.push('…'); nums.push(pages); }
+    const a = (page - 1) * size + 1, b = Math.min(total, page * size);
+    return h('nav', { class: 'pager', 'aria-label': '쪽 넘기기' },
+      h('button', { type: 'button', disabled: page <= 1, onclick: () => go(page - 1) }, '◀ 이전'),
+      nums.map(n => n === '…' ? h('span', { class: 'gap' }, '…') : h('button', { type: 'button', class: 'num', 'aria-current': n === page ? 'page' : null, 'aria-label': n + '쪽', onclick: () => go(n) }, n)),
+      h('span', { class: 'now' }, page + ' / ' + pages + '쪽'),
+      h('button', { type: 'button', disabled: page >= pages, onclick: () => go(page + 1) }, '다음 ▶'),
+      h('span', { class: 'info' }, '전체 ' + total.toLocaleString('ko-KR') + '개 중 ' + a + '–' + b));
+  }
+
   /* ---------- 저장소 ---------- */
   function fp(s) { return JSON.stringify(s); }
   function merge(a, b) {
@@ -459,7 +478,7 @@
   setTimeout(onAuth, 0);
 
   window.Life = {
-    h, iso, today, won, newId, daysBetween, prettyDate, WD, toast, sheet, choice, usedValues,
+    h, iso, today, won, newId, daysBetween, prettyDate, WD, toast, sheet, choice, usedValues, pager,
     store, api, hasServer, group, weather, weatherChip, weatherPlaces, setWeatherPlaces, pmGrade, searchPlace, reversePlace,
     canInstall: () => !!installEvt, install, standalone, ddayNext,
     onUser(fn) { userSubs.add(fn); try { fn(window.CloudSync && window.CloudSync.user); } catch (e) {} return () => userSubs.delete(fn); },

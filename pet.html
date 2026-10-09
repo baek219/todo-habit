@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#2F6F5E" />
-<link rel="stylesheet" href="life.css?v=20261009i" />
+<link rel="stylesheet" href="life.css?v=20261009k" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .pets{display:flex;gap:8px;flex-wrap:wrap}
@@ -43,11 +43,11 @@
   <div id="main" class="page" style="padding:0;gap:16px"></div>
 </main>
 
-<script src="firebase.js?v=20261009i"></script>
-<script src="sync.js?v=20261009i"></script>
-<script src="life-config.js?v=20261009i"></script>
-<script src="life.js?v=20261009i"></script>
-<script src="shell.js?v=20261009i"></script>
+<script src="firebase.js?v=20261009k"></script>
+<script src="sync.js?v=20261009k"></script>
+<script src="life-config.js?v=20261009k"></script>
+<script src="life.js?v=20261009k"></script>
+<script src="shell.js?v=20261009k"></script>
 <script>
 (function () {
   const { h, today, won, prettyDate, daysBetween, toast, sheet } = Life;
@@ -58,7 +58,7 @@
   const SHOP = Life.store('shop');   // 장보기 목록에 담기
   const TYPES = ['병원', '예방접종', '구충·심장사상충', '사료·간식', '체중', '미용·목욕', '약', '기타'];
   const KINDS = ['고양이', '강아지', '기타'];
-  let sel = null, filter = '';
+  let sel = null, filter = '', recPg = 1;
   const $ = id => document.getElementById(id);
   $('today').textContent = prettyDate(today());
 
@@ -270,15 +270,17 @@
     main.append(h('section', { class: 'card' }, h('h2', {}, '몸무게'), weightChart(recs),
       h('div', { class: 'row' }, h('button', { class: 'btn sm soft', type: 'button', onclick: () => recForm(null, '체중') }, '+ 몸무게 적기'))));
 
-    const fsel = h('select', { style: 'width:auto', 'aria-label': '기록 종류로 거르기', onchange: e => { filter = e.target.value; render(); } },
+    const fsel = h('select', { style: 'width:auto', 'aria-label': '기록 종류로 거르기', onchange: e => { filter = e.target.value; recPg = 1; render(); } },
       h('option', { value: '' }, '전체'), TYPES.map(t => h('option', { value: t, selected: t === filter }, t)));
     const shown = recs.filter(r => !filter || r.type === filter).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
-    main.append(h('section', { class: 'card' }, h('div', { class: 'card-head' }, h('h2', {}, '기록'), fsel),
-      shown.length ? h('ul', { class: 'list' }, shown.slice(0, 60).map(r => h('li', { style: 'cursor:pointer', tabindex: '0', role: 'button', onclick: () => recForm(r), onkeydown: e => { if (e.key === 'Enter') recForm(r); } },
+    recPg = Math.min(recPg, Math.max(1, Math.ceil(shown.length / 20)));
+    main.append(h('section', { class: 'card', id: 'rec-card' }, h('div', { class: 'card-head' }, h('h2', {}, '기록'), fsel),
+      shown.length ? h('ul', { class: 'list' }, shown.slice((recPg - 1) * 20, recPg * 20).map(r => h('li', { style: 'cursor:pointer', tabindex: '0', role: 'button', onclick: () => recForm(r), onkeydown: e => { if (e.key === 'Enter') recForm(r); } },
         h('div', { class: 'grow' }, h('div', { class: 'rec-type' }, r.type + ' · ' + prettyDate(r.date)),
           h('div', { style: 'font-weight:600' }, r.type === '체중' ? r.weight + 'kg' + (r.memo ? ' · ' + r.memo : '') : (r.memo || r.type)),
           r.next ? h('div', { class: 'tiny muted' }, '다음: ' + prettyDate(r.next)) : null),
-        r.cost ? h('span', { class: 'num small' }, won(r.cost)) : null))) : h('p', { class: 'empty' }, '"+ 기록"을 눌러 병원·접종·사료 기록을 남겨 보세요.')));
+        r.cost ? h('span', { class: 'num small' }, won(r.cost)) : null))) : h('p', { class: 'empty' }, '"+ 기록"을 눌러 병원·접종·사료 기록을 남겨 보세요.'),
+      Life.pager(shown.length, 20, recPg, n => { recPg = n; render(); const c = document.getElementById('rec-card'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' }); })));
   }
   P.subscribe(render); R.subscribe(render); SU.subscribe(render);
   render();
