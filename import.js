@@ -306,14 +306,14 @@
             drawMap();
           } },
           h('option', { value: '', selected: cur === '' }, '— 안 씀 —'),
-          h('option', { value: 'fix', selected: cur === 'fix' }, '✏️ 직접 적기'),
+          h('option', { value: 'fix', selected: cur === 'fix' }, '직접 적기'),
           Array.from({ length: width }, (_, i) => h('option', { value: i, selected: cur === String(i) }, colLabel(i))));
         return h('label', { class: cur === 'fix' ? 'fix' : '' }, h('span', {}, f.label + (f.required ? ' *' : '')), s, cur === 'fix' ? fixedInput(f) : null);
       });
       mapBox.replaceChildren(
         h('div', { class: 'stack', style: 'gap:6px' },
           h('span', { class: 'label' }, header ? '엑셀의 어느 열이 어떤 내용인지 맞춰봤어요. 틀리면 바꿔 주세요.' : '제목 줄이 없어서 왼쪽 열부터 차례로 맞췄어요. 틀리면 바꿔 주세요.'),
-          h('p', { class: 'small muted', style: 'margin:0' }, '엑셀에 없는 칸은 "✏️ 직접 적기"를 고르면 모든 줄에 같은 값을 넣을 수 있어요. 예) 결혼식 때 받은 축의금 명단이면 구분 → "내가 받음", 무슨 일 → "결혼", 날짜 → 결혼한 날.'),
+          h('p', { class: 'small muted', style: 'margin:0' }, '엑셀에 없는 칸은 "직접 적기"를 고르면 모든 줄에 같은 값을 넣을 수 있어요. 예) 결혼식 때 받은 축의금 명단이면 구분 → "내가 받음", 무슨 일 → "결혼", 날짜 → 결혼한 날.'),
           h('div', { class: 'xl-map' }, sel)),
         prevBox);
       drawPreview();
@@ -391,7 +391,7 @@
   L.excel = function (cfg) {
     const head = document.querySelector('.page-head'); if (!head) return;
     const btn = h('button', { class: 'btn sm soft ln-xl', type: 'button', onclick: () => open(cfg) },
-      h('span', { 'aria-hidden': 'true' }, '⇅ '), '엑셀로 넣기·받기');
+      '엑셀로 넣기·받기');
     const delBtn = h('button', { class: 'btn sm ghost', type: 'button', onclick: () => openBatches(cfg) }, '엑셀로 넣은 것 지우기');
     const wrap = h('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap;justify-self:start;margin-top:4px' }, btn, delBtn);
     head.append(wrap);

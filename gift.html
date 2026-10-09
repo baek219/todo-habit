@@ -6,8 +6,8 @@
 <title>경조사 장부 · 생활노트</title>
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
-<meta name="theme-color" content="#2F6F5E" />
-<link rel="stylesheet" href="life.css?v=20261009l" />
+<meta name="theme-color" content="#F3F4F6" />
+<link rel="stylesheet" href="life.css?v=20261009p" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .amount-input{font-size:22px!important;font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
@@ -19,8 +19,9 @@
   .tx:hover{background:var(--surface2)}
   .tx .amt{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
   .dir-say{margin:0;font-size:14px;font-weight:650;padding:10px 12px;border-radius:12px;background:var(--surface2)}
-  .dir-say.give{color:var(--danger)}
-  .dir-say.get{color:var(--primary-dark)}
+  .dir-say.give{color:var(--danger);background:#FFF1F1}
+  .dir-say.get{color:var(--good);background:#E6F6EF}
+  html.ln-dark .dir-say.give{background:#3A1E1E} html.ln-dark .dir-say.get{background:#15332A}
   .tabs{display:grid;grid-template-columns:1fr 1fr;width:100%}
   .tabs button{padding:11px 14px;font-size:15.5px}
   .search{font-size:17px!important;padding:14px 16px!important}
@@ -36,8 +37,8 @@
   </header>
 
   <div class="seg tabs" role="tablist" aria-label="기록하기·찾기">
-    <button type="button" role="tab" id="tab-rec" aria-pressed="true" aria-selected="true">✏️ 기록하기</button>
-    <button type="button" role="tab" id="tab-find" aria-pressed="false" aria-selected="false">🔍 찾기</button>
+    <button type="button" role="tab" id="tab-rec" aria-pressed="true" aria-selected="true">기록하기</button>
+    <button type="button" role="tab" id="tab-find" aria-pressed="false" aria-selected="false">찾기</button>
   </div>
 
   <section class="card" id="find-pane" hidden>
@@ -93,12 +94,12 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261009l"></script>
-<script src="sync.js?v=20261009l"></script>
-<script src="life-config.js?v=20261009l"></script>
-<script src="life.js?v=20261009l"></script>
-<script src="shell.js?v=20261009l"></script>
-<script src="import.js?v=20261009l"></script>
+<script src="firebase.js?v=20261009p"></script>
+<script src="sync.js?v=20261009p"></script>
+<script src="life-config.js?v=20261009p"></script>
+<script src="life.js?v=20261009p"></script>
+<script src="shell.js?v=20261009p"></script>
+<script src="import.js?v=20261009p"></script>
 <script>
 (function () {
   const { h, today, won, prettyDate, toast, sheet } = Life;
@@ -119,7 +120,7 @@
   function say() {
     const n = $('f-name').value.trim() || '○○', a = parseAmt($('f-amt').value);
     const money = a ? won(a) : '돈';
-    $('say').textContent = dir === 'give' ? '👉 내가 ' + n + '님께 ' + money + '을 드렸어요' : '👉 ' + n + '님이 나에게 ' + money + '을 줬어요';
+    $('say').textContent = dir === 'give' ? '내가 ' + n + '님께 ' + money + '을 드렸어요' : n + '님이 나에게 ' + money + '을 줬어요';
     $('say').className = 'dir-say ' + dir;
   }
   $('f-name').addEventListener('input', say); $('f-amt').addEventListener('input', say);

@@ -33,58 +33,74 @@
     run: '<circle cx="14" cy="4.5" r="1.8"/><path d="M8 21l3-6 3 3v4M6 12l3-4 4 1 2 3h3M11 15l-2-2"/>',
     more: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
     help: '<circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 014.8.9c0 1.7-2.4 2.2-2.4 3.6"/><circle cx="12" cy="17" r=".6" fill="currentColor"/>',
-    x: '<path d="M6 6l12 12M18 6L6 18"/>'
+    x: '<path d="M6 6l12 12M18 6L6 18"/>',
+    chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+    gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>'
   };
   const svg = (k) => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICON[k] + '</svg>';
 
   const GROUPS = [
-    { items: [{ href: 'home.html', label: '홈', icon: 'home' }, { href: 'weather.html', label: '날씨', icon: 'sun' }] },
-    { title: '기록', items: [
+    { sec: 'home', items: [{ href: 'home.html', label: '홈', icon: 'home' }, { href: 'weather.html', label: '날씨', icon: 'sun' }] },
+    { title: '기록', sec: 'rec', items: [
       { href: 'index.html', label: '할일·습관', icon: 'check' },
       { href: 'money.html', label: '가계부', icon: 'won' },
       { href: 'gift.html', label: '경조사 장부', icon: 'env' },
       { href: 'workout.html', label: '운동 기록', icon: 'run' }
     ] },
-    { title: '우리 집', items: [
+    { title: '우리 집', sec: 'house', items: [
       { href: 'shop.html', label: '장보기', icon: 'cart' },
       { href: 'fridge.html', label: '냉장고', icon: 'fridge' },
       { href: 'chores.html', label: '집안일', icon: 'broom' },
       { href: 'things.html', label: '물건 위치', icon: 'box' },
       { href: 'pet.html', label: '반려동물', icon: 'paw' }
     ] },
-    { title: '사람', items: [
+    { title: '사람', sec: 'people', items: [
       { href: 'dday.html', label: '기념일', icon: 'cake' },
       { href: 'contact.html', label: '연락 챙기기', icon: 'phone' }
     ] },
-    { title: '먹고 즐기기', items: [
+    { title: '먹고 즐기기', sec: 'food', items: [
       { href: 'menu.html', label: '메뉴 추천', icon: 'bowl' },
       { href: 'food.html', label: '맛집 찾기', icon: 'pin' }
     ] },
-    { title: '도구', items: [
+    { title: '도구', sec: 'tool', items: [
       { href: 'calc.html', label: '내 집 마련 계산기', icon: 'house' },
       { href: 'family.html', label: '가족 공유', icon: 'people' }
     ] }
   ];
 
+  // 이 페이지가 어느 묶음인지 → 색 (life.css의 html[data-sec])
+  (function () {
+    const f = (location.pathname.split('/').pop() || 'index.html') || 'index.html';
+    const g = GROUPS.find(g => g.items.some(it => it.href === f));
+    document.documentElement.setAttribute('data-sec', g ? g.sec : 'home');
+  })();
+
   const css = `
   @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css");
-  :root{--ln-bg:#F2F5F2;--ln-surface:#FFFFFF;--ln-fg:#18231D;--ln-muted:#6B7A71;--ln-line:#E3E9E4;--ln-primary:#2B6B57;--ln-soft:#E2EEE8;--ln-mark:#FFE58A;--ln-w:248px;
+  :root{--ln-bg:#F3F4F6;--ln-surface:#FFFFFF;--ln-fg:#191F28;--ln-muted:#6B7684;--ln-line:#E9ECF0;--ln-primary:var(--sec,#2563D9);--ln-soft:var(--sec-soft,#E8F0FD);--ln-mark:#FFE58A;--ln-w:252px;
     --ln-font:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif}
-  html.ln-dark{--ln-bg:#121815;--ln-surface:#1A221E;--ln-fg:#E8EFEA;--ln-muted:#93A59B;--ln-line:#2A3630;--ln-primary:#5DBB98;--ln-soft:#1E3229;--ln-mark:#6B5A12}
+  html.ln-dark{--ln-bg:#101318;--ln-surface:#1A1E25;--ln-fg:#ECEFF3;--ln-muted:#98A2B0;--ln-line:#2B313B;--ln-mark:#6B5A12}
+  .ln-group[data-sec="home"]{--g:#2563D9;--gs:#E8F0FD} .ln-group[data-sec="rec"]{--g:#5B4FD6;--gs:#EEECFC} .ln-group[data-sec="house"]{--g:#0B8A5E;--gs:#E2F5EC}
+  .ln-group[data-sec="people"]{--g:#D6336C;--gs:#FDE8EF} .ln-group[data-sec="food"]{--g:#C2620A;--gs:#FEF0E1} .ln-group[data-sec="tool"]{--g:#4B5768;--gs:#EDF0F4}
+  html.ln-dark .ln-group[data-sec="home"]{--g:#5B9BFF;--gs:#1B2A44} html.ln-dark .ln-group[data-sec="rec"]{--g:#8F86F0;--gs:#262446} html.ln-dark .ln-group[data-sec="house"]{--g:#2FBF86;--gs:#15332A}
+  html.ln-dark .ln-group[data-sec="people"]{--g:#F0679A;--gs:#3A1C29} html.ln-dark .ln-group[data-sec="food"]{--g:#F59A3C;--gs:#3A2A16} html.ln-dark .ln-group[data-sec="tool"]{--g:#9AA6B8;--gs:#262C35}
   .ln-side,.ln-top,.ln-bn,.ln-help,.ln-hs{font-family:var(--ln-font);-webkit-font-smoothing:antialiased}
-  .ln-side{position:fixed;top:0;bottom:0;left:0;width:var(--ln-w);background:var(--ln-bg);border-right:1px solid var(--ln-line);z-index:60;display:flex;flex-direction:column;
+  .ln-side{position:fixed;top:0;bottom:0;left:0;width:var(--ln-w);background:var(--ln-surface);border-right:1px solid var(--ln-line);z-index:60;display:flex;flex-direction:column;
     padding:calc(22px + env(safe-area-inset-top,0px)) 14px calc(16px + env(safe-area-inset-bottom,0px));color:var(--ln-fg);overflow-y:auto}
-  .ln-brand{display:flex;align-items:center;gap:11px;padding:0 8px 22px;text-decoration:none;color:var(--ln-fg)}
+  .ln-brand{display:flex;align-items:center;gap:11px;padding:0 8px 24px;text-decoration:none;color:var(--ln-fg)}
   .ln-brand img{width:36px;height:36px;border-radius:11px}
-  .ln-brand b{display:block;font-size:18px;font-weight:800;letter-spacing:-.03em;line-height:1.2}
+  .ln-brand b{display:block;font-size:19px;font-weight:850;letter-spacing:-.04em;line-height:1.2}
   .ln-brand small{display:block;font-size:12px;color:var(--ln-muted);font-weight:500}
-  .ln-group{display:flex;flex-direction:column;gap:2px;margin-bottom:16px}
-  .ln-gtitle{font-size:12px;font-weight:650;color:var(--ln-muted);padding:4px 12px 6px}
-  .ln-link{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:12px;color:var(--ln-fg);text-decoration:none;font-size:15px;font-weight:550;letter-spacing:-.01em}
-  .ln-link svg{color:var(--ln-muted)}
-  .ln-link:hover{background:var(--ln-surface)}
-  .ln-link[aria-current="page"]{background:var(--ln-surface);font-weight:750;box-shadow:0 1px 2px rgba(24,35,29,.06),0 0 0 1px var(--ln-line)}
-  .ln-link[aria-current="page"] svg{color:var(--ln-primary)}
+  .ln-group{display:flex;flex-direction:column;gap:1px;margin-bottom:14px}
+  .ln-gtitle{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:var(--ln-muted);padding:4px 10px 6px}
+  .ln-gtitle::before{content:"";width:8px;height:8px;border-radius:3px;background:var(--g)}
+  .ln-link{display:flex;align-items:center;gap:11px;padding:6px 10px;border-radius:12px;color:var(--ln-fg);text-decoration:none;font-size:15px;font-weight:550;letter-spacing:-.015em;transition:background .12s}
+  .ln-ic{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:var(--gs);color:var(--g);flex:none}
+  .ln-ic svg{width:18px;height:18px;stroke-width:1.9}
+  .ln-link:hover{background:var(--ln-bg)}
+  .ln-link[aria-current="page"]{background:var(--gs);font-weight:750}
+  .ln-link[aria-current="page"] .ln-ic{background:var(--g);color:#fff}
+  html.ln-dark .ln-link[aria-current="page"] .ln-ic{color:#101318}
   .ln-link:focus-visible,.ln-btn:focus-visible,.ln-top button:focus-visible,.ln-bn a:focus-visible,.ln-bn button:focus-visible,.ln-help:focus-visible{outline:2px solid var(--ln-primary);outline-offset:2px}
   .ln-acc{margin-top:auto;border-top:1px solid var(--ln-line);padding:14px 4px 0;display:grid;gap:9px}
   .ln-who{display:flex;align-items:center;gap:10px;min-width:0}
@@ -97,17 +113,18 @@
   html.ln-dark .ln-btn.ln-install{color:#0C1611}
   .ln-top,.ln-veil,.ln-bn{display:none}
   /* 사용법 버튼 */
-  .ln-help{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--ln-line);background:var(--ln-surface);color:var(--ln-fg);border-radius:999px;padding:6px 12px 6px 9px;font-size:13px;font-weight:650;cursor:pointer;line-height:1}
+  .ln-help{display:inline-flex;align-items:center;gap:5px;border:0;background:var(--ln-surface);color:var(--ln-muted);border-radius:999px;padding:8px 13px 8px 10px;font-size:13px;font-weight:700;cursor:pointer;line-height:1}
+  .ln-help:hover{color:var(--ln-fg)}
   .ln-help svg{width:17px;height:17px;color:var(--ln-primary)}
   .page-head > .ln-help{position:absolute;right:0;top:2px}
   /* 사용법 창 */
-  .ln-hveil{position:fixed;inset:0;background:rgba(15,24,19,.42);z-index:95;display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(2px)}
+  .ln-hveil{position:fixed;inset:0;background:rgba(17,22,30,.45);z-index:95;display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(2px)}
   .ln-hs{background:var(--ln-surface);color:var(--ln-fg);width:100%;max-width:540px;border-radius:24px 24px 0 0;padding:24px 22px calc(26px + env(safe-area-inset-bottom,0px));max-height:86vh;overflow-y:auto;display:grid;gap:16px}
   .ln-hs h2{margin:0;font-size:21px;font-weight:800;letter-spacing:-.03em}
   .ln-hs .ln-hsub{margin:-8px 0 0;color:var(--ln-muted);font-size:14px}
   .ln-hs ol{margin:0;padding:0;list-style:none;counter-reset:s;display:grid;gap:12px}
   .ln-hs ol li{counter-increment:s;display:grid;grid-template-columns:28px 1fr;gap:10px;font-size:14.5px;line-height:1.55}
-  .ln-hs ol li::before{content:counter(s);width:24px;height:24px;border-radius:50%;background:var(--ln-soft);color:var(--ln-primary);font-weight:800;font-size:13px;display:grid;place-items:center;margin-top:1px}
+  .ln-hs ol li::before{content:counter(s);width:24px;height:24px;border-radius:8px;background:var(--ln-soft);color:var(--ln-primary);font-weight:800;font-size:13px;display:grid;place-items:center;margin-top:1px}
   .ln-hs ol li b{font-weight:750}
   .ln-hs .ln-htips{background:var(--ln-bg);border-radius:14px;padding:12px 14px;font-size:13.5px;color:var(--ln-muted);display:grid;gap:6px}
   .ln-hs .ln-htips b{color:var(--ln-fg)}
@@ -120,7 +137,7 @@
   @media (max-width:959.98px){
     .ln-side{transform:translateX(-102%);transition:transform .22s ease;box-shadow:none;background:var(--ln-surface)}
     .ln-side.open{transform:none;box-shadow:0 10px 40px rgba(0,0,0,.25)}
-    .ln-veil.open{display:block;position:fixed;inset:0;background:rgba(15,24,19,.42);z-index:59}
+    .ln-veil.open{display:block;position:fixed;inset:0;background:rgba(17,22,30,.45);z-index:59}
     /* 할일습관 화면용 위쪽 줄 */
     .ln-top{display:flex;position:sticky;top:0;z-index:30;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top,0px)) 14px 8px;background:var(--ln-bg);color:var(--ln-fg)}
     .ln-top button.ln-menu{border:1px solid var(--ln-line);background:var(--ln-surface);color:var(--ln-fg);border-radius:12px;width:40px;height:40px;display:grid;place-items:center;cursor:pointer}
@@ -133,10 +150,24 @@
     .ln-bn a,.ln-bn button{display:grid;justify-items:center;gap:3px;padding:6px 0 4px;border:0;background:transparent;color:var(--ln-muted);text-decoration:none;font:inherit;font-size:11px;font-weight:600;cursor:pointer;border-radius:12px}
     .ln-bn svg{width:23px;height:23px}
     .ln-bn [aria-current="page"]{color:var(--ln-fg);font-weight:800}
+    .ln-bn [aria-current="page"] svg{background:var(--ln-soft);border-radius:10px;padding:3px;width:34px;height:28px;margin:-3px 0 -2px}
     .ln-bn [aria-current="page"] svg{color:var(--ln-primary);stroke-width:2.2}
     html.ln-bnon body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
   }
   @media (prefers-reduced-motion:reduce){.ln-side{transition:none}}
+  `;
+
+  // 할일습관(index.html)을 웹에서 볼 때만 글꼴·테두리·아이콘을 생활노트와 맞춤 (색은 할일습관 설정의 테마를 따름, 안드로이드 앱은 영향 없음)
+  const TODO_SKIN = `
+  html.ln-on body:not(.dark){--text:#191F28;--text-muted:#6B7684;--border:#E9ECF0}
+  html.ln-on body.dark{--text:#ECEFF3;--text-muted:#98A2B0}
+  html.ln-on body{font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;letter-spacing:-.01em}
+  html.ln-on .today-card,html.ln-on .todo-item,html.ln-on .habit-item{border-color:transparent}
+  html.ln-on .empty-box{border:0;background:var(--surface)}
+  html.ln-on .section-title .count{border:0}
+  html.ln-on .quick-bar button{border:0;background:var(--primary-soft)}
+  html.ln-on .nav-btn .ic svg{width:22px;height:22px;display:block}
+  html.ln-on .nav-btn.active .ic{transform:none}
   `;
 
   function isDark() { try { return localStorage.getItem('dark_mode_v1') === '1'; } catch (e) { return false; } }
@@ -287,11 +318,11 @@
     side.className = 'ln-side'; side.setAttribute('aria-label', '생활노트 메뉴');
     let html = '<a class="ln-brand" href="home.html"><img src="icon-192.png" alt=""><span><b>생활노트</b><small>우리 집 생활 수첩</small></span></a>';
     GROUPS.forEach(g => {
-      html += '<div class="ln-group">' + (g.title ? '<div class="ln-gtitle">' + g.title + '</div>' : '');
+      html += '<div class="ln-group" data-sec="' + g.sec + '">' + (g.title ? '<div class="ln-gtitle">' + g.title + '</div>' : '');
       g.items.forEach(it => {
         const on = it.href === cur || (cur.startsWith('index.html') && it.href === 'index.html'); // 할일습관 안의 달력·메모 탭도 '할일·습관'으로 표시
         if (on) curLabel = it.label;
-        html += '<a class="ln-link" href="' + it.href + '"' + (on ? ' aria-current="page"' : '') + '>' + svg(it.icon) + '<span>' + it.label + '</span></a>';
+        html += '<a class="ln-link" href="' + it.href + '"' + (on ? ' aria-current="page"' : '') + '><span class="ln-ic">' + svg(it.icon) + '</span><span>' + it.label + '</span></a>';
       });
       html += '</div>';
     });
@@ -314,6 +345,11 @@
       bn.querySelector('button').addEventListener('click', open);
       document.body.appendChild(bn);
       if (HELP[pageFile()]) pageHead.appendChild(helpButton());
+      // 제목 왼쪽 메뉴 색 아이콘 타일
+      const f = pageFile(); let ic = 'home';
+      GROUPS.forEach(g => g.items.forEach(it => { if (it.href === f) ic = it.icon; }));
+      const tile = document.createElement('span'); tile.className = 'ln-ptile'; tile.setAttribute('aria-hidden', 'true'); tile.innerHTML = svg(ic);
+      pageHead.prepend(tile); pageHead.classList.add('ln-tiled');
     } else {
       // 할일습관 화면: 자기 아래 탭이 있으니 위쪽 줄에 메뉴 버튼과 사용법
       const top = document.createElement('div'); top.className = 'ln-top';
@@ -325,7 +361,15 @@
       // PC에서는 위쪽 줄이 없으니 머리 부분에 사용법을 붙임
       const hdr = document.querySelector('.header');
       if (hdr && HELP[pageFile()]) { const hb = helpButton(); hb.classList.add('ln-help-pc'); hdr.appendChild(hb); }
-      const st2 = document.createElement('style'); st2.textContent = '@media (max-width:959.98px){.ln-help-pc{display:none!important}}'; document.head.appendChild(st2);
+      const st2 = document.createElement('style'); st2.textContent = '@media (max-width:959.98px){.ln-help-pc{display:none!important}}' + TODO_SKIN; document.head.appendChild(st2);
+      // 할일습관 아래 탭: 이모지 대신 선 아이콘 (웹에서만, 앱은 그대로)
+      const NAVIC = { checklist: 'check', calendar: 'cal', notes: 'note', stats: 'chart', settings: 'gear' };
+      const swapIcons = () => document.querySelectorAll('#bottom-nav-inner .nav-btn').forEach(b => {
+        const ic = b.querySelector('.ic'), k = NAVIC[b.getAttribute('data-tab')];
+        if (ic && k && !ic.querySelector('svg')) ic.innerHTML = svg(k);
+      });
+      const nav = document.getElementById('bottom-nav-inner');
+      if (nav) { swapIcons(); new MutationObserver(swapIcons).observe(nav, { childList: true, subtree: true }); }
     }
 
     document.body.appendChild(veil);
