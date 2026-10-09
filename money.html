@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>가계부 · 생활노트</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<meta name="theme-color" content="#2F6F5E" />
+<link rel="stylesheet" href="life.css" />
+<script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
+<style>
+  .month-nav{display:flex;align-items:center;gap:6px}
+  .month-nav b{font-size:18px;font-weight:800;min-width:118px;text-align:center}
+  .amount-input{font-size:22px!important;font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
+  .cat-row{display:grid;grid-template-columns:110px 1fr auto;gap:10px;align-items:center;font-size:14px}
+  .cat-row .bar{height:10px}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none}
+  .day-head{display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:var(--muted);padding:14px 2px 4px;border-bottom:1px solid var(--line)}
+  .tx{cursor:pointer}
+  .tx:hover{background:var(--surface2)}
+  .tx .amt{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .tx .amt.in{color:var(--good)}
+  .quick-amts{display:flex;gap:6px;flex-wrap:wrap}
+  @media (max-width:420px){.cat-row{grid-template-columns:86px 1fr auto}}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="page-head">
+    <span class="date" id="today"></span>
+    <h1>가계부</h1>
+    <p>쓴 돈을 바로바로 적어두면 한 달 흐름이 보여요.</p>
+  </header>
+
+  <section class="card" aria-labelledby="add-title">
+    <div class="card-head">
+      <h2 id="add-title">빠르게 적기</h2>
+      <div class="seg" role="group" aria-label="수입·지출">
+        <button type="button" id="t-out" aria-pressed="true">지출</button>
+        <button type="button" id="t-in" aria-pressed="false">수입</button>
+      </div>
+    </div>
+    <form id="add-form" class="stack" autocomplete="off">
+      <label class="field"><span class="label">금액 (원)</span>
+        <input class="amount-input" id="f-amount" type="text" inputmode="numeric" placeholder="0" required /></label>
+      <div class="quick-amts" id="quick-amts"></div>
+      <div class="field"><span class="label">분류</span><div class="chips" id="f-cats"></div></div>
+      <div class="grid2" style="gap:10px">
+        <label class="field"><span class="label">내용</span><input id="f-memo" type="text" maxlength="60" placeholder="예: 점심 김치찌개" /></label>
+        <label class="field"><span class="label">날짜</span><input id="f-date" type="date" /></label>
+      </div>
+      <div class="row"><button class="btn primary" type="submit">저장</button><span class="small muted" id="add-hint"></span></div>
+    </form>
+  </section>
+
+  <section class="card" aria-labelledby="sum-title">
+    <div class="card-head">
+      <div class="month-nav">
+        <button class="btn sm" type="button" id="prev" aria-label="이전 달">◀</button>
+        <b id="month-label" class="num"></b>
+        <button class="btn sm" type="button" id="next" aria-label="다음 달">▶</button>
+      </div>
+      <button class="btn sm soft" type="button" id="budget-btn">예산 정하기</button>
+    </div>
+    <h2 id="sum-title" class="small muted" style="font-weight:700">이번 달 요약</h2>
+    <div class="stat-row">
+      <div class="stat"><span class="label">쓴 돈</span><b id="s-out">0원</b></div>
+      <div class="stat"><span class="label">들어온 돈</span><b id="s-in">0원</b></div>
+      <div class="stat"><span class="label">하루 평균 지출</span><b id="s-avg">0원</b></div>
+      <div class="stat"><span class="label">지난달보다</span><b id="s-diff">-</b></div>
+    </div>
+    <div id="budget-box" class="stack"></div>
+  </section>
+
+  <section class="card" aria-labelledby="cat-title">
+    <h2 id="cat-title">어디에 많이 썼나</h2>
+    <div id="cats" class="stack"></div>
+  </section>
+
+  <section class="card" aria-labelledby="list-title">
+    <div class="card-head"><h2 id="list-title">내역</h2>
+      <select id="filter" style="width:auto" aria-label="분류로 거르기"><option value="">전체 분류</option></select></div>
+    <div id="list"></div>
+  </section>
+</main>
+
+<script src="firebase.js"></script>
+<script src="sync.js"></script>
+<script src="life-config.js"></script>
+<script src="life.js"></script>
+<script src="shell.js"></script>
+<script>
+(function () {
+  const { h, today, won, prettyDate, toast, sheet } = Life;
+  const S = Life.store('money');
+  const CATS = [
+    ['식비', '#E8734A'], ['카페·간식', '#C88400'], ['장보기', '#2E8B57'], ['교통', '#0072B2'], ['생활·주거', '#5B5FC7'],
+    ['쇼핑', '#B8558F'], ['의료·건강', '#C1543D'], ['반려동물', '#8A6D3B'], ['문화·여가', '#009E73'], ['경조사', '#7A7F87'], ['기타', '#9AA59E']
+  ];
+  const IN_CATS = [['월급', '#2E8B57'], ['용돈·부수입', '#009E73'], ['환급·기타', '#9AA59E']];
+  const color = c => (CATS.concat(IN_CATS).find(x => x[0] === c) || [, '#9AA59E'])[1];
+  let kind = 'out', cat = '식비', ym = today().slice(0, 7);
+
+  const $ = id => document.getElementById(id);
+  $('today').textContent = prettyDate(today());
+  $('f-date').value = today();
+
+  /* 입력 */
+  const parseAmt = v => parseInt(String(v).replace(/[^\d]/g, ''), 10) || 0;
+  $('f-amount').addEventListener('input', e => { const n = parseAmt(e.target.value); e.target.value = n ? n.toLocaleString('ko-KR') : ''; });
+  [5000, 10000, 30000, 50000].forEach(n => $('quick-amts').append(h('button', { type: 'button', class: 'chip', onclick: () => { $('f-amount').value = (parseAmt($('f-amount').value) + n).toLocaleString('ko-KR'); } }, '+' + (n / 10000 >= 1 ? n / 10000 + '만' : n / 1000 + '천'))));
+  function drawCats() {
+    const list = kind === 'out' ? CATS : IN_CATS;
+    if (!list.some(c => c[0] === cat)) cat = list[0][0];
+    $('f-cats').replaceChildren(...list.map(([c]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(c === cat), onclick: () => { cat = c; drawCats(); } }, c)));
+  }
+  function setKind(k) { kind = k; $('t-out').setAttribute('aria-pressed', String(k === 'out')); $('t-in').setAttribute('aria-pressed', String(k === 'in')); drawCats(); }
+  $('t-out').onclick = () => setKind('out'); $('t-in').onclick = () => setKind('in');
+  $('add-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const amount = parseAmt($('f-amount').value);
+    if (!amount) { toast('금액을 넣어 주세요'); $('f-amount').focus(); return; }
+    const date = $('f-date').value || today();
+    S.put({ kind, amount, cat, memo: $('f-memo').value.trim(), date });
+    toast(won(amount) + ' ' + (kind === 'out' ? '지출' : '수입') + ' 저장했어요');
+    $('f-amount').value = ''; $('f-memo').value = '';
+    ym = date.slice(0, 7); render();
+  });
+
+  /* 달 이동 */
+  function shift(n) { const [y, m] = ym.split('-').map(Number); const d = new Date(y, m - 1 + n, 1); ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); render(); }
+  $('prev').onclick = () => shift(-1); $('next').onclick = () => shift(1);
+
+  /* 예산 */
+  $('budget-btn').onclick = () => {
+    const inp = h('input', { type: 'text', inputmode: 'numeric', class: 'amount-input', value: (S.meta().budget || '') ? Number(S.meta().budget).toLocaleString('ko-KR') : '', placeholder: '예: 1,500,000' });
+    inp.addEventListener('input', () => { const n = parseAmt(inp.value); inp.value = n ? n.toLocaleString('ko-KR') : ''; });
+    const close = sheet('한 달 예산', h('div', { class: 'stack' },
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '매달 쓸 수 있는 돈 (지출 기준)'), inp),
+      h('p', { class: 'small muted' }, '비워두고 저장하면 예산을 끄게 돼요.'),
+      h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => { S.setMeta({ budget: parseAmt(inp.value) || 0 }); close(); toast('예산을 저장했어요'); } }, '저장'))));
+  };
+
+  /* 수정 */
+  function edit(t) {
+    const amt = h('input', { type: 'text', inputmode: 'numeric', class: 'amount-input', value: t.amount.toLocaleString('ko-KR') });
+    amt.addEventListener('input', () => { const n = parseAmt(amt.value); amt.value = n ? n.toLocaleString('ko-KR') : ''; });
+    const list = t.kind === 'in' ? IN_CATS : CATS;
+    const sel = h('select', {}, list.map(([c]) => h('option', { value: c, selected: c === t.cat }, c)));
+    const memo = h('input', { type: 'text', maxlength: '60', value: t.memo || '' });
+    const date = h('input', { type: 'date', value: t.date });
+    let armed = false;
+    const del = h('button', { class: 'btn ghost', type: 'button', onclick: () => {
+      if (!armed) { armed = true; del.textContent = '한 번 더 누르면 삭제'; del.style.color = 'var(--danger)'; return; }
+      S.remove(t.id); close(); toast('삭제했어요');
+    } }, '삭제');
+    const close = sheet('내역 고치기', h('div', { class: 'stack' },
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '금액'), amt),
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '분류'), sel),
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '내용'), memo),
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '날짜'), date),
+      h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => {
+        const a = parseAmt(amt.value); if (!a) { toast('금액을 넣어 주세요'); return; }
+        S.put(Object.assign({}, t, { amount: a, cat: sel.value, memo: memo.value.trim(), date: date.value || t.date })); close(); toast('고쳤어요');
+      } }, '저장'), h('span', { class: 'spacer' }), del)));
+  }
+
+  /* 그리기 */
+  function monthItems(m) { return S.items().filter(t => (t.date || '').slice(0, 7) === m); }
+  function prevYm(m) { const [y, mm] = m.split('-').map(Number); const d = new Date(y, mm - 2, 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+  function render() {
+    const [y, m] = ym.split('-').map(Number);
+    $('month-label').textContent = y + '년 ' + m + '월';
+    const items = monthItems(ym);
+    const out = items.filter(t => t.kind !== 'in').reduce((s, t) => s + t.amount, 0);
+    const inc = items.filter(t => t.kind === 'in').reduce((s, t) => s + t.amount, 0);
+    const isCur = ym === today().slice(0, 7);
+    const days = isCur ? new Date().getDate() : new Date(y, m, 0).getDate();
+    $('s-out').textContent = won(out); $('s-in').textContent = won(inc);
+    $('s-avg').textContent = won(days ? out / days : 0);
+    const prevOut = monthItems(prevYm(ym)).filter(t => t.kind !== 'in').reduce((s, t) => s + t.amount, 0);
+    $('s-diff').textContent = prevOut ? (out >= prevOut ? '+' : '−') + won(Math.abs(out - prevOut)) : '-';
+
+    const budget = Number(S.meta().budget) || 0;
+    const bb = $('budget-box'); bb.replaceChildren();
+    if (budget) {
+      const pct = Math.min(100, Math.round(out / budget * 100));
+      const left = budget - out;
+      let line = left >= 0 ? '예산 ' + won(budget) + ' 중 ' + won(left) + ' 남았어요' : '예산보다 ' + won(-left) + ' 더 썼어요';
+      if (isCur && left > 0) { const remainDays = new Date(y, m, 0).getDate() - new Date().getDate() + 1; line += ' · 남은 ' + remainDays + '일 동안 하루 ' + won(left / remainDays); }
+      bb.append(h('div', { class: 'bar' + (left < 0 ? ' over' : ''), role: 'img', 'aria-label': '예산 사용 ' + pct + '%' }, h('i', { style: 'width:' + pct + '%' })), h('p', { class: 'small' + (left < 0 ? '' : ' muted') }, line));
+    }
+
+    // 분류별
+    const by = {};
+    items.filter(t => t.kind !== 'in').forEach(t => { by[t.cat] = (by[t.cat] || 0) + t.amount; });
+    const rows = Object.entries(by).sort((a, b) => b[1] - a[1]);
+    const top = rows.length ? rows[0][1] : 0;
+    $('cats').replaceChildren(...(rows.length ? rows.map(([c, v]) => h('div', { class: 'cat-row' },
+      h('span', { class: 'row', style: 'gap:6px;flex-wrap:nowrap' }, h('i', { class: 'dot', style: 'background:' + color(c) }), c),
+      h('div', { class: 'bar' }, h('i', { style: 'width:' + Math.max(3, v / top * 100) + '%;background:' + color(c) })),
+      h('span', { class: 'num small' }, won(v) + ' · ' + Math.round(v / out * 100) + '%'))) : [h('p', { class: 'empty' }, '이 달에 적은 지출이 없어요.')]));
+
+    // 거르기
+    const f = $('filter'); const fv = f.value;
+    const usedCats = [...new Set(items.map(t => t.cat))];
+    f.replaceChildren(h('option', { value: '' }, '전체 분류'), ...usedCats.map(c => h('option', { value: c, selected: c === fv }, c)));
+    const shown = items.filter(t => !f.value || t.cat === f.value).sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0));
+    const list = $('list'); list.replaceChildren();
+    if (!shown.length) { list.append(h('p', { class: 'empty' }, '위 "빠르게 적기"에 금액을 넣고 저장하면 여기에 쌓여요.')); return; }
+    let curDay = null, ul = null;
+    shown.forEach(t => {
+      if (t.date !== curDay) {
+        curDay = t.date;
+        const dayOut = shown.filter(x => x.date === curDay && x.kind !== 'in').reduce((s, x) => s + x.amount, 0);
+        list.append(h('div', { class: 'day-head' }, h('span', {}, prettyDate(curDay)), h('span', { class: 'num' }, dayOut ? '−' + won(dayOut) : '')));
+        ul = h('ul', { class: 'list' }); list.append(ul);
+      }
+      ul.append(h('li', { class: 'tx', tabindex: '0', role: 'button', 'aria-label': t.cat + ' ' + won(t.amount) + ' 고치기', onclick: () => edit(t), onkeydown: e => { if (e.key === 'Enter') edit(t); } },
+        h('i', { class: 'dot', style: 'background:' + color(t.cat) }),
+        h('div', { class: 'grow' }, h('div', { style: 'font-weight:600' }, t.memo || t.cat), t.memo ? h('div', { class: 'tiny muted' }, t.cat) : null),
+        h('span', { class: 'amt' + (t.kind === 'in' ? ' in' : '') }, (t.kind === 'in' ? '+' : '−') + won(t.amount))));
+    });
+  }
+  $('filter').onchange = render;
+  drawCats();
+  S.subscribe(render);
+  render();
+})();
+</script>
+</body>
+</html>

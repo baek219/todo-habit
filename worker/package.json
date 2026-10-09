@@ -1,0 +1,22 @@
+{
+  "name": "life-note-worker",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "build": "node build.mjs",
+    "deploy": "node build.mjs && wrangler deploy"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.132.1",
+    "jose": "^6.2.12"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "wrangler": "^4.149.0"
+  },
+  "private": true,
+  "type": "module"
+}

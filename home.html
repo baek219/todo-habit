@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>생활노트</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<meta name="theme-color" content="#2F6F5E" />
+<link rel="stylesheet" href="life.css" />
+<script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
+<style>
+  .hello{display:grid;gap:6px}
+  .hello h1{font-size:26px}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+  .tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:grid;gap:10px;align-content:start;min-width:0}
+  .tile-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .tile-head h2{font-size:16px}
+  .tile-head a{font-size:13px;font-weight:700;text-decoration:none}
+  .big{font-size:28px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+  .mini{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:14px}
+  .mini li{display:flex;gap:8px;align-items:center;min-width:0}
+  .mini li span.t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .login-card{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="page-head hello">
+    <span class="date" id="today"></span>
+    <h1 id="hello">오늘도 좋은 하루 보내세요</h1>
+  </header>
+
+  <section class="card login-card" id="login-card" hidden>
+    <div class="stack" style="gap:2px"><b>Google로 로그인하면</b><span class="small muted">폰·PC·안드로이드 앱의 할일과 모든 기록이 자동으로 맞춰지고, 맛집 검색과 AI 메뉴 추천을 쓸 수 있어요.</span></div>
+    <button class="btn primary" type="button" id="login-btn">Google로 로그인</button>
+  </section>
+
+  <div class="tiles">
+    <section class="tile">
+      <div class="tile-head"><h2>오늘 할 일</h2><a href="index.html">열기 →</a></div>
+      <div class="row" style="gap:18px"><div><span class="label">남은 할 일</span><div class="big" id="t-left">0</div></div><div><span class="label">오늘 습관</span><div class="big" id="t-habit">0/0</div></div></div>
+      <ul class="mini" id="t-list"></ul>
+    </section>
+
+    <section class="tile">
+      <div class="tile-head"><h2>이번 달 지출</h2><a href="money.html">가계부 →</a></div>
+      <div class="big" id="m-out">0원</div>
+      <div id="m-budget" class="stack" style="gap:6px"></div>
+      <span class="small muted" id="m-today"></span>
+    </section>
+
+    <section class="tile">
+      <div class="tile-head"><h2>오늘 뭐 먹지?</h2><a href="menu.html">추천받기 →</a></div>
+      <ul class="mini" id="f-menu"></ul>
+      <div class="row"><a class="btn sm soft" href="menu.html">메뉴 추천</a><a class="btn sm" href="food.html">맛집 찾기</a></div>
+    </section>
+
+    <section class="tile">
+      <div class="tile-head"><h2>반려동물 일정</h2><a href="pet.html">수첩 →</a></div>
+      <ul class="mini" id="p-list"></ul>
+    </section>
+
+    <section class="tile">
+      <div class="tile-head"><h2>내 맛집</h2><a href="food.html?tab=mine">모두 보기 →</a></div>
+      <ul class="mini" id="r-list"></ul>
+    </section>
+
+    <section class="tile">
+      <div class="tile-head"><h2>로또</h2><a href="lotto.html">번호 뽑기 →</a></div>
+      <ul class="mini" id="l-list"></ul>
+    </section>
+  </div>
+</main>
+
+<script src="firebase.js"></script>
+<script src="sync.js"></script>
+<script src="life-config.js"></script>
+<script src="life.js"></script>
+<script src="shell.js"></script>
+<script>
+(function () {
+  const { h, today, won, prettyDate, daysBetween } = Life;
+  const $ = id => document.getElementById(id);
+  const t = today();
+  $('today').textContent = prettyDate(t);
+  const money = Life.store('money'), meals = Life.store('meals'), pets = Life.store('pets'), petlog = Life.store('petlog'), food = Life.store('food'), lotto = Life.store('lotto');
+
+  // 할일습관 앱이 이 기기에 저장해 둔 기록을 읽어요 (로그인하면 클라우드와 맞춰짐)
+  function todoInfo() {
+    let tasks = []; try { tasks = JSON.parse(localStorage.getItem('todo_habit_tasks_v3') || '[]') || []; } catch (e) {}
+    const monIdx = (new Date().getDay() + 6) % 7, dom = new Date().getDate();
+    const todos = tasks.filter(x => x.type === 'todo' && !x.repeat && !x.done && x.dueDate && x.dueDate <= t)
+      .sort((a, b) => (b.important ? 1 : 0) - (a.important ? 1 : 0) || a.dueDate.localeCompare(b.dueDate));
+    const habits = tasks.filter(x => x.type === 'habit' && !(x.startDate && t < x.startDate) && (x.frequency === 'daily' || (x.frequency === 'monthly' ? (x.monthDay || 1) === dom : (x.repeatDays || []).includes(monIdx))));
+    const done = habits.filter(x => (x.completedDates || []).includes(t));
+    return { todos, habits, done };
+  }
+
+  function render() {
+    const u = Life.user();
+    $('hello').textContent = (u && u.displayName ? u.displayName.split(' ')[0] + '님, ' : '') + '오늘도 좋은 하루 보내세요';
+    $('login-card').hidden = !!u || !(window.CloudSync && window.CloudSync.ready);
+
+    const ti = todoInfo();
+    $('t-left').textContent = ti.todos.length;
+    $('t-habit').textContent = ti.done.length + '/' + ti.habits.length;
+    $('t-list').replaceChildren(...(ti.todos.length ? ti.todos.slice(0, 4).map(x => h('li', {}, x.important ? h('span', { class: 'badge warn' }, '중요') : null, h('span', { class: 't' }, x.title), x.dueDate < t ? h('span', { class: 'badge bad' }, '밀림') : null))
+      : [h('li', { class: 'muted' }, ti.habits.length ? '오늘까지 할 일은 다 했어요.' : '할일·습관에서 첫 할 일을 적어 보세요.')]));
+
+    const ym = t.slice(0, 7);
+    const items = money.items().filter(x => (x.date || '').slice(0, 7) === ym && x.kind !== 'in');
+    const out = items.reduce((s, x) => s + x.amount, 0);
+    const todayOut = items.filter(x => x.date === t).reduce((s, x) => s + x.amount, 0);
+    $('m-out').textContent = won(out);
+    $('m-today').textContent = '오늘 ' + won(todayOut) + ' 썼어요';
+    const budget = Number(money.meta().budget) || 0;
+    $('m-budget').replaceChildren(...(budget ? [h('div', { class: 'bar' + (out > budget ? ' over' : '') }, h('i', { style: 'width:' + Math.min(100, out / budget * 100) + '%' })),
+      h('span', { class: 'small muted' }, out <= budget ? '예산까지 ' + won(budget - out) + ' 남음' : '예산보다 ' + won(out - budget) + ' 넘음')] : [h('span', { class: 'small muted' }, '가계부에서 예산을 정하면 남은 돈이 보여요.')]));
+
+    const m = meals.items().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 3);
+    $('f-menu').replaceChildren(...(m.length ? m.map(x => h('li', {}, h('span', { class: 't' }, x.menu), h('span', { class: 'tiny muted' }, prettyDate(x.date)))) : [h('li', { class: 'muted' }, '최근에 정한 메뉴가 없어요.')]));
+
+    const pl = petlog.items(), all = pl.filter(r => r.next && pets.get(r.petId) && daysBetween(t, r.next) >= -14 && !pl.some(o => o.petId === r.petId && o.type === r.type && o.date >= r.next && o.id !== r.id))
+      .sort((a, b) => a.next.localeCompare(b.next)).slice(0, 4);
+    $('p-list').replaceChildren(...(all.length ? all.map(r => { const n = daysBetween(t, r.next);
+      return h('li', {}, h('span', { class: 'badge ' + (n < 0 ? 'bad' : n <= 7 ? 'warn' : 'go') }, n === 0 ? '오늘' : n > 0 ? 'D-' + n : -n + '일 지남'), h('span', { class: 't' }, pets.get(r.petId).name + ' · ' + r.type)); })
+      : [h('li', { class: 'muted' }, pets.items().length ? '다가오는 일정이 없어요.' : '반려동물 수첩에서 아이를 등록해 보세요.')]));
+
+    const f = food.items();
+    const want = f.filter(x => x.status !== 'been').slice(-3).reverse();
+    $('r-list').replaceChildren(h('li', {}, h('span', { class: 't' }, '가볼 곳 ' + f.filter(x => x.status !== 'been').length + '곳 · 가본 곳 ' + f.filter(x => x.status === 'been').length + '곳')),
+      ...want.map(x => h('li', {}, h('span', { class: 'badge warn' }, '가볼 곳'), h('span', { class: 't' }, x.name))));
+
+    const saved = lotto.items().filter(x => x.t === 'saved');
+    $('l-list').replaceChildren(h('li', {}, h('span', { class: 't' }, saved.length ? '저장한 번호 ' + saved.length + '게임' : '아직 저장한 번호가 없어요.')));
+  }
+  [money, meals, pets, petlog, food, lotto].forEach(s => s.subscribe(render));
+  window.addEventListener('cloudsync', render);
+  window.addEventListener('storage', e => { if (e.key === 'todo_habit_tasks_v3') render(); });
+  $('login-btn').onclick = () => Life.signIn();
+  // 할일 기록이 클라우드에서 새로 들어오면 다시 그림
+  if (window.CloudSync) window.CloudSync.onRemoteApplied = render;
+  render();
+})();
+</script>
+</body>
+</html>

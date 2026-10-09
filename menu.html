@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>메뉴 추천 · 생활노트</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<meta name="theme-color" content="#2F6F5E" />
+<link rel="stylesheet" href="life.css" />
+<script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
+<style>
+  .results{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+  .mcard{border:1.5px solid var(--line);border-radius:14px;padding:14px;display:grid;gap:8px;background:var(--surface2);align-content:start}
+  .mcard h3{font-size:22px}
+  .mcard .why{font-size:14px}
+  .src{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--muted)}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .top3{display:flex;gap:8px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="page-head">
+    <span class="date" id="today"></span>
+    <h1>오늘 뭐 먹지?</h1>
+    <p>조건을 고르면 메뉴 3가지를 골라드려요. 마음에 들면 근처 맛집까지 바로 찾아볼 수 있어요.</p>
+  </header>
+
+  <section class="card" aria-label="조건">
+    <div class="field"><span class="label">끼니</span><div class="chips" data-g="meal" data-one></div></div>
+    <div class="field"><span class="label">누구랑</span><div class="chips" data-g="with" data-one></div></div>
+    <div class="field"><span class="label">기분·컨디션 (여러 개)</span><div class="chips" data-g="moods"></div></div>
+    <div class="field"><span class="label">날씨</span><div class="chips" data-g="weather" data-one></div></div>
+    <div class="field"><span class="label">먹는 방법</span><div class="chips" data-g="how" data-one></div></div>
+    <div class="grid2" style="gap:10px">
+      <label class="field"><span class="label">1인 예산</span>
+        <select id="budget"><option>상관없음</option><option>1만원 이하</option><option selected>1~2만원</option><option>2~3만원</option><option>3만원 이상</option></select></label>
+      <label class="field"><span class="label">빼고 싶은 것</span><input id="avoid" type="text" maxlength="60" placeholder="예: 회, 오이, 너무 매운 것" /></label>
+    </div>
+    <div class="actions">
+      <button class="btn primary" type="button" id="ai-btn">AI에게 추천받기</button>
+      <button class="btn" type="button" id="rule-btn">조건으로 바로 뽑기</button>
+      <span class="small muted" id="ai-left"></span>
+    </div>
+    <p class="note" id="ai-note" hidden></p>
+  </section>
+
+  <section class="card" aria-labelledby="res-title">
+    <h2 id="res-title">추천 결과</h2>
+    <div class="results" id="results"><p class="empty">조건을 고르고 위 버튼을 눌러 보세요. "조건으로 바로 뽑기"는 로그인 없이도 돼요.</p></div>
+  </section>
+
+  <section class="card" aria-labelledby="hist-title">
+    <div class="card-head"><h2 id="hist-title">최근에 정한 메뉴</h2><span class="small muted">최근 메뉴는 다음 추천에서 빠져요</span></div>
+    <div class="top3" id="top3"></div>
+    <ul class="list" id="hist"></ul>
+  </section>
+</main>
+
+<script src="firebase.js"></script>
+<script src="sync.js"></script>
+<script src="life-config.js"></script>
+<script src="life.js"></script>
+<script src="shell.js"></script>
+<script>
+(function () {
+  const { h, today, prettyDate, toast } = Life;
+  const S = Life.store('meals');
+  const $ = id => document.getElementById(id);
+  $('today').textContent = prettyDate(today());
+
+  const GROUPS = {
+    meal: ['아침', '점심', '저녁', '야식'],
+    with: ['혼자', '둘이서', '친구·동료', '가족 모임'],
+    moods: ['든든하게', '가볍게', '매콤하게', '국물', '고기', '해장', '새로운 거', '다이어트'],
+    weather: ['맑음', '비', '추움', '더움'],
+    how: ['매장', '배달', '포장']
+  };
+  const hr = new Date().getHours();
+  const DEFAULTS = { meal: hr < 10 ? '아침' : hr < 15 ? '점심' : hr < 21 ? '저녁' : '야식', with: '둘이서' };
+
+  /* 조건 칩 */
+  document.querySelectorAll('[data-g]').forEach(box => {
+    const g = box.dataset.g, one = box.hasAttribute('data-one');
+    GROUPS[g].forEach(v => box.append(h('button', { type: 'button', class: 'chip', 'aria-pressed': String(DEFAULTS[g] === v), onclick: e => {
+      const b = e.currentTarget, on = b.getAttribute('aria-pressed') === 'true';
+      if (one) box.querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', 'false'));
+      b.setAttribute('aria-pressed', String(!on));
+    } }, v)));
+  });
+  const pick = g => [...document.querySelectorAll('[data-g="' + g + '"] .chip[aria-pressed="true"]')].map(b => b.textContent);
+  const one = g => pick(g)[0] || '';
+
+  /* 규칙 기반 추천용 메뉴 목록 — t: 특징, w: 잘 어울리는 날씨, p: 1인 가격대(1 저렴 ~ 3 비쌈), m: 어울리는 끼니 */
+  const MENU = [
+    ['김치찌개', '한식', '국물 매콤하게 든든하게', '비 추움', 1], ['된장찌개', '한식', '국물 든든하게 가볍게', '비 추움', 1], ['순두부찌개', '한식', '국물 매콤하게', '비 추움', 1],
+    ['부대찌개', '한식', '국물 매콤하게 든든하게', '비 추움', 2], ['감자탕', '한식', '국물 고기 든든하게 해장', '비 추움', 2], ['뼈해장국', '한식', '국물 해장 든든하게', '추움', 1],
+    ['순대국', '한식', '국물 해장 든든하게', '추움 비', 1], ['설렁탕', '한식', '국물 해장 가볍게', '추움', 1], ['갈비탕', '한식', '국물 고기 든든하게', '추움', 2],
+    ['칼국수', '한식', '국물 가볍게', '비', 1], ['수제비', '한식', '국물 가볍게', '비', 1], ['물냉면', '한식', '가볍게', '더움', 1], ['비빔냉면', '한식', '매콤하게', '더움', 1],
+    ['막국수', '한식', '가볍게 다이어트', '더움', 1], ['콩국수', '한식', '가볍게', '더움', 1], ['비빔밥', '한식', '가볍게 다이어트', '맑음', 1], ['제육볶음', '한식', '매콤하게 고기 든든하게', '맑음', 1],
+    ['쭈꾸미볶음', '한식', '매콤하게 새로운 거', '맑음 비', 2], ['닭갈비', '고기', '매콤하게 고기 든든하게', '맑음', 2], ['찜닭', '한식', '고기 든든하게', '비', 2],
+    ['닭볶음탕', '한식', '매콤하게 고기 국물', '비 추움', 2], ['삼겹살', '고기', '고기 든든하게', '맑음 비', 2], ['목살 구이', '고기', '고기 든든하게', '맑음', 2], ['소고기 구이', '고기', '고기 든든하게', '맑음', 3],
+    ['곱창·막창', '고기', '고기 새로운 거', '비', 3], ['족발', '고기', '고기 든든하게', '맑음', 3], ['보쌈', '고기', '고기 든든하게', '맑음', 3], ['치킨', '고기', '고기 든든하게', '맑음 비', 2],
+    ['양꼬치', '고기', '고기 새로운 거', '맑음', 2], ['샤브샤브', '한식', '국물 가볍게 다이어트', '추움 비', 2], ['아구찜', '한식', '매콤하게 새로운 거', '맑음', 3],
+    ['짜장면', '중식', '든든하게', '비', 1], ['짬뽕', '중식', '국물 매콤하게 해장', '비 추움', 1], ['탕수육', '중식', '고기 든든하게', '비', 2], ['마라탕', '중식', '국물 매콤하게 새로운 거', '추움 비', 2],
+    ['마라샹궈', '중식', '매콤하게 새로운 거', '맑음', 2], ['돈까스', '일식', '든든하게', '맑음', 1], ['초밥', '일식', '가볍게', '맑음 더움', 3], ['라멘', '일식', '국물 든든하게', '추움 비', 2],
+    ['우동', '일식', '국물 가볍게', '추움 비', 1], ['규동', '일식', '고기 든든하게', '맑음', 1], ['회덮밥', '일식', '가볍게 다이어트', '더움', 2], ['쌀국수', '아시안', '국물 해장 가볍게', '비 추움', 1],
+    ['팟타이', '아시안', '새로운 거', '맑음', 2], ['분짜', '아시안', '가볍게 새로운 거', '더움', 2], ['카레', '아시안', '든든하게', '비', 1], ['떡볶이', '분식', '매콤하게', '비 추움', 1],
+    ['김밥', '분식', '가볍게', '맑음', 1], ['라볶이', '분식', '매콤하게', '비', 1], ['파스타', '양식', '새로운 거', '맑음', 2], ['피자', '양식', '든든하게', '맑음 비', 2],
+    ['수제버거', '양식', '고기 든든하게', '맑음', 2], ['샐러드', '양식', '가볍게 다이어트', '더움 맑음', 1], ['포케', '양식', '가볍게 다이어트 새로운 거', '더움', 2],
+    ['샌드위치', '양식', '가볍게', '맑음', 1], ['죽', '한식', '가볍게 해장', '추움', 1], ['토스트', '분식', '가볍게', '맑음', 1], ['국밥', '한식', '국물 해장 든든하게', '추움 비', 1]
+  ].map(([menu, kind, t, w, p]) => ({ menu, kind, t: t.split(' '), w: w.split(' '), p }));
+  const MORNING_OK = ['김밥', '토스트', '샌드위치', '죽', '설렁탕', '국밥', '된장찌개', '순두부찌개', '우동', '샐러드', '뼈해장국', '순대국', '쌀국수'];
+  const NIGHT_GOOD = ['치킨', '족발', '보쌈', '곱창·막창', '떡볶이', '라볶이', '피자', '양꼬치', '마라탕', '짬뽕'];
+
+  function recent() { return S.items().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 7).map(x => x.menu); }
+
+  function ruleRecommend() {
+    const moods = pick('moods'), wx = one('weather'), meal = one('meal'), budget = $('budget').value;
+    const avoid = $('avoid').value.split(/[,\s]+/).map(s => s.trim()).filter(s => s.length >= 1);
+    const maxP = budget === '1만원 이하' ? 1 : budget === '1~2만원' ? 2 : 3;
+    const minP = budget === '3만원 이상' ? 2 : 1;
+    const rec = new Set(recent());
+    const scored = MENU.filter(m => !rec.has(m.menu) && m.p <= maxP && m.p >= minP && !avoid.some(a => m.menu.includes(a) || (a.includes('매운') && m.t.includes('매콤하게'))))
+      .filter(m => meal !== '아침' || MORNING_OK.includes(m.menu))
+      .map(m => {
+        let s = Math.random() * 1.5;
+        moods.forEach(md => { if (m.t.includes(md)) s += 2; else if (md !== '새로운 거') s -= 0.5; });
+        if (wx && m.w.includes(wx)) s += 1.2;
+        if (meal === '야식' && NIGHT_GOOD.includes(m.menu)) s += 1.5;
+        if (one('with') === '가족 모임' && m.p >= 2) s += 0.6;
+        if (one('how') === '배달' && ['치킨', '피자', '족발', '보쌈', '짜장면', '짬뽕', '탕수육', '떡볶이', '마라탕'].includes(m.menu)) s += 0.8;
+        return { m, s };
+      }).sort((a, b) => b.s - a.s);
+    const out = [], kinds = new Set();
+    for (const { m } of scored) { if (out.length >= 3) break; if (kinds.has(m.kind) && scored.length > 8) continue; kinds.add(m.kind); out.push(m); }
+    for (const { m } of scored) { if (out.length >= 3) break; if (!out.includes(m)) out.push(m); }
+    return out.map(m => {
+      const hit = moods.filter(md => m.t.includes(md));
+      const why = (hit.length ? hit.join('·') + ' 조건에 맞고' : '골고루 고른 메뉴이고') + (wx && m.w.includes(wx) ? ', ' + wx + ' 날에 잘 어울려요.' : ' 부담 없이 먹기 좋아요.');
+      return { menu: m.menu, kind: m.kind, why, search: m.menu };
+    });
+  }
+
+  function show(items, src) {
+    const box = $('results'); box.replaceChildren();
+    if (!items.length) { box.append(h('p', { class: 'empty' }, '조건에 맞는 메뉴가 없어요. 예산이나 빼고 싶은 것을 바꿔 보세요.')); return; }
+    items.forEach(it => box.append(h('div', { class: 'mcard' },
+      h('span', { class: 'src' }, src + (it.kind ? ' · ' + it.kind : '')),
+      h('h3', {}, it.menu),
+      h('p', { class: 'why' }, it.why),
+      h('div', { class: 'actions' },
+        h('a', { class: 'btn sm soft', href: 'food.html?q=' + encodeURIComponent(it.search || it.menu) }, '근처 맛집 찾기'),
+        h('button', { class: 'btn sm', type: 'button', onclick: e => { S.put({ menu: it.menu, kind: it.kind || '', date: today(), meal: one('meal') }); e.currentTarget.disabled = true; e.currentTarget.textContent = '기록했어요'; } }, '이걸로 결정')))));
+  }
+
+  $('rule-btn').onclick = () => show(ruleRecommend(), '조건 추천');
+
+  let busy = false;
+  $('ai-btn').onclick = async () => {
+    if (busy) return;
+    const note = $('ai-note');
+    if (!Life.hasServer()) { note.hidden = false; note.textContent = 'AI 추천은 서버 연결 후에 쓸 수 있어요. 지금은 "조건으로 바로 뽑기"를 써 주세요.'; return; }
+    if (!Life.user()) { note.hidden = false; note.replaceChildren('AI 추천은 로그인한 분만 쓸 수 있어요. ', h('button', { class: 'btn sm', type: 'button', onclick: () => Life.signIn() }, 'Google로 로그인')); return; }
+    busy = true; $('ai-btn').disabled = true; note.hidden = true;
+    $('results').replaceChildren(h('p', { class: 'empty' }, 'AI가 메뉴를 고르는 중이에요… (몇 초 걸려요)'));
+    try {
+      const r = await Life.api('menu', { body: { meal: one('meal'), with: one('with'), moods: pick('moods'), weather: one('weather'), how: one('how'), budget: $('budget').value, avoid: $('avoid').value, recent: recent() } });
+      show(r.items, 'AI 추천');
+      $('ai-left').textContent = '오늘 AI 추천 ' + r.remaining + '번 남음';
+    } catch (e) {
+      $('results').replaceChildren(h('p', { class: 'empty' }, e.message || 'AI 추천을 받지 못했어요.'));
+      if (e.code === 'daily_limit') $('ai-left').textContent = '오늘 AI 추천을 다 썼어요';
+    } finally { busy = false; $('ai-btn').disabled = false; }
+  };
+
+  function renderHist() {
+    const items = S.items().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    const cnt = {}; items.forEach(x => { cnt[x.menu] = (cnt[x.menu] || 0) + 1; });
+    const top = Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, 3).filter(x => x[1] > 1);
+    $('top3').replaceChildren(...top.map(([m, n], i) => h('span', { class: 'badge go' }, '자주 먹은 ' + (i + 1) + '위 ' + m + ' (' + n + '번)')));
+    $('hist').replaceChildren(...(items.length ? items.slice(0, 12).map(x => h('li', {},
+      h('div', { class: 'grow' }, h('b', {}, x.menu), h('div', { class: 'tiny muted' }, prettyDate(x.date) + (x.meal ? ' · ' + x.meal : ''))),
+      h('a', { class: 'btn sm ghost', href: 'food.html?q=' + encodeURIComponent(x.menu) }, '맛집'),
+      h('button', { class: 'icon-btn', type: 'button', 'aria-label': x.menu + ' 기록 지우기', onclick: () => S.remove(x.id) }, '✕'))) : [h('li', { class: 'empty' }, '추천 결과에서 "이걸로 결정"을 누르면 여기에 남아요.')]));
+  }
+  S.subscribe(renderHist); renderHist();
+  // 처음 열 때 예시로 바로 보여줌
+  show(ruleRecommend(), '조건 추천');
+})();
+</script>
+</body>
+</html>
