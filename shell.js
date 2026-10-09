@@ -34,6 +34,7 @@
     more: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
     help: '<circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 014.8.9c0 1.7-2.4 2.2-2.4 3.6"/><circle cx="12" cy="17" r=".6" fill="currentColor"/>',
     x: '<path d="M6 6l12 12M18 6L6 18"/>',
+    moon: '<path d="M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z"/>',
     chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
     gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>'
   };
@@ -64,7 +65,8 @@
     ] },
     { title: '도구', sec: 'tool', items: [
       { href: 'calc.html', label: '내 집 마련 계산기', icon: 'house' },
-      { href: 'family.html', label: '가족 공유', icon: 'people' }
+      { href: 'family.html', label: '가족 공유', icon: 'people' },
+      { href: 'settings.html', label: '설정·백업', icon: 'gear' }
     ] }
   ];
 
@@ -109,6 +111,9 @@
   .ln-who em{display:block;font-style:normal;font-size:11.5px;color:var(--ln-muted);font-weight:500}
   .ln-tip{font-size:11.5px;color:var(--ln-muted);line-height:1.5}
   .ln-btn{border:1px solid var(--ln-line);background:var(--ln-surface);color:var(--ln-fg);border-radius:12px;padding:10px;font:inherit;font-size:14px;font-weight:650;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+  .ln-btn.ln-dk{background:transparent;border-color:transparent;color:var(--ln-muted);justify-content:flex-start;padding:8px 10px}
+  .ln-btn.ln-dk:hover{background:var(--ln-bg);color:var(--ln-fg)}
+  .ln-btn.ln-dk svg{width:18px;height:18px}
   .ln-btn.ln-install{background:var(--ln-primary);border-color:var(--ln-primary);color:#fff}
   html.ln-dark .ln-btn.ln-install{color:#0C1611}
   .ln-top,.ln-veil,.ln-bn{display:none}
@@ -182,6 +187,7 @@
   const HELP = {
     'home.html': { title: '홈 사용법', sub: '오늘 필요한 것만 한 화면에 모아 보여줘요.', steps: [
       '각 칸 오른쪽 위 글자(예: <b>가계부</b>, <b>목록</b>)를 누르면 그 메뉴로 가요.',
+      '맨 위 <b>검색창</b>에 이름·물건·메모·가게 이름을 치면 모든 메뉴에서 한꺼번에 찾아줘요.',
       '<b>홈 꾸미기</b>를 누르면 칸을 빼거나 다시 넣고, ▲▼로 순서를 바꿀 수 있어요.',
       '<b>챙길 것</b>에는 다가오는 기념일·연락할 사람·유통기한 임박 음식·오늘 집안일이 가까운 순으로 모여요.',
       '맨 위 날씨는 <b>날씨</b> 메뉴에서 맨 위에 둔 지역 기준이에요.',
@@ -205,6 +211,7 @@
     'money.html': { title: '가계부 사용법', sub: '쓴 돈을 바로 적고 한 달 흐름을 봐요.', steps: [
       '<b>빠르게 적기</b>에 금액을 넣고 분류를 골라 <b>저장</b>해요. 버는 돈은 위쪽 <b>수입</b>으로 바꿔서 적어요.',
       '<b>◀ ▶</b>로 달을 옮기고, <b>예산 정하기</b>로 한 달 쓸 돈을 정하면 남은 돈이 보여요.',
+      '<b>달마다 쓴 돈</b> 막대에서 최근 6달을 비교해요. 막대를 누르면 그달로 이동해요.',
       '통신비·구독료는 <b>+ 고정 지출</b>로 한 번만 등록하면 매달 그날 자동으로 들어가요.',
       '내역을 누르면 고치거나 지울 수 있어요.'
     ], tips: ['<b>가족 공유</b>를 켜면 배우자와 같은 가계부를 같이 써요.', '반려동물 수첩에서 비용을 적으면 여기에도 같이 들어갈 수 있어요.'] },
@@ -247,7 +254,7 @@
       '위쪽 <b>🔍 찾기</b> 탭에서 이름·관계·무슨 일·메모·날짜·금액 아무거나로 찾아요. 예) 친구, 결혼, 2025, 11월, 10만. 띄어 쓰면 모두 들어간 것만 찾아요 (예: 회사 장례).',
       '찾은 기록의 낸 돈·받은 돈 합계와 사람별 합계도 같이 보여줘요.',
       '기록을 누르면 고치거나 지울 수 있어요.'
-    ], tips: ['한 번 적은 이름은 다음에 입력할 때 자동으로 추천돼요.', '가족 공유를 켜면 부부가 같은 장부를 써요.'] },
+    ], tips: ['한 번 적은 이름은 다음에 입력할 때 자동으로 추천돼요.', '"내가 냈어요"로 저장할 때 <b>가계부에도 적기</b>를 켜 두면 가계부 "경조사" 지출에도 같이 들어가요. 고치거나 지우면 가계부도 같이 바뀌어요.', '가족 공유를 켜면 부부가 같은 장부를 써요.'] },
     'fridge.html': { title: '냉장고 사용법', sub: '먼저 먹어야 할 음식부터 알려줘요.', steps: [
       '음식 이름을 적고 냉장·냉동·실온 중 고른 뒤, 유통기한을 넣어요. <b>+3일, +1주</b> 버튼으로 빠르게 정할 수 있어요.',
       '목록은 유통기한이 가까운 것부터 위에 나와요. 3일 안으로 남으면 노란색, 지나면 빨간색이에요.',
@@ -280,6 +287,11 @@
       '달력의 초록 칸이 운동한 날이에요. 1시간 넘게 한 날은 더 진한 초록이에요.',
       '지난 날짜를 누르면 그날로 기록할 수 있어요.'
     ], tips: [] },
+    'settings.html': { title: '설정·백업 사용법', sub: '화면 밝기와 전체 백업을 관리해요.', steps: [
+      '<b>밝게 / 어둡게</b>로 화면 밝기를 바꿔요. 왼쪽 메뉴 맨 아래 버튼으로도 바꿀 수 있어요.',
+      '<b>백업 파일 받기</b>를 누르면 모든 메뉴의 기록이 파일 하나로 내려받아져요.',
+      '다른 기기나 나중에 <b>백업 파일 고르기</b>로 그 파일을 고르면, 없는 기록만 골라 합쳐 넣어요.'
+    ], tips: ['로그인해 두면 백업 없이도 폰·PC 기록이 자동으로 맞춰져요.', '할일·습관 기록은 할일·습관 → 설정에서 따로 백업해요.'] },
     'family.html': { title: '가족 공유 사용법', sub: '가계부·장보기·반려동물을 가족과 같이 써요.', steps: [
       '로그인한 뒤 <b>가족 공유 시작</b>을 눌러요.',
       '나온 <b>초대 주소</b>를 복사해서 가족에게 카톡으로 보내요.',
@@ -392,6 +404,16 @@
     const box = document.getElementById('ln-acc'); if (!box) return;
     const CS = window.CloudSync;
     box.replaceChildren();
+    // 어두운 화면 켜고 끄기
+    const dk = document.createElement('button'); dk.type = 'button'; dk.className = 'ln-btn ln-dk';
+    dk.innerHTML = svg(isDark() ? 'sun' : 'moon') + '<span>' + (isDark() ? '밝은 화면으로' : '어두운 화면으로') + '</span>';
+    dk.addEventListener('click', () => {
+      const on = !isDark();
+      if (window.Life && window.Life.setDark) window.Life.setDark(on); else { try { localStorage.setItem('dark_mode_v1', on ? '1' : '0'); } catch (e) {} document.documentElement.classList.toggle('ln-dark', on); }
+      if (!document.querySelector('.page-head')) { location.reload(); return; } // 할일·습관 화면은 다시 열어야 바뀜
+      renderAccount();
+    });
+    box.appendChild(dk);
     if (window.Life && window.Life.canInstall && window.Life.canInstall()) {
       const ib = document.createElement('button'); ib.type = 'button'; ib.className = 'ln-btn ln-install';
       ib.innerHTML = svg('down') + '<span>앱으로 설치</span>';

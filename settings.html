@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>설정·백업 · 생활노트</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<meta name="theme-color" content="#F3F4F6" />
+<link rel="stylesheet" href="life.css?v=20261009t" />
+<script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
+<style>
+  .counts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+  .counts div{background:var(--surface2);border-radius:12px;padding:10px 12px;font-size:14px;display:flex;justify-content:space-between;gap:8px}
+  .counts b{font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="page-head">
+    <span class="date" id="today"></span>
+    <h1>설정·백업</h1>
+    <p>화면 밝기를 바꾸고, 모든 기록을 파일 하나로 내려받거나 다시 불러와요.</p>
+  </header>
+
+  <section class="card">
+    <div class="card-head"><h2>화면</h2>
+      <div class="seg" role="group" aria-label="화면 밝기">
+        <button type="button" id="th-light">밝게</button>
+        <button type="button" id="th-dark">어둡게</button>
+      </div></div>
+    <p class="small muted">왼쪽 메뉴 아래의 버튼으로도 바꿀 수 있어요. 할일·습관 화면도 같이 바뀌어요.</p>
+  </section>
+
+  <section class="card">
+    <h2>전체 백업</h2>
+    <p class="small muted">이 기기에 있는 생활노트 기록을 파일 하나(.json)로 내려받아요. 폰을 바꾸거나 혹시 모를 때를 대비해 가끔 받아 두세요.</p>
+    <div class="counts" id="counts"></div>
+    <div class="row"><button class="btn primary" type="button" id="save">백업 파일 받기</button></div>
+    <p class="small muted">할일·습관 기록은 할일·습관 → 설정 → <b>데이터 백업 / 복원</b>에서 따로 받아요.</p>
+  </section>
+
+  <section class="card">
+    <h2>백업 파일 불러오기</h2>
+    <p class="small muted">예전에 받아 둔 백업 파일을 고르면, 지금 기록에 <b>합쳐서</b>넣어요. 지금 있는 기록은 지워지지 않아요.</p>
+    <div class="row"><button class="btn" type="button" id="pick">백업 파일 고르기</button><input type="file" id="file" accept=".json,application/json" hidden /></div>
+    <div id="restore" class="stack" style="gap:10px"></div>
+  </section>
+
+  <section class="card">
+    <h2>기록은 어디에 저장되나요?</h2>
+    <p class="small" id="where"></p>
+  </section>
+</main>
+
+<script src="firebase.js?v=20261009t"></script>
+<script src="sync.js?v=20261009t"></script>
+<script src="life-config.js?v=20261009t"></script>
+<script src="life.js?v=20261009t"></script>
+<script src="shell.js?v=20261009t"></script>
+<script>
+(function () {
+  const { h, today, prettyDate, toast } = Life;
+  const $ = id => document.getElementById(id);
+  $('today').textContent = prettyDate(today());
+
+  /* 화면 밝기 */
+  function drawTheme() { const d = Life.isDark(); $('th-light').setAttribute('aria-pressed', String(!d)); $('th-dark').setAttribute('aria-pressed', String(d)); }
+  $('th-light').onclick = () => { Life.setDark(false); drawTheme(); };
+  $('th-dark').onclick = () => { Life.setDark(true); drawTheme(); };
+  window.addEventListener('life-dark', drawTheme);
+  drawTheme();
+
+  /* 백업 */
+  const NAMES = { money: '가계부', gifts: '경조사 장부', workout: '운동 기록', shop: '장보기', fridge: '냉장고', chores: '집안일', things: '물건 위치',
+    pets: '반려동물', petlog: '반려동물 기록', supplies: '반려동물 소모품', dday: '기념일', contacts: '연락 챙기기', meals: '먹은 메뉴', food: '내 맛집', settings: '내 설정' };
+  const KEYS = Object.keys(NAMES);
+  function drawCounts() {
+    $('counts').replaceChildren(...KEYS.filter(k => k !== 'settings').map(k => h('div', {}, h('span', {}, NAMES[k]), h('b', {}, Life.store(k).items().length + '개'))));
+  }
+  KEYS.forEach(k => Life.store(k).subscribe(drawCounts));
+  drawCounts();
+
+  $('save').onclick = () => {
+    const data = { app: '생활노트', v: 1, at: new Date().toISOString(), stores: {} };
+    KEYS.forEach(k => { const s = Life.store(k); data.stores[k] = { items: s.items(), meta: s.meta() }; });
+    const url = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
+    const a = h('a', { href: url, download: '생활노트_백업_' + today() + '.json' }); document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    toast('백업 파일을 받았어요');
+  };
+
+  /* 불러오기 */
+  $('pick').onclick = () => $('file').click();
+  $('file').addEventListener('change', async () => {
+    const f = $('file').files[0]; $('file').value = ''; if (!f) return;
+    let data;
+    try { data = JSON.parse(await f.text()); } catch (e) { $('restore').replaceChildren(h('p', { class: 'note warn' }, '이 파일은 읽을 수 없어요. 생활노트에서 받은 백업 파일(.json)인지 확인해 주세요.')); return; }
+    if (!data || data.app !== '생활노트' || !data.stores) { $('restore').replaceChildren(h('p', { class: 'note warn' }, '생활노트 백업 파일이 아니에요. 할일·습관 백업은 할일·습관 → 설정에서 불러와 주세요.')); return; }
+    // 이미 있는 것(같은 기록)은 빼고 새로 들어갈 것만 셈
+    const plan = KEYS.filter(k => data.stores[k]).map(k => {
+      const s = Life.store(k), have = new Set(s.items().map(x => x.id));
+      const add = (data.stores[k].items || []).filter(x => x && x.id && !x.deleted && !have.has(x.id));
+      return { k, add, meta: data.stores[k].meta };
+    });
+    const total = plan.reduce((a, p) => a + p.add.length, 0);
+    $('restore').replaceChildren(...[
+      h('p', { class: 'small' }, prettyDate((data.at || '').slice(0, 10)) + '에 받은 백업이에요.'),
+      h('div', { class: 'counts' }, plan.filter(p => p.add.length).map(p => h('div', {}, h('span', {}, NAMES[p.k]), h('b', {}, '+' + p.add.length + '개')))),
+      total ? null : h('p', { class: 'small muted' }, '새로 넣을 기록이 없어요. 이미 다 들어 있어요.'),
+      h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', disabled: !total, onclick: e => {
+        e.currentTarget.disabled = true;
+        plan.forEach(p => {
+          const s = Life.store(p.k);
+          if (p.add.length) s.putMany(p.add);
+          if (p.meta && Object.keys(p.meta).length && !Object.keys(s.meta()).length) s.setMeta(p.meta);
+        });
+        $('restore').replaceChildren(h('p', { class: 'note' }, h('b', {}, total + '개를 불러왔어요.'), ' 로그인해 있으면 다른 기기에도 곧 보여요.'));
+        toast(total + '개를 불러왔어요');
+      } }, total ? total + '개 합쳐서 불러오기' : '불러올 것 없음'))].filter(Boolean));
+  });
+
+  /* 저장 위치 안내 */
+  function drawWhere() {
+    const u = Life.user();
+    $('where').textContent = u
+      ? (u.email || '내 Google 계정') + '으로 로그인되어 있어요. 기록은 이 기기와 클라우드에 함께 저장되고, 같은 계정으로 로그인한 폰·PC에 자동으로 맞춰져요.' + (Life.group.id() ? ' 가족 공유 중인 메뉴는 가족과 같은 곳에 저장돼요.' : '')
+      : '지금은 로그인하지 않아서 이 브라우저에만 저장돼요. 브라우저 기록을 지우면 사라질 수 있으니, Google로 로그인하거나 위에서 백업 파일을 받아 두세요.';
+  }
+  Life.onUser(drawWhere);
+})();
+</script>
+</body>
+</html>

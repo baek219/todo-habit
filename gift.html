@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261009r" />
+<link rel="stylesheet" href="life.css?v=20261009t" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .amount-input{font-size:22px!important;font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
@@ -69,6 +69,7 @@
         <label class="field"><span class="label">날짜</span><input id="f-date" type="date" /></label>
         <label class="field"><span class="label">메모</span><input id="f-memo" type="text" maxlength="60" placeholder="예: 화환도 보냄, 부부 같이 감" /></label>
       </div>
+      <label class="row small" for="f-money" id="f-money-row" style="gap:8px"><input type="checkbox" id="f-money" style="width:18px;height:18px" /> 가계부에도 "경조사" 지출로 적기</label>
       <div class="row"><button class="btn primary" type="submit">저장</button></div>
     </form>
   </section>
@@ -94,16 +95,25 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261009r"></script>
-<script src="sync.js?v=20261009r"></script>
-<script src="life-config.js?v=20261009r"></script>
-<script src="life.js?v=20261009r"></script>
-<script src="shell.js?v=20261009r"></script>
-<script src="import.js?v=20261009r"></script>
+<script src="firebase.js?v=20261009t"></script>
+<script src="sync.js?v=20261009t"></script>
+<script src="life-config.js?v=20261009t"></script>
+<script src="life.js?v=20261009t"></script>
+<script src="shell.js?v=20261009t"></script>
+<script src="import.js?v=20261009t"></script>
 <script>
 (function () {
   const { h, today, won, prettyDate, toast, sheet } = Life;
-  const S = Life.store('gifts');
+  const S = Life.store('gifts'), M = Life.store('money');
+  // 경조사 → 가계부 연결: 내가 낸 돈은 가계부 '경조사' 지출로도 남김 (giftId로 묶어서 고치면 같이 고쳐짐)
+  const moneyOf = id => M.items().find(m => m.giftId === id);
+  function syncMoney(g) {
+    const m = moneyOf(g.id);
+    if (g.dir !== 'give') { if (m) M.remove(m.id); return; }
+    const row = { kind: 'out', amount: g.amount, cat: '경조사', memo: g.person + ' ' + g.ev, date: g.date, giftId: g.id };
+    M.put(m ? Object.assign({}, m, row) : row);
+  }
+  let toMoneyPref = true; try { toMoneyPref = localStorage.getItem('gift_to_money_v1') !== '0'; } catch (e) {}
   const $ = id => document.getElementById(id);
   $('today').textContent = prettyDate(today());
   $('f-date').value = today();
@@ -124,7 +134,8 @@
     $('say').className = 'dir-say ' + dir;
   }
   $('f-name').addEventListener('input', say); $('f-amt').addEventListener('input', say);
-  function setDir(d) { dir = d; $('d-give').setAttribute('aria-pressed', String(d === 'give')); $('d-get').setAttribute('aria-pressed', String(d === 'get')); say(); }
+  $('f-money').checked = toMoneyPref;
+  function setDir(d) { dir = d; $('f-money-row').hidden = d !== 'give'; $('d-give').setAttribute('aria-pressed', String(d === 'give')); $('d-get').setAttribute('aria-pressed', String(d === 'get')); say(); }
   say();
   $('d-give').onclick = () => setDir('give'); $('d-get').onclick = () => setDir('get');
   $('f-amt').addEventListener('input', e => { const n = parseAmt(e.target.value); e.target.value = n ? n.toLocaleString('ko-KR') : ''; });
@@ -141,7 +152,10 @@
     if (!person) { toast('누구인지 적어 주세요'); $('f-name').focus(); return; }
     if (!amount) { toast('금액을 넣어 주세요'); $('f-amt').focus(); return; }
     if (!rel) rel = '기타'; if (!ev) ev = '기타';
-    S.put({ dir, person, rel, ev, amount, date: $('f-date').value || today(), memo: $('f-memo').value.trim() });
+    const g = S.put({ dir, person, rel, ev, amount, date: $('f-date').value || today(), memo: $('f-memo').value.trim() });
+    const linked = dir === 'give' && $('f-money').checked;
+    try { localStorage.setItem('gift_to_money_v1', $('f-money').checked ? '1' : '0'); } catch (e) {}
+    if (linked) syncMoney(g);
     toast(dir === 'give' ? '내가 ' + person + '님께 ' + won(amount) + ' 낸 걸 저장했어요' : person + '님께 ' + won(amount) + ' 받은 걸 저장했어요');
     $('f-name').value = ''; $('f-amt').value = ''; $('f-memo').value = '';
     relC.set(rel); evC.set(ev); say();
@@ -159,7 +173,7 @@
     let armed = false;
     const del = h('button', { class: 'btn ghost', type: 'button', onclick: () => {
       if (!armed) { armed = true; del.textContent = '한 번 더 누르면 삭제'; del.style.color = 'var(--danger)'; return; }
-      S.remove(x.id); close(); toast('삭제했어요');
+      S.remove(x.id); const m = moneyOf(x.id); if (m) M.remove(m.id); close(); toast(m ? '삭제했어요 (가계부 기록도 같이 지웠어요)' : '삭제했어요');
     } }, '삭제');
     const close = sheet('기록 고치기', h('div', { class: 'stack' },
       h('div', { class: 'grid2', style: 'gap:10px' }, h('label', { class: 'field' }, h('span', { class: 'label' }, '누구'), name), h('label', { class: 'field' }, h('span', { class: 'label' }, '누가 냈나요'), d)),
@@ -170,7 +184,8 @@
       h('label', { class: 'field' }, h('span', { class: 'label' }, '메모'), memo),
       h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => {
         const a = parseAmt(amt.value); if (!a || !name.value.trim()) { toast('이름과 금액을 넣어 주세요'); return; }
-        S.put(Object.assign({}, x, { person: name.value.trim(), dir: d.value, amount: a, ev: evE.get() || '기타', rel: relE.get() || '기타', date: date.value || x.date, memo: memo.value.trim() })); close(); toast('고쳤어요');
+        const g = S.put(Object.assign({}, x, { person: name.value.trim(), dir: d.value, amount: a, ev: evE.get() || '기타', rel: relE.get() || '기타', date: date.value || x.date, memo: memo.value.trim() }));
+        if (moneyOf(x.id)) syncMoney(g); close(); toast(moneyOf(x.id) ? '고쳤어요 (가계부도 같이 고쳤어요)' : '고쳤어요');
       } }, '저장'), h('span', { class: 'spacer' }), del)));
   }
 
@@ -195,6 +210,7 @@
   function drawQDir() { $('q-dir').replaceChildren(...[['', '전체'], ['give', '내가 낸 것만'], ['get', '내가 받은 것만']].map(([v, l]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(qDir === v), onclick: () => { qDir = v; pgP = pgL = 1; drawQDir(); render(); } }, l))); }
   drawQDir();
   $('q').addEventListener('input', e => { q = e.target.value.trim(); pgP = pgL = 1; render(); });
+  const q0 = new URLSearchParams(location.search).get('q'); if (q0) { $('q').value = q0; q = q0.trim(); setTimeout(() => setTab('find'), 0); }
 
   /* 아무 말로 찾기: 이름·관계·무슨 일·메모·날짜·금액 */
   const lc = s => String(s || '').toLowerCase().replace(/\s+/g, '');

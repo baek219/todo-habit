@@ -8,7 +8,7 @@
 <link rel="icon" href="icon-192.png" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261009r" />
+<link rel="stylesheet" href="life.css?v=20261009t" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .hello{display:grid;gap:6px}
@@ -35,6 +35,20 @@
   .edit-row .dot{width:10px;height:10px;border-radius:4px;background:var(--sec);flex:none}
   .edit-row.off .nm{color:var(--muted);text-decoration:line-through}
   .edit-row input[type=checkbox]{width:20px;height:20px;accent-color:var(--sec)}
+  .gsearch{position:relative}
+  .gsearch svg{position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+  .gsearch input{background:var(--surface)!important;padding:15px 16px 15px 46px!important;font-size:16px!important;border-radius:18px!important}
+  .gr-group{display:grid;gap:4px}
+  .gr-group + .gr-group{border-top:1px solid var(--line);padding-top:12px}
+  .gr-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .gr-head b{display:flex;align-items:center;gap:8px;font-size:14.5px}
+  .gr-head b::before{content:"";width:8px;height:8px;border-radius:3px;background:var(--sec)}
+  .gr-head a{font-size:13px;font-weight:700;text-decoration:none;color:var(--sec-dark)}
+  .gr-item{display:flex;gap:10px;align-items:baseline;padding:6px 0;text-decoration:none;color:var(--fg);font-size:14.5px;min-width:0}
+  .gr-item:hover .t{text-decoration:underline}
+  .gr-item .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gr-item .s{font-size:12.5px;color:var(--muted);white-space:nowrap}
+  mark{background:var(--mark);color:inherit;border-radius:3px;padding:0 1px}
   .login-card{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 </style>
 </head>
@@ -45,6 +59,12 @@
     <h1 id="hello">오늘도 좋은 하루 보내세요</h1>
     <button class="btn sm soft" type="button" id="edit-home-top" style="justify-self:start;margin-top:6px">홈 꾸미기</button>
   </header>
+
+  <div class="gsearch" role="search">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    <input id="gq" type="search" placeholder="모든 기록에서 찾기 — 이름, 물건, 메모, 가게…" aria-label="모든 기록에서 찾기" autocomplete="off" />
+  </div>
+  <section class="card" id="gres" hidden></section>
 
   <section class="card login-card" id="login-card" hidden>
     <div class="stack" style="gap:2px"><b>Google로 로그인하면</b><span class="small muted">폰·PC·안드로이드 앱의 할일과 모든 기록이 자동으로 맞춰지고, 맛집 검색과 AI 메뉴 추천을 쓸 수 있어요.</span></div>
@@ -154,12 +174,12 @@
   <div class="row" style="justify-content:center"><button class="btn" type="button" id="edit-home">홈 꾸미기 · 칸 추가·빼기·순서</button></div>
 </main>
 
-<script src="firebase.js?v=20261009r"></script>
-<script src="sync.js?v=20261009r"></script>
-<script src="lunar.js?v=20261009r"></script>
-<script src="life-config.js?v=20261009r"></script>
-<script src="life.js?v=20261009r"></script>
-<script src="shell.js?v=20261009r"></script>
+<script src="firebase.js?v=20261009t"></script>
+<script src="sync.js?v=20261009t"></script>
+<script src="lunar.js?v=20261009t"></script>
+<script src="life-config.js?v=20261009t"></script>
+<script src="life.js?v=20261009t"></script>
+<script src="shell.js?v=20261009t"></script>
 <script>
 (function () {
   const { h, today, won, prettyDate, daysBetween } = Life;
@@ -233,6 +253,11 @@
     clist.forEach(({ x, n }) => care.push({ n, tag: n <= 0 ? '연락' : 'D-' + n, cls: n <= 0 ? 'warn' : 'go', text: n <= 0 ? x.name + '님께 연락할 때예요' : x.name + '님 연락', href: 'contact.html' }));
     fridge.items().forEach(x => { if (!x.exp) return; const n = daysBetween(t, x.exp); if (n <= 3) care.push({ n, tag: n < 0 ? '지남' : n === 0 ? '오늘' : 'D-' + n, cls: n < 0 ? 'bad' : 'warn', text: x.name + ' 먹기', href: 'fridge.html' }); });
     chores.items().forEach(x => { const due = choreDue(x); const n = daysBetween(t, due); if (n <= 0) care.push({ n, tag: '집안일', cls: n < 0 ? 'bad' : 'go', text: x.name, href: 'chores.html' }); });
+    // 반려동물: 다음 병원·접종 일정(2주 안), 사료·모래 떨어질 때(1주 안)
+    petlog.items().filter(r => r.next && pets.get(r.petId) && !petlog.items().some(o => o.petId === r.petId && o.type === r.type && o.date >= r.next && o.id !== r.id)).forEach(r => {
+      const n = daysBetween(t, r.next); if (n <= 14) care.push({ n, tag: ddTag(n), cls: n < 0 ? 'bad' : n <= 7 ? 'warn' : 'go', text: pets.get(r.petId).name + ' ' + r.type, href: 'pet.html' });
+    });
+    supplies.items().filter(x => x.last && x.days).forEach(x => { const n = daysBetween(t, addDays(x.last, x.days)); if (n <= 7) care.push({ n, tag: n < 0 ? '떨어짐' : ddTag(n), cls: n <= 2 ? 'bad' : 'warn', text: x.name + ' 떨어질 때', href: 'pet.html' }); });
     care.sort((a, b) => a.n - b.n);
     $('c-count').textContent = care.length ? care.length + '개' : '';
     const cli = c => h('li', {}, h('span', { class: 'badge ' + c.cls }, c.tag), h('a', { class: 't', href: c.href, style: 'color:inherit;text-decoration:none' }, c.text));
@@ -336,6 +361,41 @@
         h('button', { class: 'btn primary', type: 'button', onclick: () => { settings.setMeta({ home: { order, hidden: [...hidden] } }); layout(); close(); Life.toast('홈을 바꿨어요'); } }, '저장'),
         h('button', { class: 'btn ghost', type: 'button', onclick: () => { order = DEFAULT.slice(); hidden = new Set(); draw(); } }, '처음 모습으로'))));
   }
+  /* 모든 기록에서 찾기 */
+  const lcs = v => String(v == null ? '' : v).toLowerCase();
+  function hlx(text, q) { text = String(text || ''); const i = lcs(text).indexOf(q); return i < 0 ? text : [text.slice(0, i), h('mark', {}, text.slice(i, i + q.length)), text.slice(i + q.length)]; }
+  function gsearch() {
+    const raw = $('gq').value.trim(), q = lcs(raw);
+    $('gres').hidden = !q; $('tiles').hidden = !!q;
+    if (!q) return;
+    const hit = (...vals) => vals.some(v => lcs(v).includes(q));
+    let tasks = []; try { tasks = JSON.parse(localStorage.getItem('todo_habit_tasks_v3') || '[]') || []; } catch (e) {}
+    const G = [
+      ['s-rec', '할일·습관', 'index.html', tasks.filter(x => hit(x.title, x.memo)).map(x => [x.title, x.type === 'habit' ? '습관' : x.done ? '완료' : (x.dueDate || '할 일')])],
+      ['s-rec', '가계부', 'money.html', money.items().filter(x => x.kind !== 'fixed' && hit(x.memo, x.cat)).sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(x => [(x.memo || x.cat) + ' · ' + won(x.amount), (x.date || '').slice(2).replace(/-/g, '.')])],
+      ['s-rec', '경조사 장부', 'gift.html?q=' + encodeURIComponent(raw), gifts.items().filter(x => hit(x.person, x.ev, x.rel, x.memo)).sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(x => [x.person + ' · ' + x.ev + ' · ' + (x.dir === 'give' ? '내가 냄 ' : '내가 받음 ') + won(x.amount), (x.date || '').slice(0, 4)])],
+      ['s-rec', '운동 기록', 'workout.html', workout.items().filter(x => hit(x.type, x.memo)).map(x => [x.type + ' ' + x.min + '분' + (x.memo ? ' · ' + x.memo : ''), (x.date || '').slice(5).replace('-', '/')])],
+      ['s-house', '물건 위치', 'things.html?q=' + encodeURIComponent(raw), things.items().filter(x => hit(x.name, x.where, x.memo)).map(x => [x.name + ' → ' + x.where, x.cat || ''])],
+      ['s-house', '장보기', 'shop.html', shop.items().filter(x => !x.done && hit(x.name)).map(x => [x.name + (x.qty ? ' ' + x.qty : ''), '살 것'])],
+      ['s-house', '냉장고', 'fridge.html', fridge.items().filter(x => hit(x.name)).map(x => [x.name, x.exp ? '~' + x.exp.slice(5).replace('-', '/') : x.zone || ''])],
+      ['s-house', '집안일', 'chores.html', chores.items().filter(x => hit(x.name)).map(x => [x.name, Life.everyText(Number(x.every))])],
+      ['s-house', '반려동물', 'pet.html', pets.items().filter(x => hit(x.name, x.breed, x.memo)).map(x => [x.name, x.kind || '']).concat(petlog.items().filter(r => hit(r.type, r.memo)).map(r => [(pets.get(r.petId) || {}).name + ' · ' + r.type + (r.memo ? ' · ' + r.memo : ''), (r.date || '').slice(5).replace('-', '/')]))],
+      ['s-people', '기념일', 'dday.html', ddays.items().filter(x => hit(x.title, x.memo, x.label)).map(x => { const nx = Life.ddayNext(x); return [x.title, x.kind === 'count' ? nx.days + '일째' : nx.n === 0 ? '오늘' : 'D-' + nx.n]; })],
+      ['s-people', '연락 챙기기', 'contact.html', contacts.items().filter(x => hit(x.name, x.how)).map(x => [x.name + (x.how ? ' · ' + x.how : ''), Life.everyText(Number(x.every))])],
+      ['s-food', '내 맛집', 'food.html?tab=mine', food.items().filter(x => hit(x.name, x.memo, x.category, x.address)).map(x => [x.name, x.status === 'been' ? '가본 곳' : '가볼 곳'])],
+      ['s-food', '먹은 메뉴', 'menu.html', meals.items().filter(x => hit(x.menu)).map(x => [x.menu, (x.date || '').slice(5).replace('-', '/')])]
+    ].filter(g => g[3].length);
+    const total = G.reduce((a, g) => a + g[3].length, 0);
+    $('gres').replaceChildren(
+      h('div', { class: 'card-head' }, h('h2', {}, '"' + raw + '" 찾은 결과 ' + total + '개'), h('button', { class: 'btn sm ghost', type: 'button', onclick: () => { $('gq').value = ''; gsearch(); } }, '지우기')),
+      ...(G.length ? G.map(([cls, name, href, rows]) => h('div', { class: 'gr-group ' + cls },
+        h('div', { class: 'gr-head' }, h('b', {}, name + ' ' + rows.length), h('a', { href }, rows.length > 4 ? rows.length + '개 모두 보기' : '열기')),
+        rows.slice(0, 4).map(([tx, sub]) => h('a', { class: 'gr-item', href }, h('span', { class: 't' }, hlx(tx, q)), sub ? h('span', { class: 's' }, sub) : null))))
+        : [h('p', { class: 'empty' }, '찾는 기록이 없어요. 다른 말로 찾아보세요.')]));
+  }
+  $('gq').addEventListener('input', gsearch);
+  [money, gifts, things, shop, fridge, chores, ddays, contacts, food, meals, workout, pets, petlog].forEach(st => st.subscribe(() => { if ($('gq').value.trim()) gsearch(); }));
+
   $('edit-home').onclick = editHome; $('edit-home-top').onclick = editHome;
   settings.subscribe(layout);
   layout();

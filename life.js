@@ -491,6 +491,14 @@
     return j;
   }
 
+  /* ---------- 화면 밝기 (할일·습관과 같은 저장값) ---------- */
+  function isDark() { try { return localStorage.getItem('dark_mode_v1') === '1'; } catch (e) { return false; } }
+  function setDark(on) {
+    try { localStorage.setItem('dark_mode_v1', on ? '1' : '0'); } catch (e) {}
+    document.documentElement.classList.toggle('ln-dark', !!on);
+    window.dispatchEvent(new Event('life-dark'));
+  }
+
   /* ---------- 시작 ---------- */
   try { if (localStorage.getItem('dark_mode_v1') === '1') document.documentElement.classList.add('ln-dark'); } catch (e) {}
   const CS = window.CloudSync;
@@ -501,6 +509,7 @@
   window.Life = {
     h, iso, today, won, newId, daysBetween, prettyDate, WD, toast, sheet, choice, usedValues, pager, daysChoice, everyText,
     store, api, hasServer, group, weather, weatherChip, weatherPlaces, setWeatherPlaces, pmGrade, searchPlace, reversePlace,
+    isDark, setDark,
     canInstall: () => !!installEvt, install, standalone, ddayNext,
     onUser(fn) { userSubs.add(fn); try { fn(window.CloudSync && window.CloudSync.user); } catch (e) {} return () => userSubs.delete(fn); },
     user: () => (window.CloudSync && window.CloudSync.user) || null,

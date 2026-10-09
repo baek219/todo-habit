@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261009r" />
+<link rel="stylesheet" href="life.css?v=20261009t" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .month-nav{display:flex;align-items:center;gap:6px}
@@ -23,6 +23,21 @@
   .tx .amt.in{color:var(--good)}
   .quick-amts{display:flex;gap:6px;flex-wrap:wrap}
   @media (max-width:420px){.cat-row{grid-template-columns:86px 1fr auto}}
+  /* 달마다 쓴 돈: 한 가지 색, 보고 있는 달만 진하게 */
+  .trend{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;align-items:end;height:180px;padding-top:22px;border-bottom:1px solid var(--line)}
+  .trend button{all:unset;cursor:pointer;height:100%;display:grid;grid-template-rows:1fr auto;align-items:end;justify-items:center;position:relative;border-radius:8px}
+  .trend button:focus-visible{outline:2px solid var(--sec);outline-offset:2px}
+  .trend .col{width:min(100%,44px);background:var(--sec-soft);border-radius:4px 4px 0 0;min-height:2px;transition:background .15s}
+  .trend button:hover .col{background:color-mix(in srgb,var(--sec) 45%,var(--sec-soft))}
+  .trend button[aria-current="true"] .col{background:var(--sec)}
+  .trend .v{position:absolute;top:-20px;font-size:12px;font-weight:750;color:var(--fg);white-space:nowrap;font-variant-numeric:tabular-nums}
+  .trend .tip{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--fg);color:var(--bg);font-size:12.5px;font-weight:650;padding:6px 9px;border-radius:9px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .12s;z-index:2}
+  .trend button:nth-child(-n+2) .tip{left:0;transform:none}
+  .trend button:nth-last-child(-n+2) .tip{left:auto;right:0;transform:none}
+  .trend .tip{visibility:hidden}
+  .trend button:hover .tip,.trend button:focus-visible .tip{opacity:1;visibility:visible}
+  .trend-x{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:6px;font-size:12px;color:var(--muted);text-align:center}
+  .trend-x .on{color:var(--fg);font-weight:750}
 </style>
 </head>
 <body>
@@ -79,6 +94,12 @@
     <ul class="list" id="fixed"></ul>
   </section>
 
+  <section class="card" aria-labelledby="trend-title">
+    <div class="card-head"><h2 id="trend-title">달마다 쓴 돈</h2><span class="small muted" id="trend-sub"></span></div>
+    <div class="trend" id="trend" role="list"></div>
+    <p class="small muted" id="trend-note"></p>
+  </section>
+
   <section class="card" aria-labelledby="cat-title">
     <h2 id="cat-title">어디에 많이 썼나</h2>
     <div id="cats" class="stack"></div>
@@ -91,12 +112,12 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261009r"></script>
-<script src="sync.js?v=20261009r"></script>
-<script src="life-config.js?v=20261009r"></script>
-<script src="life.js?v=20261009r"></script>
-<script src="shell.js?v=20261009r"></script>
-<script src="import.js?v=20261009r"></script>
+<script src="firebase.js?v=20261009t"></script>
+<script src="sync.js?v=20261009t"></script>
+<script src="life-config.js?v=20261009t"></script>
+<script src="life.js?v=20261009t"></script>
+<script src="shell.js?v=20261009t"></script>
+<script src="import.js?v=20261009t"></script>
 <script>
 (function () {
   const { h, today, won, prettyDate, toast, sheet } = Life;
@@ -222,7 +243,29 @@
   /* 그리기 */
   function monthItems(m) { return S.items().filter(t => (t.date || '').slice(0, 7) === m); }
   function prevYm(m) { const [y, mm] = m.split('-').map(Number); const d = new Date(y, mm - 2, 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+  function drawTrend() {
+    const [y, m] = ym.split('-').map(Number);
+    const months = Array.from({ length: 6 }, (_, i) => { const d = new Date(y, m - 6 + i, 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); });
+    const sums = months.map(k => monthItems(k).filter(t => t.kind !== 'in').reduce((a, t) => a + t.amount, 0));
+    const max = Math.max(...sums, 1);
+    const short = n => n >= 10000 ? (Math.round(n / 1000) / 10) + '만' : n.toLocaleString('ko-KR');
+    $('trend').replaceChildren(...months.map((k, i) => h('button', { type: 'button', role: 'listitem', 'aria-current': String(k === ym), 'aria-label': Number(k.slice(5)) + '월 ' + won(sums[i]), onclick: () => { ym = k; render(); } },
+      k === ym ? h('span', { class: 'v' }, short(sums[i])) : null,
+      h('span', { class: 'tip' }, k.slice(0, 4) + '년 ' + Number(k.slice(5)) + '월 · ' + won(sums[i])),
+      h('i', { class: 'col', style: 'height:' + Math.max(1, sums[i] / max * 100) + '%' }))));
+    let x = document.getElementById('trend-x');
+    if (!x) { x = h('div', { class: 'trend-x', id: 'trend-x', 'aria-hidden': 'true' }); $('trend').after(x); }
+    x.replaceChildren(...months.map(k => h('span', { class: k === ym ? 'on' : '' }, Number(k.slice(5)) + '월')));
+    const cur = sums[5], prev = sums[4], used = sums.filter(Boolean);
+    const avg = used.length ? Math.round(used.reduce((a, b) => a + b, 0) / used.length) : 0;
+    $('trend-sub').textContent = used.length ? '6개월 평균 ' + won(avg) : '';
+    $('trend-note').textContent = !cur && !prev ? '지출을 적으면 달마다 얼마 썼는지 막대로 보여요. 막대를 누르면 그달로 가요.'
+      : !prev ? '지난달 기록이 없어서 비교할 수 없어요.'
+      : cur > prev ? '지난달보다 ' + won(cur - prev) + ' 더 썼어요.' : cur < prev ? '지난달보다 ' + won(prev - cur) + ' 덜 썼어요.' : '지난달과 똑같이 썼어요.';
+  }
+
   function render() {
+    drawTrend();
     $('sub').textContent = S.isShared() ? '가족과 같이 쓰는 가계부예요. 누가 적어도 여기 모여요.' : '쓴 돈을 바로바로 적어두면 한 달 흐름이 보여요.';
     const [y, m] = ym.split('-').map(Number);
     $('month-label').textContent = y + '년 ' + m + '월';
