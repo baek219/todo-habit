@@ -61,6 +61,7 @@
           <button type="button" id="loc-me" aria-pressed="true">내 위치 주변</button>
           <button type="button" id="loc-area" aria-pressed="false">동네 이름으로</button>
         </div>
+        <button class="btn sm ghost" type="button" id="loc-help">위치 허용 방법</button>
         <input type="text" id="area" placeholder="예: 수지구청역, 판교" maxlength="30" style="width:auto;flex:1 1 140px" hidden aria-label="동네 이름" />
         <select id="radius" aria-label="거리"><option value="500">500m 안</option><option value="1000">1km 안</option><option value="2000" selected>2km 안</option><option value="5000">5km 안</option></select>
         <select id="cat" aria-label="종류"><option value="food">음식점</option><option value="cafe">카페</option><option value="all">전체</option></select>
@@ -169,17 +170,45 @@
   function setLoc(m) {
     locMode = m;
     $('loc-me').setAttribute('aria-pressed', String(m === 'me')); $('loc-area').setAttribute('aria-pressed', String(m === 'area'));
-    $('area').hidden = m !== 'area'; $('radius').hidden = m !== 'me'; $('sort').hidden = m !== 'me';
+    $('area').hidden = m !== 'area'; $('radius').hidden = m !== 'me'; $('sort').hidden = m !== 'me'; $('loc-help').hidden = m !== 'me';
     try { localStorage.setItem('food_loc_mode', m); } catch (e) {}
   }
+  $('loc-help').onclick = locHelp;
   $('loc-me').onclick = () => setLoc('me'); $('loc-area').onclick = () => { setLoc('area'); $('area').focus(); };
   try { const m = localStorage.getItem('food_loc_mode'); if (m) setLoc(m); $('area').value = localStorage.getItem('food_area') || ''; } catch (e) {}
+
+  // 위치 허용 방법 안내 (기기·브라우저별)
+  function locHelp() {
+    const step = (title, items) => h('div', { class: 'stack', style: 'gap:6px' }, h('h3', {}, title), h('ol', { class: 'small', style: 'margin:0;padding-left:20px;display:grid;gap:4px' }, items.map(t => h('li', {}, t))));
+    sheet('위치 허용하는 방법', h('div', { class: 'stack', style: 'gap:16px' },
+      h('p', { class: 'small muted' }, '두 가지가 모두 켜져 있어야 해요. ① 폰(또는 PC) 자체의 위치 기능, ② 이 사이트에 위치를 알려줘도 된다는 브라우저 허락.'),
+      step('안드로이드 폰 — 크롬', [
+        '화면 맨 위에서 아래로 쓸어내려 빠른 설정에서 "위치"를 켜요.',
+        '이 페이지 주소창 왼쪽의 아이콘(자물쇠 또는 줄 두 개 모양)을 눌러요.',
+        '"권한" 또는 "사이트 설정" → "위치" → "허용"으로 바꿔요.',
+        '목록에 위치가 없으면: 크롬 오른쪽 위 ⋮ → 설정 → 사이트 설정 → 위치 → "차단됨"에서 baek219.github.io를 눌러 "허용".',
+        '이 페이지를 새로고침하고 다시 "찾기"를 눌러요. "위치 정보를 사용하시겠어요?" 창이 뜨면 "허용".'
+      ]),
+      step('안드로이드 폰 — 삼성 인터넷', [
+        '빠른 설정에서 "위치"를 켜요.',
+        '오른쪽 아래 ≡ → 설정 → 사이트 및 다운로드 → 사이트 권한 → 위치를 눌러요.',
+        'baek219.github.io가 "차단"이면 눌러서 지우거나 허용으로 바꿔요.',
+        '새로고침하고 다시 "찾기" → 뜨는 창에서 "허용".'
+      ]),
+      step('PC — 크롬', [
+        '주소창 왼쪽 아이콘을 눌러 "위치"를 "허용"으로 바꿔요.',
+        '윈도우 설정 → 개인 정보 및 보안 → 위치 → "위치 서비스"를 켜요.',
+        '새로고침하고 다시 "찾기"를 눌러요.',
+        'PC는 GPS가 없어서 위치가 동네 단위로 어긋날 수 있어요. 그럴 땐 "동네 이름으로"가 더 정확해요.'
+      ]),
+      h('p', { class: 'note' }, '위치 허용이 번거로우면 "동네 이름으로"를 누르고 "수지구청역"처럼 적어도 같은 결과를 볼 수 있어요.')));
+  }
 
   function getCoords() {
     return new Promise((res, rej) => {
       if (!navigator.geolocation) return rej(new Error('이 기기에서는 위치를 쓸 수 없어요.'));
       navigator.geolocation.getCurrentPosition(p => res({ x: p.coords.longitude, y: p.coords.latitude }),
-        e => rej(new Error(e.code === 1 ? '위치 사용이 거부됐어요. 브라우저 설정에서 위치를 허용하거나 "동네 이름으로"를 써 주세요.' : '현재 위치를 찾지 못했어요. "동네 이름으로"를 써 주세요.')),
+        e => rej(Object.assign(new Error(e.code === 1 ? '위치 사용이 막혀 있어요.' : '현재 위치를 찾지 못했어요. 폰의 위치(GPS)가 켜져 있는지 확인해 주세요.'), { geo: true })),
         { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 });
     });
   }
@@ -211,7 +240,8 @@
       $('more-row').hidden = r.isEnd || !r.places.length;
     } catch (e) {
       if (!more) $('results').replaceChildren();
-      note(e.message || '검색하지 못했어요.', 'warn');
+      if (e.geo) note(h('span', {}, e.message + ' ', h('button', { class: 'btn sm', type: 'button', onclick: locHelp }, '위치 허용 방법 보기'), ' 또는 ', h('button', { class: 'btn sm', type: 'button', onclick: () => setLoc('area') }, '동네 이름으로 찾기')), 'warn');
+      else note(e.message || '검색하지 못했어요.', 'warn');
     }
   }
   function showFallback(q) {

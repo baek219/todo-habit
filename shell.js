@@ -27,8 +27,6 @@
     { items: [{ href: 'home.html', label: '홈', icon: 'home' }] },
     { title: '기록', items: [
       { href: 'index.html', label: '할일·습관', icon: 'check' },
-      { href: 'index.html?tab=calendar', label: '달력', icon: 'cal' },
-      { href: 'index.html?tab=notes', label: '메모장', icon: 'note' },
       { href: 'money.html', label: '가계부', icon: 'won' },
       { href: 'pet.html', label: '반려동물', icon: 'paw' }
     ] },
@@ -102,7 +100,7 @@
     GROUPS.forEach(g => {
       html += '<div class="ln-group">' + (g.title ? '<div class="ln-gtitle">' + g.title + '</div>' : '');
       g.items.forEach(it => {
-        const on = it.href === cur || (cur === 'index.html' && it.href === 'index.html');
+        const on = it.href === cur || (cur.startsWith('index.html') && it.href === 'index.html'); // 할일습관 안의 달력·메모 탭도 '할일·습관'으로 표시
         if (on) curLabel = it.label;
         html += '<a class="ln-link" href="' + it.href + '"' + (on ? ' aria-current="page"' : '') + '>' + svg(it.icon) + '<span>' + it.label + '</span></a>';
       });

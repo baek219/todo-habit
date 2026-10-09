@@ -16,6 +16,7 @@ html.ln-dark{
   color-scheme:dark;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important} /* 숨김 표시는 어떤 칸 모양 설정보다 우선 */
 html,body{margin:0;background:var(--bg)}
 body{font-family:var(--font);color:var(--fg);font-size:15px;line-height:1.55;-webkit-tap-highlight-color:transparent}
 .page{max-width:860px;margin:0 auto;padding:22px 16px 90px;display:grid;gap:16px}

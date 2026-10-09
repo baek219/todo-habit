@@ -66,16 +66,6 @@
     <ul class="list" id="saved"></ul>
   </section>
 
-  <section class="card">
-    <h2>당첨번호 직접 기록</h2>
-    <p class="small muted">서버 통계를 못 쓸 때, 동행복권에서 확인한 당첨번호를 직접 넣으면 그걸로 계산해요.</p>
-    <form id="draw-form" class="grid2" style="gap:8px" autocomplete="off">
-      <label class="field"><span class="label">회차</span><input id="d-round" type="number" min="1" max="9999" placeholder="예: 1190" /></label>
-      <label class="field"><span class="label">번호 6개 (+보너스)</span><input id="d-nums" type="text" placeholder="예: 3 11 17 25 33 41 + 7" /></label>
-      <div class="row"><button class="btn" type="submit">기록 추가</button></div>
-    </form>
-    <ul class="list" id="draws"></ul>
-  </section>
 </main>
 
 <script src="firebase.js"></script>
@@ -131,7 +121,7 @@
 
   /* 서버 통계 */
   async function loadStats() {
-    if (!Life.hasServer()) { toast('서버 연결 후에 쓸 수 있어요. 아래 "직접 기록"을 써 주세요.'); return; }
+    if (!Life.hasServer()) { toast('서버 연결 후에 쓸 수 있어요.'); return; }
     if (!Life.user()) { toast('통계는 로그인한 뒤 불러올 수 있어요'); Life.signIn(); return; }
     const btn = $('load-stats'); btn.disabled = true;
     try {
@@ -140,7 +130,7 @@
         const r = await Life.api('lotto/stats');
         server = r; try { localStorage.setItem('lotto_server_stats_v1', JSON.stringify(r)); } catch (e) {}
         render();
-        if (r.blocked) { toast('동행복권에서 번호를 가져오지 못했어요. 직접 기록을 써 주세요.'); break; }
+        if (r.blocked) { toast('동행복권에서 번호를 가져오지 못했어요. 잠시 뒤 다시 눌러 주세요.'); break; }
         if (r.complete) { toast(r.last + '회까지 통계를 불러왔어요'); break; }
       }
     } catch (e) { toast(e.message || '통계를 불러오지 못했어요'); }
@@ -148,31 +138,17 @@
   }
   $('load-stats').onclick = loadStats;
 
-  /* 직접 기록 */
-  $('draw-form').addEventListener('submit', e => {
-    e.preventDefault();
-    const round = parseInt($('d-round').value, 10);
-    const [main, bonusPart] = $('d-nums').value.split('+');
-    const nums = [...new Set((main.match(/\d+/g) || []).map(Number))];
-    const bonus = bonusPart ? parseInt((bonusPart.match(/\d+/) || [])[0], 10) : null;
-    if (!round) { toast('회차를 넣어 주세요'); return; }
-    if (nums.length !== 6 || nums.some(n => n < 1 || n > 45)) { toast('1~45 사이 서로 다른 번호 6개를 넣어 주세요'); return; }
-    if (bonus != null && (bonus < 1 || bonus > 45 || nums.includes(bonus))) { toast('보너스 번호를 확인해 주세요'); return; }
-    if (draws().some(d => d.round === round)) { toast(round + '회는 이미 있어요'); return; }
-    L.put({ t: 'draw', round, nums: nums.sort((a, b) => a - b), bonus: bonus || null });
-    $('d-round').value = ''; $('d-nums').value = '';
-  });
 
   function render() {
     const src = source();
-    ['hot', 'cold'].forEach(m => { document.querySelector('.mode[data-mode="' + m + '"]').disabled = !src; });
-    $('hot-hint').textContent = src ? src.label + ' 기준 상위 15개 중 6개' : '통계를 불러오거나 당첨번호를 기록하면 켜져요';
-    $('cold-hint').textContent = src ? src.label + ' 기준 하위 15개 중 6개' : '통계를 불러오거나 당첨번호를 기록하면 켜져요';
+    // 통계가 있을 때만 '자주/덜 나온 번호' 버튼을 보여줌
+    ['hot', 'cold'].forEach(m => { document.querySelector('.mode[data-mode="' + m + '"]').hidden = !src; });
+    if (src) { $('hot-hint').textContent = src.label + ' 기준 상위 15개 중 6개'; $('cold-hint').textContent = src.label + ' 기준 하위 15개 중 6개'; }
     if (server && server.complete) $('load-stats').textContent = '통계 새로 불러오기';
 
     // 빈도 그래프
     const fb = $('freq-box'); fb.replaceChildren();
-    if (!src) { $('stat-src').textContent = ''; fb.append(h('p', { class: 'empty' }, '"전체 회차 통계 불러오기"를 누르거나 아래에 당첨번호를 기록하면 번호별 횟수가 그려져요.')); }
+    if (!src) { $('stat-src').textContent = ''; fb.append(h('p', { class: 'empty' }, '"전체 회차 통계 불러오기"를 누르면 번호별 당첨 횟수가 그려지고, 위에 "자주 나온 / 덜 나온 번호 조합" 뽑기가 생겨요.')); }
     else {
       $('stat-src').textContent = src.label + ' 기준 (보너스 번호 제외)';
       const r = ranked(src.counts), hot = new Set(r.slice(0, 15)), cold = new Set(r.slice(-15));
@@ -196,11 +172,6 @@
         rk ? h('span', { class: 'badge rank ' + (/등/.test(rk) ? 'go' : '') }, rk) : null,
         h('button', { class: 'icon-btn', type: 'button', 'aria-label': '삭제', onclick: () => L.remove(x.id) }, '✕'));
     }) : [h('li', { class: 'empty' }, '번호를 뽑고 "뽑은 번호 저장"을 누르면 여기에 남아요.')]));
-
-    const d = draws();
-    $('draws').replaceChildren(...d.slice(0, 15).map(x => h('li', {}, h('b', { class: 'num', style: 'min-width:56px' }, x.round + '회'),
-      h('div', { class: 'grow balls' }, x.nums.map(n => ball(n, true)), x.bonus ? [h('span', { class: 'plus' }, '+'), ball(x.bonus, true)] : null),
-      h('button', { class: 'icon-btn', type: 'button', 'aria-label': '삭제', onclick: () => L.remove(x.id) }, '✕'))));
   }
   L.subscribe(render);
   render();
