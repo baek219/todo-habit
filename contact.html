@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#2F6F5E" />
-<link rel="stylesheet" href="life.css?v=20261009k" />
+<link rel="stylesheet" href="life.css?v=20261009l" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .p{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center}
@@ -35,12 +35,12 @@
   <p class="small muted">연락처 목록은 나만 볼 수 있어요. 가족 공유를 켜도 같이 보이지 않아요.</p>
 </main>
 
-<script src="firebase.js?v=20261009k"></script>
-<script src="sync.js?v=20261009k"></script>
-<script src="life-config.js?v=20261009k"></script>
-<script src="life.js?v=20261009k"></script>
-<script src="shell.js?v=20261009k"></script>
-<script src="import.js?v=20261009k"></script>
+<script src="firebase.js?v=20261009l"></script>
+<script src="sync.js?v=20261009l"></script>
+<script src="life-config.js?v=20261009l"></script>
+<script src="life.js?v=20261009l"></script>
+<script src="shell.js?v=20261009l"></script>
+<script src="import.js?v=20261009l"></script>
 <script>
 (function () {
   const { h, today, prettyDate, daysBetween, toast, sheet, iso } = Life;
@@ -53,7 +53,7 @@
   function form(x) {
     x = x || {};
     const name = h('input', { type: 'text', maxlength: '20', value: x.name || '', placeholder: '예: 엄마, 김민수' });
-    const every = h('select', {}, EVERY.map(([d, l]) => h('option', { value: d, selected: d === (x.every || 7) }, l)));
+    const every = Life.daysChoice({ options: EVERY, value: x.every || 7 });
     const how = h('input', { type: 'text', maxlength: '30', value: x.how || '', placeholder: '예: 쉬는 날 오후에 전화' });
     const last = h('input', { type: 'date', value: x.last || '' });
     let armed = false;
@@ -63,13 +63,13 @@
     } }, '삭제') : null;
     const close = sheet(x.id ? x.name + ' 고치기' : '사람 추가', h('div', { class: 'stack' },
       h('label', { class: 'field' }, h('span', { class: 'label' }, '누구'), name),
-      h('div', { class: 'grid2', style: 'gap:10px' },
-        h('label', { class: 'field' }, h('span', { class: 'label' }, '얼마나 자주'), every),
-        h('label', { class: 'field' }, h('span', { class: 'label' }, '마지막으로 연락한 날'), last)),
+      h('div', { class: 'field' }, h('span', { class: 'label' }, '얼마나 자주'), every.el),
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '마지막으로 연락한 날'), last),
       h('label', { class: 'field' }, h('span', { class: 'label' }, '메모'), how),
       h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => {
         if (!name.value.trim()) { toast('이름을 넣어 주세요'); return; }
-        P.put(Object.assign({}, x, { name: name.value.trim(), every: Number(every.value), how: how.value.trim(), last: last.value || x.last || '' }));
+        if (!(every.get() > 0)) { toast('며칠마다 연락할지 숫자로 적어 주세요'); return; }
+        P.put(Object.assign({}, x, { name: name.value.trim(), every: every.get(), how: how.value.trim(), last: last.value || x.last || '' }));
         close(); toast('저장했어요');
       } }, '저장'), h('span', { class: 'spacer' }), del)));
   }
@@ -81,7 +81,7 @@
       h('span', { class: 'face' + (n <= 0 ? ' due' : ''), 'aria-hidden': 'true' }, x.name.slice(0, 1)),
       h('div', { class: 'grow', role: 'button', tabindex: '0', style: 'cursor:pointer', onclick: () => form(x), onkeydown: e => { if (e.key === 'Enter') form(x); } },
         h('b', {}, x.name),
-        h('div', { class: 'tiny muted' }, (since == null ? '아직 기록 없음' : since === 0 ? '오늘 연락함' : since + '일 전에 연락') + ' · ' + (EVERY.find(e => e[0] === Number(x.every)) || [, x.every + '일마다'])[1] + (x.how ? ' · ' + x.how : ''))),
+        h('div', { class: 'tiny muted' }, (since == null ? '아직 기록 없음' : since === 0 ? '오늘 연락함' : since + '일 전에 연락') + ' · ' + Life.everyText(Number(x.every)) + (x.how ? ' · ' + x.how : ''))),
       h('div', { class: 'acts' },
         n > 0 ? h('span', { class: 'badge go' }, 'D-' + n) : null,
         h('button', { class: 'btn sm ' + (n <= 0 ? 'primary' : ''), type: 'button', onclick: () => { P.put(Object.assign({}, x, { last: today() })); toast(x.name + '님께 연락한 걸로 기록했어요'); } }, '연락했어요')));

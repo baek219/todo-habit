@@ -89,6 +89,27 @@
       redraw: draw
     };
   }
+  // 주기 고르기: 버튼(매일·매주…) + "+ 직접 쓰기"(○일마다)
+  // daysChoice({ options: [[7, '매주'], ...], value: 7 })  → get()은 날 수(숫자)
+  function daysChoice(o) {
+    const chips = h('div', { class: 'chips' });
+    const num = h('input', { type: 'number', min: '1', max: '730', inputmode: 'numeric', style: 'width:96px', 'aria-label': '며칠마다' });
+    const unit = h('div', { class: 'row', style: 'gap:8px', hidden: true }, num, h('span', {}, '일마다'),
+      h('span', { class: 'small muted' }, '(예: 10 → 10일마다, 45 → 45일마다)'));
+    let val = Number(o.value) || o.options[0][0];
+    let typing = !o.options.some(([d]) => d === val);
+    if (typing) { num.value = val; unit.hidden = false; }
+    function draw() {
+      chips.replaceChildren(...o.options.map(([d, l]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(!typing && d === val),
+        onclick: () => { typing = false; val = d; unit.hidden = true; draw(); } }, l)),
+        h('button', { type: 'button', class: 'chip', 'aria-pressed': String(typing), onclick: () => { typing = true; unit.hidden = false; num.value = ''; val = 0; draw(); num.focus(); } }, '+ 직접 쓰기'));
+    }
+    num.addEventListener('input', () => { val = parseInt(num.value, 10) || 0; });
+    draw();
+    return { el: h('div', { class: 'stack', style: 'gap:8px' }, chips, unit), get: () => val, set(v) { val = v; typing = !o.options.some(([d]) => d === v); if (typing) num.value = v; unit.hidden = !typing; draw(); } };
+  }
+  const everyText = d => ({ 1: '매일', 2: '이틀마다', 7: '매주', 14: '2주마다', 30: '한 달마다', 60: '두 달마다', 90: '석 달마다', 365: '1년마다' })[d] || d + '일마다';
+
   // 저장된 기록에서 직접 쓴 값들 모으기 (자주 쓴 순)
   function usedValues(items, key, base) {
     const c = {};
@@ -478,7 +499,7 @@
   setTimeout(onAuth, 0);
 
   window.Life = {
-    h, iso, today, won, newId, daysBetween, prettyDate, WD, toast, sheet, choice, usedValues, pager,
+    h, iso, today, won, newId, daysBetween, prettyDate, WD, toast, sheet, choice, usedValues, pager, daysChoice, everyText,
     store, api, hasServer, group, weather, weatherChip, weatherPlaces, setWeatherPlaces, pmGrade, searchPlace, reversePlace,
     canInstall: () => !!installEvt, install, standalone, ddayNext,
     onUser(fn) { userSubs.add(fn); try { fn(window.CloudSync && window.CloudSync.user); } catch (e) {} return () => userSubs.delete(fn); },

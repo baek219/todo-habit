@@ -115,7 +115,8 @@
   .qex { display:inline-block; border:1px dashed var(--border); border-radius: 8px; padding: 1px 7px; margin: 2px 2px; cursor:pointer; color: var(--text); font-weight:700; }
   .dd-edit { flex: none; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 9px; width: 34px; height: 30px; font-size: 15px; cursor: pointer; margin-left: 6px; }
   .quick-bar { padding: 10px 16px 0; }
-  .quick-bar button { width: 100%; text-align: left; border: 1.5px dashed var(--border); background: var(--surface); color: var(--text); border-radius: 14px; padding: 12px 14px; font-size: 14px; font-weight: 800; font-family: inherit; cursor: pointer; }
+  .quick-bar button { width: 100%; text-align: left; border: 1.5px solid var(--primary); background: var(--primary-soft, var(--surface)); color: var(--primary-dark, var(--primary)); border-radius: 14px; padding: 13px 14px; font-size: 15px; font-weight: 800; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.05); }
+  .quick-bar button::after { content: '누르기 ›'; margin-left: auto; font-size: 12.5px; font-weight: 700; opacity: .8; }
   .quick-bar button small { font-weight: 600; color: var(--text-muted); margin-left: 6px; }
   #dday-box:empty { display: none; }
   .dday-card { margin: 10px 16px 0; border-radius: 14px; border: 1.5px solid var(--imp); background: linear-gradient(90deg, var(--imp-soft), transparent 80%), var(--surface); padding: 10px 14px; }

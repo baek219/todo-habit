@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#2F6F5E" />
-<link rel="stylesheet" href="life.css?v=20261009k" />
+<link rel="stylesheet" href="life.css?v=20261009l" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .chore{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}
@@ -42,12 +42,12 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261009k"></script>
-<script src="sync.js?v=20261009k"></script>
-<script src="life-config.js?v=20261009k"></script>
-<script src="life.js?v=20261009k"></script>
-<script src="shell.js?v=20261009k"></script>
-<script src="import.js?v=20261009k"></script>
+<script src="firebase.js?v=20261009l"></script>
+<script src="sync.js?v=20261009l"></script>
+<script src="life-config.js?v=20261009l"></script>
+<script src="life.js?v=20261009l"></script>
+<script src="shell.js?v=20261009l"></script>
+<script src="import.js?v=20261009l"></script>
 <script>
 (function () {
   const { h, today, prettyDate, daysBetween, toast, sheet, iso } = Life;
@@ -56,7 +56,7 @@
   $('today').textContent = prettyDate(today());
   let names = {};
   const me = () => (Life.user() && Life.user().uid) || 'me';
-  const nameOf = id => id === 'together' ? '같이' : id === 'any' ? '아무나' : id === me() ? '나' : (names[id] || '가족');
+  const nameOf = id => id === 'together' ? '같이' : id === 'any' ? '아무나' : String(id).startsWith('n:') ? id.slice(2) : id === me() ? '나' : (names[id] || '가족');
   const PRESETS = [['설거지', 1], ['빨래', 3], ['청소기', 3], ['분리수거', 7], ['음식물 쓰레기', 2], ['화장실 청소', 7], ['이불 빨래', 14], ['냉장고 정리', 30]];
   const EVERY = [[1, '매일'], [2, '이틀마다'], [3, '3일마다'], [7, '매주'], [14, '2주마다'], [30, '매달']];
 
@@ -69,9 +69,13 @@
   function form(x) {
     x = x || {};
     const name = h('input', { type: 'text', maxlength: '20', value: x.name || '', placeholder: '예: 분리수거' });
-    const presets = h('div', { class: 'chips' }, PRESETS.map(([n, d]) => h('button', { type: 'button', class: 'chip', onclick: () => { name.value = n; every.value = d; } }, n)));
-    const every = h('select', {}, EVERY.map(([d, l]) => h('option', { value: d, selected: d === (x.every || 7) }, l)));
-    const who = h('select', {}, people().map(([id, l]) => h('option', { value: id, selected: id === (x.who || 'any') }, l)));
+    const presets = h('div', { class: 'chips' }, PRESETS.map(([n, d]) => h('button', { type: 'button', class: 'chip', onclick: () => { name.value = n; every.set(d); } }, n)));
+    const every = Life.daysChoice({ options: EVERY, value: x.every || 7 });
+    // 누가: 버튼으로 고르거나 "+ 직접 쓰기" (예: 엄마, 아들)
+    const ppl = people();
+    const usedWho = [...new Set(C.items().map(c => c.who).filter(w => String(w || '').startsWith('n:')).map(w => w.slice(2)))];
+    const who = Life.choice({ options: ppl.map(p => p[1]), value: nameOf(x.who || 'any'), extra: usedWho, placeholder: '예: 엄마, 아들, 도우미' });
+    const whoId = () => { const l = who.get(); if (!l) return 'any'; const f = ppl.find(p => p[1] === l); return f ? f[0] : 'n:' + l; };
     const last = h('input', { type: 'date', value: x.last || '' });
     let armed = false;
     const del = x.id ? h('button', { class: 'btn ghost', type: 'button', onclick: () => {
@@ -80,13 +84,13 @@
     } }, '삭제') : null;
     const close = sheet(x.id ? '집안일 고치기' : '집안일 추가', h('div', { class: 'stack' },
       h('label', { class: 'field' }, h('span', { class: 'label' }, '무슨 일'), name), x.id ? null : presets,
-      h('div', { class: 'grid2', style: 'gap:10px' },
-        h('label', { class: 'field' }, h('span', { class: 'label' }, '얼마나 자주'), every),
-        h('label', { class: 'field' }, h('span', { class: 'label' }, '누가'), who)),
+      h('div', { class: 'field' }, h('span', { class: 'label' }, '얼마나 자주'), every.el),
+      h('div', { class: 'field' }, h('span', { class: 'label' }, '누가'), who.el),
       h('label', { class: 'field' }, h('span', { class: 'label' }, '마지막으로 한 날 (모르면 비워두세요)'), last),
       h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => {
         if (!name.value.trim()) { toast('무슨 일인지 적어 주세요'); return; }
-        C.put(Object.assign({ log: [] }, x, { name: name.value.trim(), every: Number(every.value), who: who.value, last: last.value || x.last || '' }));
+        if (!(every.get() > 0)) { toast('며칠마다 할지 숫자로 적어 주세요'); return; }
+        C.put(Object.assign({ log: [] }, x, { name: name.value.trim(), every: every.get(), who: whoId(), last: last.value || x.last || '' }));
         close(); toast('저장했어요');
       } }, '저장'), h('span', { class: 'spacer' }), del)));
   }
@@ -103,7 +107,7 @@
       h('span', { class: 'badge dd ' + (n < 0 ? 'bad' : n === 0 ? 'warn' : 'go') }, n < 0 ? (-n) + '일 밀림' : n === 0 ? '오늘' : 'D-' + n),
       h('div', { class: 'grow', style: 'cursor:pointer', role: 'button', tabindex: '0', onclick: () => form(x), onkeydown: e => { if (e.key === 'Enter') form(x); } },
         h('div', { class: 'row', style: 'gap:6px' }, h('b', {}, x.name), h('span', { class: 'who' }, nameOf(x.who || 'any'))),
-        h('div', { class: 'tiny muted' }, (EVERY.find(e => e[0] === Number(x.every)) || [, x.every + '일마다'])[1] + (x.last ? ' · 마지막 ' + prettyDate(x.last) + (x.lastBy ? ' (' + nameOf(x.lastBy) + ')' : '') : ' · 아직 안 함'))),
+        h('div', { class: 'tiny muted' }, Life.everyText(Number(x.every)) + (x.last ? ' · 마지막 ' + prettyDate(x.last) + (x.lastBy ? ' (' + nameOf(x.lastBy) + ')' : '') : ' · 아직 안 함'))),
       h('button', { class: 'btn sm ' + (n <= 0 ? 'primary' : ''), type: 'button', onclick: () => done(x) }, '했어요'));
   }
   function render() {
