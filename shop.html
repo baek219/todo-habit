@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>장보기 · 생활노트</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<meta name="theme-color" content="#2F6F5E" />
+<link rel="stylesheet" href="life.css" />
+<script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
+<style>
+  .add-row{display:grid;grid-template-columns:1fr 92px auto;gap:8px}
+  .shop li{gap:10px}
+  .shop li.done .grow b{text-decoration:line-through;color:var(--muted);font-weight:500}
+  .qty{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px;white-space:nowrap}
+  .who{font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px;background:var(--surface2);color:var(--muted)}
+  .group-head{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.06em;padding:12px 2px 2px}
+  @media (max-width:420px){.add-row{grid-template-columns:1fr 70px auto}}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="page-head">
+    <span class="date" id="today"></span>
+    <h1>장보기 목록</h1>
+    <p id="sub">살 것을 적어두고, 마트에서 하나씩 체크하세요.</p>
+  </header>
+
+  <section class="card">
+    <form id="add" class="add-row" autocomplete="off">
+      <input type="text" id="name" maxlength="40" placeholder="예: 우유, 고양이 모래" aria-label="살 것" />
+      <input type="text" id="qty" maxlength="12" placeholder="수량" aria-label="수량" />
+      <button class="btn primary" type="submit">담기</button>
+    </form>
+    <div class="stack" style="gap:6px"><span class="label">자주 사는 것</span><div class="chips" id="freq"></div></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2 id="left-title">살 것</h2>
+      <button class="btn sm ghost" type="button" id="clear">산 것 지우기</button></div>
+    <ul class="list shop" id="list"></ul>
+  </section>
+</main>
+
+<script src="firebase.js"></script>
+<script src="sync.js"></script>
+<script src="life-config.js"></script>
+<script src="life.js"></script>
+<script src="shell.js"></script>
+<script>
+(function () {
+  const { h, today, prettyDate, toast } = Life;
+  const S = Life.store('shop');
+  const $ = id => document.getElementById(id);
+  $('today').textContent = prettyDate(today());
+  let names = {};
+
+  $('add').addEventListener('submit', e => {
+    e.preventDefault();
+    const n = $('name').value.trim(); if (!n) { $('name').focus(); return; }
+    addItem(n, $('qty').value.trim());
+    $('name').value = ''; $('qty').value = ''; $('name').focus();
+  });
+  function addItem(n, qty) {
+    const same = S.items().find(x => !x.done && x.name === n);
+    if (same) { toast('"' + n + '"은(는) 이미 목록에 있어요'); return; }
+    S.put({ name: n, qty: qty || '', done: false });
+    // 자주 사는 것 기록
+    const f = Object.assign({}, S.meta().freq || {}); f[n] = (f[n] || 0) + 1;
+    const top = Object.entries(f).sort((a, b) => b[1] - a[1]).slice(0, 40); // 너무 많이 쌓이지 않게
+    S.setMeta({ freq: Object.fromEntries(top) });
+  }
+  let armed = false;
+  $('clear').onclick = () => {
+    const done = S.items().filter(x => x.done);
+    if (!done.length) { toast('체크한 항목이 없어요'); return; }
+    if (!armed) { armed = true; $('clear').textContent = done.length + '개 지울까요? 한 번 더'; setTimeout(() => { armed = false; $('clear').textContent = '산 것 지우기'; }, 3000); return; }
+    done.forEach(x => S.remove(x.id)); armed = false; $('clear').textContent = '산 것 지우기'; toast('지웠어요');
+  };
+
+  async function loadNames() {
+    if (!Life.group.id()) { names = {}; return; }
+    try { const g = await Life.group.info(); names = (g && g.names) || {}; } catch (e) { names = {}; }
+    render();
+  }
+
+  function render() {
+    const shared = S.isShared();
+    $('sub').textContent = shared ? '가족과 같이 보는 목록이에요. 누가 담았는지도 표시돼요.' : '살 것을 적어두고, 마트에서 하나씩 체크하세요. 가족 공유를 켜면 같이 쓸 수 있어요.';
+    const all = S.items();
+    const left = all.filter(x => !x.done).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    const done = all.filter(x => x.done).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    $('left-title').textContent = '살 것 ' + left.length + '개';
+    const me = Life.user() && Life.user().uid;
+    const row = x => h('li', { class: x.done ? 'done' : '' },
+      h('input', { type: 'checkbox', checked: !!x.done, 'aria-label': x.name + ' 샀어요', onchange: () => S.put(Object.assign({}, x, { done: !x.done })) }),
+      h('div', { class: 'grow' }, h('b', {}, x.name)),
+      x.qty ? h('span', { class: 'qty' }, x.qty) : null,
+      shared && x.by && names[x.by] ? h('span', { class: 'who' }, x.by === me ? '나' : names[x.by]) : null,
+      h('button', { class: 'icon-btn', type: 'button', 'aria-label': x.name + ' 지우기', onclick: () => S.remove(x.id) }, '✕'));
+    const list = $('list'); list.replaceChildren();
+    if (!all.length) list.append(h('li', { class: 'empty' }, '위 칸에 살 것을 적고 "담기"를 눌러 보세요.'));
+    left.forEach(x => list.append(row(x)));
+    if (done.length) { list.append(h('li', { class: 'group-head' }, '장바구니에 담음 ' + done.length + '개')); done.forEach(x => list.append(row(x))); }
+
+    const inList = new Set(left.map(x => x.name));
+    const freq = Object.entries(S.meta().freq || {}).filter(([n]) => !inList.has(n)).sort((a, b) => b[1] - a[1]).slice(0, 12);
+    $('freq').replaceChildren(...(freq.length ? freq.map(([n]) => h('button', { type: 'button', class: 'chip', onclick: () => addItem(n, '') }, '+ ' + n))
+      : [h('span', { class: 'small muted' }, '자주 담는 물건이 여기에 생겨요. 누르면 바로 담겨요.')]));
+  }
+  S.subscribe(render);
+  Life.group.onChange(loadNames);
+  Life.onUser(() => loadNames());
+  render();
+})();
+</script>
+</body>
+</html>

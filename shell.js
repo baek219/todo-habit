@@ -18,6 +18,10 @@
     bowl: '<path d="M3 11h18a9 9 0 01-18 0z"/><path d="M8 7c0-2 2-2 2-4M13 7c0-2 2-2 2-4"/>',
     pin: '<path d="M12 21s7-6.5 7-12a7 7 0 00-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/>',
     ball: '<circle cx="12" cy="12" r="9"/><path d="M8 12h8M12 8v8"/>',
+    cart: '<path d="M3 4h2l2.4 11h10.2L20 8H7"/><circle cx="9" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/>',
+    house: '<path d="M4 11l8-6 8 6v9H4z"/><path d="M9 20v-5h6v5"/>',
+    people: '<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 19c0-3 3-5 6-5s6 2 6 5M15 14.5c2.5 0 6 1.2 6 4.5"/>',
+    down: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
     menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
     x: '<path d="M6 6l12 12M18 6L6 18"/>'
   };
@@ -28,12 +32,17 @@
     { title: '기록', items: [
       { href: 'index.html', label: '할일·습관', icon: 'check' },
       { href: 'money.html', label: '가계부', icon: 'won' },
+      { href: 'shop.html', label: '장보기', icon: 'cart' },
       { href: 'pet.html', label: '반려동물', icon: 'paw' }
     ] },
     { title: '먹고 즐기기', items: [
       { href: 'menu.html', label: '메뉴 추천', icon: 'bowl' },
       { href: 'food.html', label: '맛집 찾기', icon: 'pin' },
       { href: 'lotto.html', label: '로또 번호', icon: 'ball' }
+    ] },
+    { title: '도구', items: [
+      { href: 'calc.html', label: '내 집 마련 계산기', icon: 'house' },
+      { href: 'family.html', label: '가족 공유', icon: 'people' }
     ] }
   ];
 
@@ -60,6 +69,8 @@
   .ln-tip{font-size:11px;color:var(--ln-muted);line-height:1.45}
   .ln-btn{border:1.5px solid var(--ln-line);background:var(--ln-surface);color:var(--ln-fg);border-radius:10px;padding:9px 10px;font:inherit;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
   .ln-btn.g{border-color:#dadce0}
+  .ln-btn.ln-install{background:var(--ln-primary);border-color:var(--ln-primary);color:#fff}
+  html.ln-dark .ln-btn.ln-install{color:#0F1A15}
   .ln-top{display:none}
   .ln-veil{display:none}
   @media (min-width:960px){
@@ -125,6 +136,7 @@
     document.body.appendChild(side);
     renderAccount();
     window.addEventListener('cloudsync', renderAccount);
+    window.addEventListener('life-install', renderAccount);
     // 다른 페이지에서 다크모드를 바꾸면 따라감
     window.addEventListener('storage', e => { if (e.key === 'dark_mode_v1') document.documentElement.classList.toggle('ln-dark', isDark()); });
     // 할일습관 화면 안의 다크모드 버튼과도 맞춤
@@ -138,6 +150,12 @@
     const box = document.getElementById('ln-acc'); if (!box) return;
     const CS = window.CloudSync;
     box.replaceChildren();
+    if (window.Life && window.Life.canInstall && window.Life.canInstall()) {
+      const ib = document.createElement('button'); ib.type = 'button'; ib.className = 'ln-btn ln-install';
+      ib.innerHTML = svg('down') + '<span>앱으로 설치</span>';
+      ib.addEventListener('click', () => window.Life.install());
+      box.appendChild(ib);
+    }
     if (!CS || !CS.ready) {
       const p = document.createElement('div'); p.className = 'ln-who';
       p.innerHTML = '<span>로그인 준비 중…</span>'; box.appendChild(p); return;

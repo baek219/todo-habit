@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>내 집 마련 계산기 · 생활노트</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<meta name="theme-color" content="#2F6F5E" />
+<link rel="stylesheet" href="life.css" />
+<script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
+<style>
+  .inputs{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+  .unit{position:relative}
+  .unit input{padding-right:52px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+  .unit span{position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;pointer-events:none}
+  .hint{font-size:12px;color:var(--muted);min-height:16px}
+  .result{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+  .result .stat b{font-size:21px}
+  .result .stat.main{background:var(--primary-soft)}
+  .result .stat.main b{color:var(--primary-dark);font-size:26px}
+  .chart{width:100%;height:auto;display:block}
+  .chart text{fill:var(--muted);font-size:11px;font-family:var(--font)}
+  .chart .grid{stroke:var(--line)}
+  .legend{display:flex;gap:14px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+  .chart-wrap{overflow-x:auto}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="page-head">
+    <span class="date" id="today"></span>
+    <h1>내 집 마련 계산기</h1>
+    <p>집값과 모은 돈, 금리를 넣으면 대출이 얼마 필요하고 매달 얼마씩 갚게 되는지 계산해요.</p>
+  </header>
+
+  <section class="card">
+    <h2>조건 넣기</h2>
+    <div class="inputs">
+      <label class="field"><span class="label">집값</span><div class="unit"><input id="price" type="text" inputmode="numeric" /><span>만원</span></div><span class="hint" id="price-h"></span></label>
+      <label class="field"><span class="label">내가 가진 돈 (자기자본)</span><div class="unit"><input id="own" type="text" inputmode="numeric" /><span>만원</span></div><span class="hint" id="own-h"></span></label>
+      <label class="field"><span class="label">세금·이사비 등 부대비용</span><div class="unit"><input id="extra" type="text" inputmode="numeric" /><span>만원</span></div><span class="hint" id="extra-h">모르면 집값의 2~3% 정도로 넣어 보세요</span></label>
+      <label class="field"><span class="label">대출 금리 (연)</span><div class="unit"><input id="rate" type="text" inputmode="decimal" /><span>%</span></div><span class="hint">은행·상품마다 달라요</span></label>
+      <label class="field"><span class="label">갚는 기간</span><select id="years"><option value="10">10년</option><option value="20">20년</option><option value="30" selected>30년</option><option value="40">40년</option></select><span class="hint"></span></label>
+      <label class="field"><span class="label">갚는 방식</span><select id="method"><option value="equal">원리금 균등 (매달 같은 금액)</option><option value="principal">원금 균등 (처음에 많이, 점점 줄어듦)</option></select><span class="hint"></span></label>
+      <label class="field"><span class="label">우리 집 연소득 (선택)</span><div class="unit"><input id="income" type="text" inputmode="numeric" placeholder="비워도 돼요" /><span>만원</span></div><span class="hint" id="income-h">넣으면 소득 대비 얼마나 갚는지 보여줘요</span></label>
+    </div>
+    <p class="small muted">입력한 숫자는 이 기기에만 저장되고, 클라우드나 가족 공유로 올라가지 않아요.</p>
+  </section>
+
+  <section class="card" aria-live="polite">
+    <h2>계산 결과</h2>
+    <div class="result" id="result"></div>
+    <p class="note" id="note"></p>
+  </section>
+
+  <section class="card">
+    <h2>해마다 갚는 돈</h2>
+    <p class="small muted" id="chart-cap"></p>
+    <div class="chart-wrap" id="chart"></div>
+    <div class="legend"><span><i style="background:var(--primary)"></i>원금</span><span><i style="background:var(--accent)"></i>이자</span></div>
+  </section>
+
+  <section class="card">
+    <h2>거꾸로 계산: 매달 이만큼 갚을 수 있다면</h2>
+    <div class="inputs">
+      <label class="field"><span class="label">매달 갚을 수 있는 돈</span><div class="unit"><input id="monthly" type="text" inputmode="numeric" /><span>만원</span></div><span class="hint"></span></label>
+    </div>
+    <div class="result" id="reverse"></div>
+    <p class="small muted">위의 금리·기간·내가 가진 돈·부대비용을 그대로 써서, 원리금 균등 방식으로 계산해요.</p>
+  </section>
+</main>
+
+<script src="firebase.js"></script>
+<script src="sync.js"></script>
+<script src="life-config.js"></script>
+<script src="life.js"></script>
+<script src="shell.js"></script>
+<script>
+(function () {
+  const { h, today, prettyDate } = Life;
+  const $ = id => document.getElementById(id);
+  $('today').textContent = prettyDate(today());
+  const KEY = 'calc_home_inputs_v1';
+  const DEF = { price: 50000, own: 15000, extra: 1500, rate: 4.0, years: 30, method: 'equal', income: '', monthly: 150 };
+  let v = DEF; try { v = Object.assign({}, DEF, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) {}
+
+  const num = s => parseFloat(String(s).replace(/[^\d.]/g, '')) || 0;
+  const comma = n => Math.round(n).toLocaleString('ko-KR');
+  // 만원 단위를 "5억 3,000만원"처럼
+  function man(n) {
+    n = Math.round(n); if (!n) return '0원';
+    const neg = n < 0; n = Math.abs(n);
+    const eok = Math.floor(n / 10000), rest = n % 10000;
+    return (neg ? '−' : '') + (eok ? eok + '억' + (rest ? ' ' : '') : '') + (rest ? comma(rest) + '만' : '') + '원';
+  }
+  const won = n => comma(n) + '원';
+
+  // 입력칸 채우기
+  ['price', 'own', 'extra', 'income', 'monthly'].forEach(k => { $(k).value = v[k] === '' ? '' : comma(v[k]); });
+  $('rate').value = v.rate; $('years').value = v.years; $('method').value = v.method;
+  ['price', 'own', 'extra', 'income', 'monthly'].forEach(k => $(k).addEventListener('input', e => {
+    const n = num(e.target.value); e.target.value = e.target.value.trim() === '' ? '' : comma(n); calc();
+  }));
+  ['rate', 'years', 'method'].forEach(k => $(k).addEventListener('input', calc));
+
+  // 대출 상환표 (연 단위로 묶음)
+  function schedule(P, r, n, method) {
+    const i = r / 100 / 12; const rows = []; let bal = P, totalInt = 0, first = 0, last = 0;
+    const pmtEq = i ? P * i / (1 - Math.pow(1 + i, -n)) : P / n;
+    for (let k = 1; k <= n; k++) {
+      const interest = bal * i;
+      const principal = method === 'equal' ? pmtEq - interest : P / n;
+      const pay = principal + interest;
+      if (k === 1) first = pay; if (k === n) last = pay;
+      bal -= principal; totalInt += interest;
+      const y = Math.ceil(k / 12) - 1;
+      rows[y] = rows[y] || { p: 0, i: 0 }; rows[y].p += principal; rows[y].i += interest;
+    }
+    return { first, last, totalInt, rows };
+  }
+
+  function stat(label, val, sub, main) { return h('div', { class: 'stat' + (main ? ' main' : '') }, h('span', { class: 'label' }, label), h('b', {}, val), sub ? h('span', { class: 'tiny muted' }, sub) : null); }
+
+  function chart(rows) {
+    const W = Math.max(560, rows.length * 18 + 60), H = 220, L = 54, R = 10, T = 12, B = 26;
+    const max = Math.max(...rows.map(r => r.p + r.i)) || 1;
+    const nice = (() => { const step = Math.pow(10, Math.floor(Math.log10(max / 4))); const m = [1, 2, 5, 10].find(x => max / (x * step) <= 4) * step; return m; })();
+    const top = Math.ceil(max / nice) * nice;
+    const Y = val => T + (1 - val / top) * (H - T - B);
+    const bw = (W - L - R) / rows.length;
+    const NS = 'http://www.w3.org/2000/svg';
+    const s = (tag, a, txt) => { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); if (txt != null) e.textContent = txt; return e; };
+    const svg = s('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'chart', style: 'min-width:' + Math.min(W, 900) + 'px', role: 'img', 'aria-label': '해마다 갚는 원금과 이자 막대그래프' });
+    for (let g = 0; g <= top + 1e-9; g += nice) {
+      svg.append(s('line', { x1: L, x2: W - R, y1: Y(g), y2: Y(g), class: 'grid' }), s('text', { x: L - 6, y: Y(g) + 4, 'text-anchor': 'end' }, g >= 10000 ? (g / 10000) + '억' : comma(g) + '만'));
+    }
+    rows.forEach((r, k) => {
+      const x = L + k * bw + bw * 0.15, w = bw * 0.7;
+      svg.append(s('rect', { x, y: Y(r.p), width: w, height: Y(0) - Y(r.p), fill: 'var(--primary)', rx: 2 }));
+      svg.append(s('rect', { x, y: Y(r.p + r.i), width: w, height: Y(r.p) - Y(r.p + r.i), fill: 'var(--accent)', rx: 2 }));
+      if (k === 0 || (k + 1) % 5 === 0) svg.append(s('text', { x: x + w / 2, y: H - 8, 'text-anchor': 'middle' }, (k + 1) + '년'));
+    });
+    return svg;
+  }
+
+  function calc() {
+    v = { price: num($('price').value), own: num($('own').value), extra: num($('extra').value), rate: num($('rate').value), years: Number($('years').value),
+      method: $('method').value, income: $('income').value.trim() === '' ? '' : num($('income').value), monthly: num($('monthly').value) };
+    try { localStorage.setItem(KEY, JSON.stringify(v)); } catch (e) {}
+    $('price-h').textContent = v.price ? man(v.price) : '';
+    $('own-h').textContent = v.own ? man(v.own) : '';
+    $('income-h').textContent = v.income ? man(v.income) + ' · 넣으면 소득 대비 얼마나 갚는지 보여줘요' : '넣으면 소득 대비 얼마나 갚는지 보여줘요';
+    const need = v.price + v.extra;
+    const loan = Math.max(0, need - v.own);         // 만원
+    const n = v.years * 12;
+    const res = $('result'), note = $('note');
+    if (!v.price) { res.replaceChildren(h('p', { class: 'empty' }, '집값을 넣어 주세요.')); note.hidden = true; $('chart').replaceChildren(); return; }
+    if (!loan) {
+      res.replaceChildren(stat('필요한 대출', '0원', '가진 돈으로 충분해요', true), stat('남는 돈', man(v.own - need)));
+      note.hidden = true; $('chart').replaceChildren(); $('chart-cap').textContent = '대출이 없어서 갚을 돈이 없어요.'; reverse(); return;
+    }
+    const sc = schedule(loan * 10000, v.rate, n, v.method);
+    const ratio = loan / v.price * 100;
+    const yearly = sc.rows[0].p + sc.rows[0].i;
+    const items = [
+      stat(v.method === 'equal' ? '매달 갚는 돈' : '첫 달 갚는 돈', won(sc.first), v.method === 'equal' ? v.years + '년 동안 매달 같아요' : '마지막 달엔 ' + won(sc.last), true),
+      stat('필요한 대출', man(loan), '집값의 ' + ratio.toFixed(0) + '%'),
+      stat('총 이자', man(sc.totalInt / 10000), v.years + '년 동안'),
+      stat('총 갚는 돈', man(loan + sc.totalInt / 10000), '대출 + 이자')
+    ];
+    if (v.income) items.push(stat('소득 대비 갚는 비율', (yearly / (v.income * 10000) * 100).toFixed(1) + '%', '첫해 갚는 돈 ÷ 연소득'));
+    res.replaceChildren(...items);
+    note.hidden = false;
+    note.textContent = '실제로 받을 수 있는 대출 한도와 금리는 은행 심사, 정부 정책, 상품에 따라 달라요. 이 결과는 감을 잡기 위한 계산이에요. 대출을 정할 땐 은행 상담에서 꼭 확인하세요.';
+    $('chart-cap').textContent = '앞쪽 해일수록 주황색(이자)이 많아요. 시간이 갈수록 원금 비중이 커져요.';
+    $('chart').replaceChildren(chart(sc.rows.map(r => ({ p: r.p / 10000, i: r.i / 10000 }))));
+    reverse();
+  }
+
+  function reverse() {
+    const m = v.monthly * 10000, i = v.rate / 100 / 12, n = v.years * 12;
+    const box = $('reverse');
+    if (!m) { box.replaceChildren(h('p', { class: 'empty' }, '매달 갚을 수 있는 돈을 넣어 보세요.')); return; }
+    const maxLoan = (i ? m * (1 - Math.pow(1 + i, -n)) / i : m * n) / 10000; // 만원
+    const maxPrice = maxLoan + v.own - v.extra;
+    box.replaceChildren(stat('빌릴 수 있는 돈 (계산상)', man(maxLoan), '매달 ' + man(v.monthly) + '씩 ' + v.years + '년'), stat('살 수 있는 집값 (계산상)', man(Math.max(0, maxPrice)), '대출 + 가진 돈 − 부대비용', true));
+  }
+  calc();
+})();
+</script>
+</body>
+</html>

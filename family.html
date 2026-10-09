@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>가족 공유 · 생활노트</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<meta name="theme-color" content="#2F6F5E" />
+<link rel="stylesheet" href="life.css" />
+<script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
+<style>
+  .members{display:flex;gap:10px;flex-wrap:wrap}
+  .member{display:flex;align-items:center;gap:8px;background:var(--surface2);border-radius:999px;padding:6px 14px 6px 6px;font-weight:600}
+  .member i{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--primary-soft);color:var(--primary-dark);font-style:normal;font-weight:800}
+  .share-link{display:grid;grid-template-columns:1fr auto;gap:8px}
+  .what{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+  .what div{background:var(--surface2);border-radius:12px;padding:10px 12px;font-size:14px}
+  .what b{display:block}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="page-head">
+    <span class="date" id="today"></span>
+    <h1>가족 공유</h1>
+    <p>배우자나 가족을 초대하면 가계부·장보기·반려동물 기록을 같이 보고 같이 고칠 수 있어요.</p>
+  </header>
+
+  <section class="card">
+    <h2>같이 쓰게 되는 것</h2>
+    <div class="what">
+      <div><b>가계부</b><span class="muted">지출·예산·고정 지출</span></div>
+      <div><b>장보기 목록</b><span class="muted">한 사람이 담고 다른 사람이 체크</span></div>
+      <div><b>반려동물 수첩</b><span class="muted">병원·접종·몸무게·사료</span></div>
+    </div>
+    <p class="small muted">할일·습관, 메뉴 기록, 내 맛집, 로또는 각자 따로예요.</p>
+  </section>
+
+  <section class="card" id="state"></section>
+</main>
+
+<script src="firebase.js"></script>
+<script src="sync.js"></script>
+<script src="life-config.js"></script>
+<script src="life.js"></script>
+<script src="shell.js"></script>
+<script>
+(function () {
+  const { h, today, prettyDate, toast } = Life;
+  const $ = id => document.getElementById(id);
+  $('today').textContent = prettyDate(today());
+  const joinId = new URLSearchParams(location.search).get('join');
+  const link = gid => location.origin + location.pathname + '?join=' + gid;
+  const errMsg = e => (e && e.code === 'permission-denied') ? 'Firebase 규칙이 아직 예전 것이에요. 설정 안내서의 새 규칙을 붙여넣어 주세요.' : (e && e.message) || '문제가 생겼어요.';
+
+  function copyBox(url) {
+    const inp = h('input', { type: 'text', readonly: true, value: url, 'aria-label': '초대 주소' });
+    return h('div', { class: 'share-link' }, inp, h('button', { class: 'btn', type: 'button', onclick: async () => {
+      try { await navigator.clipboard.writeText(url); toast('초대 주소를 복사했어요. 카톡으로 보내 주세요.'); } catch (e) { inp.select(); toast('주소를 길게 눌러 복사해 주세요'); }
+    } }, '복사'));
+  }
+
+  let busy = false;
+  async function render() {
+    const box = $('state');
+    const u = Life.user();
+    if (!u) {
+      box.replaceChildren(h('h2', {}, joinId ? '가족 초대를 받았어요' : '먼저 로그인해 주세요'),
+        h('p', { class: 'muted' }, joinId ? 'Google로 로그인하면 바로 함께 쓰기를 시작할 수 있어요.' : '가족 공유는 로그인한 사람끼리만 할 수 있어요.'),
+        h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => Life.signIn() }, 'Google로 로그인')));
+      return;
+    }
+    const gid = Life.group.id();
+
+    // 초대 주소로 들어온 경우
+    if (joinId && gid !== joinId) {
+      box.replaceChildren(h('p', { class: 'muted' }, '초대 정보를 확인하는 중…'));
+      let info = null; try { info = await Life.group.info(joinId); } catch (e) { box.replaceChildren(h('p', {}, errMsg(e))); return; }
+      if (!info || !info.members || !info.members.length) { box.replaceChildren(h('h2', {}, '없거나 끝난 초대예요'), h('p', { class: 'muted' }, '초대한 사람에게 새 주소를 받아 주세요.')); return; }
+      const who = Object.values(info.names || {}).join(', ') || '가족';
+      box.replaceChildren(h('h2', {}, who + '님이 초대했어요'),
+        gid ? h('p', { class: 'note warn' }, '지금 다른 가족 공유에 들어가 있어요. 수락하면 그 공유에서 나와요.') : null,
+        h('p', { class: 'small muted' }, '수락하면 이 기기에 있던 내 가계부·장보기·반려동물 기록도 공용으로 합쳐져요.'),
+        h('div', { class: 'row' },
+          h('button', { class: 'btn primary', type: 'button', onclick: async e => {
+            if (busy) return; busy = true; e.currentTarget.disabled = true;
+            try { if (gid) await Life.group.leave(); await Life.group.join(joinId); toast('가족 공유를 시작했어요'); history.replaceState(null, '', location.pathname); location.reload(); }
+            catch (err) { toast(errMsg(err)); e.currentTarget.disabled = false; } finally { busy = false; }
+          } }, '수락하고 같이 쓰기'),
+          h('a', { class: 'btn ghost', href: 'family.html' }, '나중에')));
+      return;
+    }
+
+    if (!gid) {
+      box.replaceChildren(h('h2', {}, '아직 혼자 쓰고 있어요'),
+        h('p', { class: 'muted' }, '"가족 공유 시작"을 누르면 초대 주소가 생겨요. 그 주소를 가족에게 보내면, 가족이 열고 로그인해서 수락하면 끝이에요.'),
+        h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: async e => {
+          if (busy) return; busy = true; e.currentTarget.disabled = true;
+          try { await Life.group.create(); toast('가족 공유를 만들었어요'); render(); }
+          catch (err) { toast(errMsg(err)); e.currentTarget.disabled = false; } finally { busy = false; }
+        } }, '가족 공유 시작')));
+      return;
+    }
+
+    box.replaceChildren(h('p', { class: 'muted' }, '불러오는 중…'));
+    let info = null; try { info = await Life.group.info(gid); } catch (e) { box.replaceChildren(h('p', {}, errMsg(e))); return; }
+    const names = (info && info.names) || {};
+    const members = (info && info.members) || [];
+    let armed = false;
+    const leave = h('button', { class: 'btn ghost', type: 'button', onclick: async () => {
+      if (!armed) { armed = true; leave.textContent = '한 번 더 누르면 나가요'; leave.style.color = 'var(--danger)'; return; }
+      await Life.group.leave(); toast('가족 공유에서 나왔어요. 이제 내 기록만 보여요.'); render();
+    } }, '가족 공유에서 나가기');
+    box.replaceChildren(
+      h('div', { class: 'card-head' }, h('h2', {}, '함께 쓰는 사람 ' + members.length + '명'), h('span', { class: 'badge go' }, '공유 중')),
+      h('div', { class: 'members' }, members.map(m => { const n = names[m] || '가족'; return h('span', { class: 'member' }, h('i', {}, n.slice(0, 1)), n + (m === u.uid ? ' (나)' : '')); })),
+      h('div', { class: 'stack' }, h('span', { class: 'label' }, '초대 주소 — 가족에게 보내 주세요'), copyBox(link(gid))),
+      members.length < 2 ? h('p', { class: 'small muted' }, '받은 사람이 주소를 열고 Google로 로그인한 뒤 "수락"을 누르면 여기에 나타나요.') : null,
+      h('p', { class: 'small muted' }, '이 주소를 아는 사람은 누구나 들어올 수 있어요. 가족에게만 보내 주세요.'),
+      h('div', { class: 'row' }, leave));
+  }
+  Life.onUser(() => render());
+  Life.group.onChange(() => render());
+  render();
+})();
+</script>
+</body>
+</html>

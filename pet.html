@@ -54,6 +54,8 @@
   const P = Life.store('pets');      // 아이 정보
   const R = Life.store('petlog');    // 기록
   const M = Life.store('money');     // 비용을 가계부에도 남길 때
+  const SU = Life.store('supplies'); // 사료·모래 같은 소모품
+  const SHOP = Life.store('shop');   // 장보기 목록에 담기
   const TYPES = ['병원', '예방접종', '구충·심장사상충', '사료·간식', '체중', '미용·목욕', '약', '기타'];
   const KINDS = ['고양이', '강아지', '기타'];
   let sel = null, filter = '';
@@ -141,6 +143,65 @@
       } }, '저장'), h('span', { class: 'spacer' }), del)));
   }
 
+  /* 사료·모래 떨어짐 알림 */
+  function dueOf(x) { const d = new Date(x.last + 'T00:00:00'); d.setDate(d.getDate() + Number(x.days || 30)); return Life.iso(d); }
+  function supplyForm(x) {
+    x = x || {};
+    const name = h('input', { type: 'text', maxlength: '20', value: x.name || '', placeholder: '예: 사료, 모래' });
+    const presets = h('div', { class: 'chips' }, ['사료', '모래', '간식', '패드', '영양제'].map(n => h('button', { type: 'button', class: 'chip', onclick: () => { name.value = n; } }, n)));
+    const last = h('input', { type: 'date', value: x.last || today() });
+    const days = h('input', { type: 'number', min: '1', max: '365', inputmode: 'numeric', value: x.days || 30 });
+    let armed = false;
+    const del = x.id ? h('button', { class: 'btn ghost', type: 'button', onclick: () => {
+      if (!armed) { armed = true; del.textContent = '한 번 더 누르면 삭제'; del.style.color = 'var(--danger)'; return; }
+      SU.remove(x.id); close(); toast('삭제했어요');
+    } }, '삭제') : null;
+    const close = sheet(x.id ? x.name + ' 고치기' : '소모품 추가', h('div', { class: 'stack' },
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '이름'), name), presets,
+      h('div', { class: 'grid2', style: 'gap:10px' },
+        h('label', { class: 'field' }, h('span', { class: 'label' }, '마지막으로 산(뜯은) 날'), last),
+        h('label', { class: 'field' }, h('span', { class: 'label' }, '한 번 사면 보통 며칠 가요'), days)),
+      h('p', { class: 'small muted' }, '"새로 샀어요"를 몇 번 누르면, 실제로 산 간격을 보고 며칠 가는지 알아서 맞춰요.'),
+      h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => {
+        const d = parseInt(days.value, 10);
+        if (!name.value.trim() || !(d > 0)) { toast('이름과 며칠 가는지 넣어 주세요'); return; }
+        SU.put(Object.assign({ history: [] }, x, { name: name.value.trim(), last: last.value || today(), days: d }));
+        close(); toast('저장했어요');
+      } }, '저장'), h('span', { class: 'spacer' }), del)));
+  }
+  function bought(x) {
+    const hist = Array.from(new Set([...(x.history || []), x.last].filter(Boolean))).sort();
+    const t = today();
+    let days = x.days;
+    const all = Array.from(new Set(hist.concat([t]))).sort();
+    if (all.length >= 3) { // 최근 간격 평균으로 자동 조정
+      const gaps = []; for (let i = Math.max(1, all.length - 4); i < all.length; i++) gaps.push(daysBetween(all[i - 1], all[i]));
+      const avg = Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length); if (avg > 0) days = avg;
+    }
+    SU.put(Object.assign({}, x, { last: t, history: all.slice(-8), days }));
+    toast(x.name + ' 새로 산 걸로 기록했어요' + (days !== x.days ? ' · 이제 ' + days + '일로 계산해요' : ''));
+  }
+  function suppliesCard() {
+    const list = SU.items().sort((a, b) => dueOf(a).localeCompare(dueOf(b)));
+    return h('section', { class: 'card' },
+      h('div', { class: 'card-head' }, h('h2', {}, '사료·모래 떨어짐 알림'), h('button', { class: 'btn sm soft', type: 'button', onclick: () => supplyForm() }, '+ 소모품')),
+      list.length ? h('ul', { class: 'list' }, list.map(x => {
+        const due = dueOf(x), n = daysBetween(today(), due), used = Math.min(100, Math.max(0, daysBetween(x.last, today()) / (x.days || 30) * 100));
+        return h('li', { style: 'align-items:flex-start' },
+          h('span', { class: 'badge d ' + (n < 0 ? 'bad' : n <= 5 ? 'warn' : 'go'), style: 'min-width:62px;justify-content:center' }, n < 0 ? (-n) + '일 지남' : n === 0 ? '오늘' : 'D-' + n),
+          h('div', { class: 'grow stack', style: 'gap:5px' },
+            h('div', { class: 'row', style: 'justify-content:space-between' }, h('b', {}, x.name), h('button', { class: 'btn sm ghost', type: 'button', onclick: () => supplyForm(x) }, '고치기')),
+            h('div', { class: 'bar' + (n < 0 ? ' over' : '') }, h('i', { style: 'width:' + used + '%' })),
+            h('span', { class: 'tiny muted' }, prettyDate(x.last) + '에 삼 · ' + x.days + '일 간다고 보면 ' + prettyDate(due) + '쯤 떨어져요'),
+            h('div', { class: 'row' },
+              h('button', { class: 'btn sm primary', type: 'button', onclick: () => bought(x) }, '새로 샀어요'),
+              h('button', { class: 'btn sm', type: 'button', onclick: () => {
+                if (SHOP.items().some(s => !s.done && s.name === x.name)) { toast('이미 장보기 목록에 있어요'); return; }
+                SHOP.put({ name: x.name, qty: '', done: false }); toast('장보기 목록에 담았어요');
+              } }, '장보기에 담기'))));
+      })) : h('p', { class: 'empty' }, '"+ 소모품"으로 사료·모래를 등록하면, 떨어지기 며칠 전부터 여기와 홈에 알려줘요.'));
+  }
+
   /* 몸무게 그래프 */
   function weightChart(recs) {
     const pts = recs.filter(r => r.type === '체중' && r.weight > 0).sort((a, b) => a.date.localeCompare(b.date)).slice(-12);
@@ -189,6 +250,7 @@
           h('button', { class: 'btn sm soft', type: 'button', onclick: () => { sel = r.petId; recForm(null, r.type); } }, '다녀옴'));
       })) : h('p', { class: 'empty' }, '기록할 때 "다음 일정"을 넣으면 여기서 날짜를 알려줘요.')));
 
+    main.append(suppliesCard());
     if (!sel) return;
     const pet = P.get(sel);
     const recs = all.filter(r => r.petId === sel);
@@ -218,7 +280,7 @@
           r.next ? h('div', { class: 'tiny muted' }, '다음: ' + prettyDate(r.next)) : null),
         r.cost ? h('span', { class: 'num small' }, won(r.cost)) : null))) : h('p', { class: 'empty' }, '"+ 기록"을 눌러 병원·접종·사료 기록을 남겨 보세요.')));
   }
-  P.subscribe(render); R.subscribe(render);
+  P.subscribe(render); R.subscribe(render); SU.subscribe(render);
   render();
 })();
 </script>

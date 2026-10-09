@@ -89,6 +89,15 @@
       b.setAttribute('aria-pressed', String(!on));
     } }, v)));
   });
+  // 오늘 날씨에 맞춰 '날씨' 칸을 자동으로 골라 둠 (직접 바꿔도 돼요)
+  Life.weather().then(w => {
+    const want = Life.weatherChip(w);
+    const box = document.querySelector('[data-g="weather"]');
+    if (!want || box.querySelector('.chip[aria-pressed="true"]')) return;
+    box.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', String(c.textContent === want)));
+    const lab = box.parentElement.querySelector('.label');
+    lab.textContent = '날씨 (오늘 ' + w.place + ' ' + w.label + ' ' + w.temp + '°, 자동으로 골랐어요)';
+  }).catch(() => {});
   const pick = g => [...document.querySelectorAll('[data-g="' + g + '"] .chip[aria-pressed="true"]')].map(b => b.textContent);
   const one = g => pick(g)[0] || '';
 

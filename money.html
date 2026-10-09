@@ -30,7 +30,7 @@
   <header class="page-head">
     <span class="date" id="today"></span>
     <h1>가계부</h1>
-    <p>쓴 돈을 바로바로 적어두면 한 달 흐름이 보여요.</p>
+    <p id="sub">쓴 돈을 바로바로 적어두면 한 달 흐름이 보여요.</p>
   </header>
 
   <section class="card" aria-labelledby="add-title">
@@ -71,6 +71,12 @@
       <div class="stat"><span class="label">지난달보다</span><b id="s-diff">-</b></div>
     </div>
     <div id="budget-box" class="stack"></div>
+  </section>
+
+  <section class="card" aria-labelledby="fixed-title">
+    <div class="card-head"><h2 id="fixed-title">매달 나가는 돈</h2><button class="btn sm soft" type="button" id="fixed-add">+ 고정 지출</button></div>
+    <p class="small muted">통신비·구독료·보험처럼 매달 같은 날 나가는 돈을 적어두면, 등록한 다음부터 그날이 되면 내역에 자동으로 들어가요.</p>
+    <ul class="list" id="fixed"></ul>
   </section>
 
   <section class="card" aria-labelledby="cat-title">
@@ -166,10 +172,55 @@
       } }, '저장'), h('span', { class: 'spacer' }), del)));
   }
 
+  /* 고정 지출 */
+  const fixedItems = () => S.items().filter(t => t.kind === 'fixed');
+  function fixedForm(f) {
+    f = f || {};
+    const name = h('input', { type: 'text', maxlength: '30', value: f.name || '', placeholder: '예: 휴대폰 요금, 넷플릭스' });
+    const amt = h('input', { type: 'text', inputmode: 'numeric', class: 'amount-input', value: f.amount ? f.amount.toLocaleString('ko-KR') : '' });
+    amt.addEventListener('input', () => { const n = parseAmt(amt.value); amt.value = n ? n.toLocaleString('ko-KR') : ''; });
+    const sel = h('select', {}, CATS.map(([c]) => h('option', { value: c, selected: c === (f.cat || '생활·주거') }, c)));
+    const day = h('select', {}, Array.from({ length: 31 }, (_, i) => h('option', { value: i + 1, selected: (i + 1) === (f.day || 25) }, (i + 1) + '일' + (i + 1 >= 29 ? ' (없는 달은 말일)' : ''))));
+    let armed = false;
+    const del = f.id ? h('button', { class: 'btn ghost', type: 'button', onclick: () => {
+      if (!armed) { armed = true; del.textContent = '한 번 더 누르면 삭제 (이미 들어간 내역은 남아요)'; del.style.color = 'var(--danger)'; return; }
+      S.remove(f.id); close(); toast('고정 지출을 지웠어요');
+    } }, '삭제') : null;
+    const close = sheet(f.id ? '고정 지출 고치기' : '고정 지출 추가', h('div', { class: 'stack' },
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '이름'), name),
+      h('label', { class: 'field' }, h('span', { class: 'label' }, '금액 (원)'), amt),
+      h('div', { class: 'grid2', style: 'gap:10px' },
+        h('label', { class: 'field' }, h('span', { class: 'label' }, '분류'), sel),
+        h('label', { class: 'field' }, h('span', { class: 'label' }, '매달 나가는 날'), day)),
+      h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => {
+        const a = parseAmt(amt.value);
+        if (!name.value.trim() || !a) { toast('이름과 금액을 넣어 주세요'); return; }
+        S.put(Object.assign({}, f, { kind: 'fixed', name: name.value.trim(), amount: a, cat: sel.value, day: Number(day.value), start: f.start || today() }));
+        close(); toast('저장했어요. 매달 ' + day.value + '일에 자동으로 들어가요');
+      } }, '저장'), h('span', { class: 'spacer' }), del)));
+  }
+  $('fixed-add').onclick = () => fixedForm();
+  // 이번 달·지난달 중 날짜가 지난 고정 지출을 내역에 넣음 (같은 달엔 한 번만, 지운 건 다시 안 넣음)
+  function ensureFixed() {
+    const now = today(), cur = now.slice(0, 7);
+    fixedItems().forEach(f => {
+      [prevYm(cur), cur].forEach(m => {
+        const [y, mm] = m.split('-').map(Number);
+        const d = Math.min(f.day || 1, new Date(y, mm, 0).getDate());
+        const date = m + '-' + String(d).padStart(2, '0');
+        if (date > now || (f.start && date < f.start)) return; // 등록한 날 이후부터만
+        const id = 'fx_' + f.id + '_' + m;
+        if (S.exists(id)) return;
+        S.put({ id, kind: 'out', amount: f.amount, cat: f.cat, memo: f.name + ' (매달)', date, fixedId: f.id });
+      });
+    });
+  }
+
   /* 그리기 */
   function monthItems(m) { return S.items().filter(t => (t.date || '').slice(0, 7) === m); }
   function prevYm(m) { const [y, mm] = m.split('-').map(Number); const d = new Date(y, mm - 2, 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
   function render() {
+    $('sub').textContent = S.isShared() ? '가족과 같이 쓰는 가계부예요. 누가 적어도 여기 모여요.' : '쓴 돈을 바로바로 적어두면 한 달 흐름이 보여요.';
     const [y, m] = ym.split('-').map(Number);
     $('month-label').textContent = y + '년 ' + m + '월';
     const items = monthItems(ym);
@@ -191,6 +242,15 @@
       if (isCur && left > 0) { const remainDays = new Date(y, m, 0).getDate() - new Date().getDate() + 1; line += ' · 남은 ' + remainDays + '일 동안 하루 ' + won(left / remainDays); }
       bb.append(h('div', { class: 'bar' + (left < 0 ? ' over' : ''), role: 'img', 'aria-label': '예산 사용 ' + pct + '%' }, h('i', { style: 'width:' + pct + '%' })), h('p', { class: 'small' + (left < 0 ? '' : ' muted') }, line));
     }
+
+    // 고정 지출 목록
+    const fx = fixedItems().sort((a, b) => (a.day || 0) - (b.day || 0));
+    const fxSum = fx.reduce((t, f) => t + f.amount, 0);
+    $('fixed').replaceChildren(...(fx.length ? fx.map(f => h('li', { class: 'tx', tabindex: '0', role: 'button', onclick: () => fixedForm(f), onkeydown: e => { if (e.key === 'Enter') fixedForm(f); } },
+      h('span', { class: 'badge', style: 'min-width:46px;justify-content:center' }, '매달 ' + f.day + '일'),
+      h('div', { class: 'grow' }, h('div', { style: 'font-weight:600' }, f.name), h('div', { class: 'tiny muted' }, f.cat)),
+      h('span', { class: 'amt' }, won(f.amount)))).concat([h('li', {}, h('div', { class: 'grow small muted' }, '한 달 합계'), h('b', { class: 'num' }, won(fxSum)))])
+      : [h('li', { class: 'empty' }, '"+ 고정 지출"을 눌러 매달 나가는 돈을 등록해 보세요.')]));
 
     // 분류별
     const by = {};
@@ -225,7 +285,8 @@
   }
   $('filter').onchange = render;
   drawCats();
-  S.subscribe(render);
+  S.subscribe(() => { ensureFixed(); render(); });
+  ensureFixed();
   render();
 })();
 </script>
