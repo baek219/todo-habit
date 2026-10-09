@@ -3,5 +3,5 @@
  *   비어 있으면 AI 메뉴추천·맛집 검색·구글 후기·로또 통계는 꺼지고, 나머지 기능은 그대로 써요.
  */
 window.LIFE_CONFIG = {
-  workerUrl: ''
+  workerUrl: 'https://life-note.bshkokbu2.workers.dev'
 };
