@@ -145,7 +145,7 @@
       if (!cur || (it.updatedAt || 0) > (cur.updatedAt || 0)) by[it.id] = it;
     });
     const cutoff = Date.now() - 90 * 86400000; // 지운 표시는 90일 뒤 정리
-    const items = Object.values(by).filter(it => !(it.deleted && (it.updatedAt || 0) < cutoff))
+    const items = Object.values(by).filter(it => !(it.deleted && (it.updatedAt || 0) < cutoff && !String(it.id).startsWith('fx_'))) // 고정 지출 자동 기록을 지운 표시는 계속 남김 (되살아나지 않게)
       .sort((x, y) => (x.createdAt || 0) - (y.createdAt || 0) || String(x.id).localeCompare(String(y.id)));
     // 설정값(meta)은 항목마다 따로 최신 것을 고름 (한 기기에서 홈 꾸미기만 바꿔도 가족 공유·날씨 지역이 지워지지 않게)
     const ma = a.meta || {}, mb = b.meta || {}, ta = a.metaTs || {}, tb = b.metaTs || {};
@@ -308,7 +308,7 @@
     async create() {
       const CS = window.CloudSync, u = CS.user;
       const gid = Array.from(crypto.getRandomValues(new Uint8Array(15)), b => 'abcdefghijkmnpqrstuvwxyz23456789'[b % 32]).join('');
-      await CS.K.setDoc(CS.K.doc(CS.db, 'groups', gid), { owner: u.uid, members: [u.uid], names: { [u.uid]: u.displayName || u.email || '가족' }, createdAt: Date.now() });
+      await CS.K.setDoc(CS.K.doc(CS.db, 'groups', gid), { owner: u.uid, members: [u.uid], names: { [u.uid]: u.displayName || '가족' }, createdAt: Date.now() });
       settingsStore().setMeta({ groupId: gid }); applyGroup(gid);
       return gid;
     },
@@ -318,7 +318,7 @@
       if (!d || !Array.isArray(d.members) || !d.members.length) throw new Error('없거나 끝난 초대예요.');
       if (!d.members.includes(u.uid)) {
         await CS.K.setDoc(CS.K.doc(CS.db, 'groups', gid), { owner: d.owner, members: d.members.concat([u.uid]),
-          names: Object.assign({}, d.names || {}, { [u.uid]: u.displayName || u.email || '가족' }), createdAt: d.createdAt || Date.now() });
+          names: Object.assign({}, d.names || {}, { [u.uid]: u.displayName || '가족' }), createdAt: d.createdAt || Date.now() });
       }
       settingsStore().setMeta({ groupId: gid }); applyGroup(gid);
     },
@@ -539,7 +539,7 @@
         const date = ym + '-' + String(d).padStart(2, '0');
         const id = 'fx_' + f.id + '_' + ym;
         if (date <= now && !(f.start && date < f.start) && !S.exists(id)) {
-          const at = new Date(date + 'T09:00:00').getTime();
+          const at = Math.min(new Date(date + 'T09:00:00').getTime(), Date.now());
           rows.push({ id, kind: 'out', amount: f.amount, cat: f.cat, memo: f.name + ' (매달)', date, fixedId: f.id, createdAt: at, updatedAt: at });
         }
         m++; if (m > 12) { m = 1; y++; }

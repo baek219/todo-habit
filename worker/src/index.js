@@ -21,12 +21,14 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 const GOOGLE_JWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com'));
 
 const DEFAULT_LIMITS = { menu: 10, places: 150, google: 30, lotto: 60, geo: 200 };
+// 모든 사람을 합친 하루 최대 횟수 (누가 계정을 잔뜩 만들어도 요금이 크게 나가지 않게). 환경변수 TOTAL_MENU 등으로 바꿀 수 있어요.
+const DEFAULT_TOTAL = { menu: 200, places: 3000, google: 300, lotto: 600, geo: 3000 };
 
 /* ---------- 응답 도우미 ---------- */
 function corsHeaders(req, env) {
   const origin = req.headers.get('Origin') || '';
   const allowed = (env.ALLOWED_ORIGIN || 'https://baek219.github.io').split(',').map(s => s.trim());
-  const ok = allowed.includes(origin) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+  const ok = allowed.includes(origin) || (env.ALLOW_LOCALHOST === '1' && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin));
   return {
     'Access-Control-Allow-Origin': ok ? origin : allowed[0],
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -47,7 +49,11 @@ async function verifyUser(req, env) {
   if (!token) return null;
   const pid = env.FIREBASE_PROJECT_ID || 'checklist-3164e';
   try {
-    const { payload } = await jwtVerify(token, GOOGLE_JWKS, { issuer: 'https://securetoken.google.com/' + pid, audience: pid });
+    const { payload } = await jwtVerify(token, GOOGLE_JWKS, { issuer: 'https://securetoken.google.com/' + pid, audience: pid, algorithms: ['RS256'] });
+    // 구글 로그인으로 들어온 사람만 (익명·이메일 가입으로 계정을 마구 만들어 쓰는 것 막기)
+    const provider = payload.firebase && payload.firebase.sign_in_provider;
+    if (provider !== 'google.com') return null;
+    if (env.ALLOWED_UIDS && !env.ALLOWED_UIDS.split(',').map(x => x.trim()).includes(payload.sub)) return null;
     return payload.sub ? { uid: payload.sub } : null;
   } catch (e) { return null; }
 }
@@ -62,6 +68,12 @@ function limitFor(env, kind) {
 async function useQuota(env, kind, uid) {
   if (!env.LIFE_KV) return { ok: false, setup: true };
   const limit = limitFor(env, kind);
+  // 전체 합계 먼저 확인
+  const tv = parseInt(env['TOTAL_' + kind.toUpperCase()], 10), total = Number.isFinite(tv) && tv >= 0 ? tv : DEFAULT_TOTAL[kind];
+  const tkey = 'rl:' + kind + ':ALL:' + kstDate();
+  const tused = parseInt(await env.LIFE_KV.get(tkey), 10) || 0;
+  if (tused >= total) return { ok: false, remaining: 0, limit, all: true };
+  await env.LIFE_KV.put(tkey, String(tused + 1), { expirationTtl: 2 * 86400 });
   const key = 'rl:' + kind + ':' + uid + ':' + kstDate();
   const used = parseInt(await env.LIFE_KV.get(key), 10) || 0;
   if (used >= limit) return { ok: false, remaining: 0, limit };
@@ -70,6 +82,7 @@ async function useQuota(env, kind, uid) {
 }
 function quotaFail(req, env, q, what) {
   if (q.setup) return fail(req, env, 503, 'server_setup', '서버에 KV 저장소(LIFE_KV)가 연결되지 않았어요.');
+  if (q.all) return fail(req, env, 429, 'daily_limit', '오늘은 ' + what + '을(를) 쓰는 사람이 많아서 하루 한도에 닿았어요. 내일 다시 써 주세요.');
   return fail(req, env, 429, 'daily_limit', '오늘 ' + what + ' 사용 횟수(' + q.limit + '번)를 다 썼어요. 내일 다시 써 주세요.');
 }
 

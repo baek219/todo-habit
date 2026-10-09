@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261010e" />
+<link rel="stylesheet" href="life.css?v=20261010f" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .search{font-size:17px!important;padding:14px 16px!important}
@@ -38,13 +38,13 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261010e"></script>
-<script src="sync.js?v=20261010e"></script>
-<script src="life-config.js?v=20261010e"></script>
-<script src="life.js?v=20261010e"></script>
-<script src="shell.js?v=20261010e"></script>
-<script src="notify.js?v=20261010e"></script>
-<script src="import.js?v=20261010e"></script>
+<script src="firebase.js?v=20261010f"></script>
+<script src="sync.js?v=20261010f"></script>
+<script src="life-config.js?v=20261010f"></script>
+<script src="life.js?v=20261010f"></script>
+<script src="shell.js?v=20261010f"></script>
+<script src="notify.js?v=20261010f"></script>
+<script src="import.js?v=20261010f"></script>
 <script>
 (function () {
   const { h, today, prettyDate, toast, sheet } = Life;
@@ -62,8 +62,8 @@
     const urls = {};
     return {
       get: id => tx('readonly', st => st.get(id)),
-      put: (id, blob) => { delete urls[id]; return tx('readwrite', st => st.put(blob, id)); },
-      del: id => { delete urls[id]; return tx('readwrite', st => st.delete(id)); },
+      put: (id, blob) => { if (urls[id]) URL.revokeObjectURL(urls[id]); delete urls[id]; return tx('readwrite', st => st.put(blob, id)); },
+      del: id => { if (urls[id]) URL.revokeObjectURL(urls[id]); delete urls[id]; return tx('readwrite', st => st.delete(id)); },
       async url(id) { if (urls[id]) return urls[id]; const b = await this.get(id).catch(() => null); return b ? (urls[id] = URL.createObjectURL(b)) : null; }
     };
   })();
@@ -95,7 +95,7 @@
     const pdel = h('button', { class: 'btn sm ghost', type: 'button', hidden: true, onclick: () => { dropPhoto = true; newPhoto = null; prev.hidden = true; pdel.hidden = true; } }, '사진 빼기');
     pfile.addEventListener('change', async () => {
       const f = pfile.files[0]; if (!f) return;
-      try { newPhoto = await shrink(f); dropPhoto = false; prev.src = URL.createObjectURL(newPhoto); prev.hidden = false; pdel.hidden = false; } catch (e) { toast(e.message); }
+      try { newPhoto = await shrink(f); dropPhoto = false; if (prev.dataset.tmp) URL.revokeObjectURL(prev.src); prev.src = URL.createObjectURL(newPhoto); prev.dataset.tmp = '1'; prev.hidden = false; pdel.hidden = false; } catch (e) { toast(e.message); }
     });
     if (x.id) PH.url(x.id).then(u => { if (u) { prev.src = u; prev.hidden = false; pdel.hidden = false; } else if (x.hasPhoto) pnote.textContent = '이 물건의 사진은 다른 기기에서 찍었어요. 여기서 새로 찍을 수 있어요.'; });
     const photoBox = h('div', { class: 'field' }, h('span', { class: 'label' }, '사진 (선택)'), prev,

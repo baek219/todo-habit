@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261010e" />
+<link rel="stylesheet" href="life.css?v=20261010f" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .amount-input{font-size:22px!important;font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
@@ -101,13 +101,13 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261010e"></script>
-<script src="sync.js?v=20261010e"></script>
-<script src="life-config.js?v=20261010e"></script>
-<script src="life.js?v=20261010e"></script>
-<script src="shell.js?v=20261010e"></script>
-<script src="notify.js?v=20261010e"></script>
-<script src="import.js?v=20261010e"></script>
+<script src="firebase.js?v=20261010f"></script>
+<script src="sync.js?v=20261010f"></script>
+<script src="life-config.js?v=20261010f"></script>
+<script src="life.js?v=20261010f"></script>
+<script src="shell.js?v=20261010f"></script>
+<script src="notify.js?v=20261010f"></script>
+<script src="import.js?v=20261010f"></script>
 <script>
 (function () {
   const { h, today, won, prettyDate, toast, sheet } = Life;
@@ -266,7 +266,7 @@
           setTab('rec'); setDir('give'); $('f-name').value = n; $('f-amt').value = got.amount.toLocaleString('ko-KR'); rel = got.rel || rel; relC.set(rel); say();
           window.scrollTo({ top: 0, behavior: 'smooth' }); toast(n + '님께 낼 때 무슨 일·날짜만 고르고 저장하세요');
         } }, '낼 때 기록'),
-        h('button', { class: 'btn sm ghost', type: 'button', title: '이 분은 답례 목록에서 빼요', onclick: () => { S.put(Object.assign({}, got, { noReturn: true })); toast(n + '님은 목록에서 뺐어요'); } }, '빼기'))))
+        h('button', { class: 'btn sm ghost', type: 'button', title: '이 분은 답례 목록에서 빼요', onclick: () => { S.putMany(all.filter(x => x.person === n && x.dir === 'get' && !x.noReturn).map(x => Object.assign({}, x, { noReturn: true }))); toast(n + '님은 목록에서 뺐어요'); } }, '빼기'))))
       : [h('li', { class: 'empty' }, all.some(x => x.dir === 'get') ? '받은 만큼 다 챙기셨어요.' : '"내가 받았어요"로 기록하면, 아직 답례하지 않은 분이 여기 모여요.')]));
     $('owe-pg').replaceChildren(Life.pager(owe.length, 5, pgO, k => { pgO = k; render(); }));
   }

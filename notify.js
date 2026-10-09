@@ -5,7 +5,7 @@
 (function () {
   const L = window.Life; if (!L || window.AndroidBridge) return;
   const PREF = 'life_notify_v1', CACHE = 'life-notify', KEY = './__notify.json', SENT = './__notified.json';
-  const pref = () => { try { return Object.assign({ on: false, hour: 8 }, JSON.parse(localStorage.getItem(PREF)) || {}); } catch (e) { return { on: false, hour: 8 }; } };
+  const pref = () => { try { return Object.assign({ on: false, hour: 8, hide: false }, JSON.parse(localStorage.getItem(PREF)) || {}); } catch (e) { return { on: false, hour: 8, hide: false }; } };
   const supported = () => 'Notification' in window && 'serviceWorker' in navigator && 'caches' in window;
   const addDays = (d, n) => { const z = new Date(d + 'T00:00:00'); z.setDate(z.getDate() + Number(n)); return L.iso(z); };
 
@@ -38,7 +38,7 @@
     const p = pref(); if (!p.on || !supported()) return;
     const old = await readJson(KEY);
     const items = schedule(old && old.items);
-    await writeJson(KEY, { hour: p.hour, items, at: Date.now() });
+    await writeJson(KEY, { hour: p.hour, hide: !!p.hide, items, at: Date.now() });
     maybeShowNow(items);
   }
   const later = () => { clearTimeout(timer); timer = setTimeout(save, 1500); };
@@ -49,7 +49,7 @@
     const sent = await readJson(SENT); if (sent && sent.date === t) return;
     const todays = (items || []).filter(e => e.date === t); if (!todays.length) return;
     const reg = await navigator.serviceWorker.ready;
-    await reg.showNotification('오늘 챙길 것 ' + todays.length + '개', { body: todays.slice(0, 5).map(e => '· ' + e.text).join('\n') + (todays.length > 5 ? '\n외 ' + (todays.length - 5) + '개' : ''), icon: 'icon-192.png', badge: 'icon-192.png', tag: 'life-today', data: { url: 'home.html' } });
+    await reg.showNotification('오늘 챙길 것 ' + todays.length + '개', { body: p.hide ? '생활노트를 열어 확인해 주세요.' : todays.slice(0, 5).map(e => '· ' + e.text).join('\n') + (todays.length > 5 ? '\n외 ' + (todays.length - 5) + '개' : ''), icon: 'icon-192.png', badge: 'icon-192.png', tag: 'life-today', data: { url: 'home.html' } });
     await writeJson(SENT, { date: t });
   }
 
@@ -71,12 +71,13 @@
       if (!supported()) throw new Error('이 브라우저는 알림을 지원하지 않아요.');
       const perm = await Notification.requestPermission();
       if (perm !== 'granted') throw new Error('알림이 막혀 있어요. 주소창 왼쪽 자물쇠 → 권한 → 알림을 "허용"으로 바꿔 주세요.');
-      try { localStorage.setItem(PREF, JSON.stringify({ on: true, hour: hour == null ? pref().hour : hour })); } catch (e) {}
+      try { localStorage.setItem(PREF, JSON.stringify(Object.assign(pref(), { on: true, hour: hour == null ? pref().hour : hour }))); } catch (e) {}
       const bg = await registerPeriodic();
       await save();
       return bg;
     },
-    disable() { try { localStorage.setItem(PREF, JSON.stringify({ on: false, hour: pref().hour })); } catch (e) {} writeJson(KEY, { hour: 0, items: [], at: Date.now() }); },
+    setHide(v) { const p = pref(); p.hide = !!v; try { localStorage.setItem(PREF, JSON.stringify(p)); } catch (e) {} save(); },
+    disable() { try { localStorage.setItem(PREF, JSON.stringify(Object.assign(pref(), { on: false }))); } catch (e) {} writeJson(KEY, { hour: 0, items: [], at: Date.now() }); },
     setHour(h) { const p = pref(); p.hour = h; try { localStorage.setItem(PREF, JSON.stringify(p)); } catch (e) {} save(); },
     async test() {
       const reg = await navigator.serviceWorker.ready;

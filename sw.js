@@ -1,6 +1,6 @@
 // 인터넷이 없어도 앱이 열리도록 파일을 폰에 저장해두는 역할
 // 화면 파일은 '인터넷 먼저 → 안 되면 저장본' 방식이라, 새 버전을 올리면 다음에 열 때 바로 반영돼요.
-const CACHE_NAME = 'todo-habit-v3.31';
+const CACHE_NAME = 'todo-habit-v3.32';
 const FILES_TO_CACHE = ['./', './index.html', './desk.html', './login.html', './firebase.js', './sync.js', './lunar.js', './repeat.js', './quick.js', './shell.js', './life.js', './life.css', './life-config.js', './home.html', './money.html', './pet.html', './menu.html', './food.html', './shop.html', './family.html', './calc.html', './weather.html', './gift.html', './fridge.html', './chores.html', './dday.html', './contact.html', './things.html', './workout.html', './settings.html', './hospital.html', './tour.html', './nearby.js', './locmap.js', './notify.js', './cardsms.js', './import.js', './manifest.json', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
@@ -44,7 +44,7 @@ async function lifeRemind() {
   if (sent && sent.date === t) return;
   const todays = data.items.filter(e => e.date === t); if (!todays.length) return;
   await self.registration.showNotification('오늘 챙길 것 ' + todays.length + '개', {
-    body: todays.slice(0, 5).map(e => '· ' + e.text).join('\n') + (todays.length > 5 ? '\n외 ' + (todays.length - 5) + '개' : ''),
+    body: data.hide ? '생활노트를 열어 확인해 주세요.' : todays.slice(0, 5).map(e => '· ' + e.text).join('\n') + (todays.length > 5 ? '\n외 ' + (todays.length - 5) + '개' : ''),
     icon: 'icon-192.png', badge: 'icon-192.png', tag: 'life-today', data: { url: 'home.html' }
   });
   await c.put('./__notified.json', new Response(JSON.stringify({ date: t }), { headers: { 'Content-Type': 'application/json' } }));

@@ -142,7 +142,7 @@
     if (xlsxLib) return xlsxLib;
     xlsxLib = new Promise((ok, no) => {
       const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.src = 'vendor/xlsx/xlsx.full.min.js';
       s.onload = () => ok(window.XLSX); s.onerror = () => { xlsxLib = null; no(new Error('엑셀 읽기 도구를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.')); };
       document.head.append(s);
     });
@@ -367,12 +367,12 @@
   const when = t => { const d = new Date(t); return (d.getMonth() + 1) + '월 ' + d.getDate() + '일 ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
   function openBatches(cfg) {
     const body = h('div', { class: 'stack', style: 'gap:12px' });
-    const close = sheet('엑셀로 넣은 기록 지우기', body);
+    const close = sheet('한꺼번에 넣은 기록 지우기', body);
     function draw() {
       const list = batches(cfg.store);
       if (!list.length) { body.replaceChildren(h('p', { class: 'muted', style: 'margin:0' }, '엑셀로 넣은 기록이 남아 있지 않아요.'), h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => close() }, '닫기'))); return; }
       body.replaceChildren(
-        h('p', { class: 'muted', style: 'margin:0' }, '엑셀로 한 번에 넣은 것을 넣은 때마다 묶어서 보여줘요. 잘못 넣은 묶음을 통째로 지울 수 있어요. 직접 하나씩 적은 기록은 지워지지 않아요.'),
+        h('p', { class: 'muted', style: 'margin:0' }, '엑셀이나 카드 문자로 한꺼번에 넣은 것을 넣은 때마다 묶어서 보여줘요. 잘못 넣은 묶음을 통째로 지울 수 있어요. 직접 하나씩 적은 기록은 지워지지 않아요.'),
         h('ul', { class: 'list' }, list.map(b => {
           let armed = false;
           const del = h('button', { class: 'btn sm', type: 'button', onclick: () => {
@@ -392,7 +392,7 @@
     const head = document.querySelector('.page-head'); if (!head) return;
     const btn = h('button', { class: 'btn sm soft ln-xl', type: 'button', onclick: () => open(cfg) },
       '엑셀로 넣기·받기');
-    const delBtn = h('button', { class: 'btn sm ghost', type: 'button', onclick: () => openBatches(cfg) }, '엑셀로 넣은 것 지우기');
+    const delBtn = h('button', { class: 'btn sm ghost', type: 'button', onclick: () => openBatches(cfg) }, '한꺼번에 넣은 것 지우기');
     const wrap = h('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap;justify-self:start;margin-top:4px' }, btn, delBtn);
     head.append(wrap);
     const sync = () => { delBtn.hidden = !batches(cfg.store).length; };

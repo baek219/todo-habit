@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261010e" />
+<link rel="stylesheet" href="life.css?v=20261010f" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .results{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
@@ -68,12 +68,12 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261010e"></script>
-<script src="sync.js?v=20261010e"></script>
-<script src="life-config.js?v=20261010e"></script>
-<script src="life.js?v=20261010e"></script>
-<script src="shell.js?v=20261010e"></script>
-<script src="notify.js?v=20261010e"></script>
+<script src="firebase.js?v=20261010f"></script>
+<script src="sync.js?v=20261010f"></script>
+<script src="life-config.js?v=20261010f"></script>
+<script src="life.js?v=20261010f"></script>
+<script src="shell.js?v=20261010f"></script>
+<script src="notify.js?v=20261010f"></script>
 <script>
 (function () {
   const { h, today, prettyDate, toast } = Life;
@@ -202,7 +202,7 @@
     $('fr-sub').textContent = items.length ? '냉장고에 있는 ' + items.length + '가지 중에서 골라요. 유통기한이 가까운 재료부터 보여요. 눌러서 빼거나 넣을 수 있어요.' : '냉장고 메뉴에 재료를 넣어 두면, 그 재료로 해 먹을 수 있는 메뉴를 골라줘요.';
     $('fr-items').replaceChildren(...items.slice(0, 30).map(x => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(!frOff.has(x.id)), onclick: () => { frOff.has(x.id) ? frOff.delete(x.id) : frOff.add(x.id); frDraw(); } },
       x.name + (x.exp && x.exp <= plusDays(3) ? ' · 곧 기한' : ''))));
-    $('fr-rule').disabled = $('fr-ai').disabled = !items.length;
+    $('fr-rule').disabled = $('fr-ai').disabled = !items.filter(x => !frOff.has(x.id)).length;
   }
   const chosen = () => frItems().filter(x => !frOff.has(x.id));
   function cookRecommend() {
@@ -225,7 +225,8 @@
   $('ai-btn').onclick = () => aiAsk(null);
   async function aiAsk(ingredients) {
     if (busy) return;
-    const note = $('ai-note');
+    // 냉장고 칸에서 눌렀으면 안내를 결과 자리에 (위쪽 칸은 화면 밖이라 안 보여요)
+    const note = ingredients ? (() => { const p = h('p', { class: 'note warn', hidden: true }); $('results').replaceChildren(p); return p; })() : $('ai-note');
     if (!Life.hasServer()) { note.hidden = false; note.textContent = 'AI 추천은 서버 연결 후에 쓸 수 있어요. 지금은 "조건으로 바로 뽑기"를 써 주세요.'; return; }
     if (!Life.user()) { note.hidden = false; note.replaceChildren('AI 추천은 로그인한 분만 쓸 수 있어요. ', h('button', { class: 'btn sm', type: 'button', onclick: () => Life.signIn() }, 'Google로 로그인')); return; }
     busy = true; $('ai-btn').disabled = true; note.hidden = true;

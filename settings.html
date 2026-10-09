@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261010e" />
+<link rel="stylesheet" href="life.css?v=20261010f" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .counts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
@@ -40,6 +40,7 @@
       <label class="row small" style="gap:6px">알림 시간 <select id="noti-hour" style="width:auto"></select></label>
       <button class="btn sm ghost" type="button" id="noti-test" hidden>시험 알림 보내기</button>
     </div>
+    <label class="row small" for="noti-hide" style="gap:8px"><input type="checkbox" id="noti-hide" style="width:18px;height:18px" /> 잠금화면에 내용 숨기기 (사람 이름·일정 대신 "오늘 챙길 것 3개"만 보여요)</label>
     <p class="note" id="noti-note" hidden></p>
     <div class="note" style="display:grid;gap:4px">
       <b style="color:var(--fg)">알림이 잘 오게 하려면</b>
@@ -68,15 +69,21 @@
     <h2>기록은 어디에 저장되나요?</h2>
     <p class="small" id="where"></p>
   </section>
+
+  <section class="card">
+    <h2>이 기기에서 기록 지우기</h2>
+    <p class="small muted">회사·PC방처럼 여러 사람이 쓰는 컴퓨터에서 썼다면, 다 쓴 뒤 이 기기에 남은 기록을 지우고 로그아웃하세요. 로그인해 두었던 기록은 클라우드에 그대로 남아서, 다시 로그인하면 돌아와요.</p>
+    <div class="row"><button class="btn" type="button" id="wipe" style="color:var(--danger)">이 기기 기록 지우고 로그아웃</button></div>
+  </section>
 </main>
 
-<script src="firebase.js?v=20261010e"></script>
-<script src="lunar.js?v=20261010e"></script>
-<script src="sync.js?v=20261010e"></script>
-<script src="life-config.js?v=20261010e"></script>
-<script src="life.js?v=20261010e"></script>
-<script src="shell.js?v=20261010e"></script>
-<script src="notify.js?v=20261010e"></script>
+<script src="firebase.js?v=20261010f"></script>
+<script src="lunar.js?v=20261010f"></script>
+<script src="sync.js?v=20261010f"></script>
+<script src="life-config.js?v=20261010f"></script>
+<script src="life.js?v=20261010f"></script>
+<script src="shell.js?v=20261010f"></script>
+<script src="notify.js?v=20261010f"></script>
 <script>
 (function () {
   const { h, today, prettyDate, toast } = Life;
@@ -109,6 +116,8 @@
     } catch (e) { drawNoti(e.message); }
   };
   $('noti-hour').onchange = () => { Life.notify.setHour(Number($('noti-hour').value)); toast('알림 시간을 바꿨어요'); };
+  $('noti-hide').checked = !!Life.notify.pref().hide;
+  $('noti-hide').onchange = () => { Life.notify.setHide($('noti-hide').checked); toast($('noti-hide').checked ? '알림에 내용을 숨겨요' : '알림에 내용을 보여줘요'); };
   $('noti-test').onclick = () => Life.notify.test().catch(e => toast(e.message || '알림을 보내지 못했어요'));
   drawNoti();
 
@@ -161,6 +170,23 @@
         toast(total + '개를 불러왔어요');
       } }, total ? total + '개 합쳐서 불러오기' : '불러올 것 없음'))].filter(Boolean));
   });
+
+  /* 이 기기 기록 지우기 (클라우드는 그대로) */
+  let wipeArmed = false;
+  $('wipe').onclick = async () => {
+    if (!wipeArmed) { wipeArmed = true; $('wipe').textContent = '정말 지울까요? 한 번 더 누르면 지워져요'; setTimeout(() => { wipeArmed = false; $('wipe').textContent = '이 기기 기록 지우고 로그아웃'; }, 4000); return; }
+    const u = Life.user();
+    if (!u) { const ok = confirmLocal(); if (!ok) return; }
+    try { if (window.CloudSync && window.CloudSync.user) await window.CloudSync.signOut(); } catch (e) {}
+    try {
+      Object.keys(localStorage).filter(k => /^(life_|todo_habit_|calc_home_|loc_fix_|food_|nearby_|gift_to_money|custom_categories|default_cat_colors)/.test(k)).forEach(k => localStorage.removeItem(k));
+    } catch (e) {}
+    try { indexedDB.deleteDatabase('life_photos'); } catch (e) {}
+    try { await caches.delete('life-notify'); } catch (e) {}
+    location.href = 'home.html';
+  };
+  // 로그인 안 한 상태면 클라우드에 없어서 영영 사라지니 한 번 더 알림
+  function confirmLocal() { return window.confirm('로그인하지 않은 상태라 지우면 되돌릴 수 없어요. 먼저 위에서 "백업 파일 받기"를 해 두세요. 그래도 지울까요?'); }
 
   /* 저장 위치 안내 */
   function drawWhere() {

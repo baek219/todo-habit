@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261010e" />
+<link rel="stylesheet" href="life.css?v=20261010f" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .meta .phone{user-select:all}
@@ -88,13 +88,13 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261010e"></script>
-<script src="sync.js?v=20261010e"></script>
-<script src="life-config.js?v=20261010e"></script>
-<script src="life.js?v=20261010e"></script>
-<script src="shell.js?v=20261010e"></script>
-<script src="notify.js?v=20261010e"></script>
-<script src="locmap.js?v=20261010e"></script>
+<script src="firebase.js?v=20261010f"></script>
+<script src="sync.js?v=20261010f"></script>
+<script src="life-config.js?v=20261010f"></script>
+<script src="life.js?v=20261010f"></script>
+<script src="shell.js?v=20261010f"></script>
+<script src="notify.js?v=20261010f"></script>
+<script src="locmap.js?v=20261010f"></script>
 <script>
 (function () {
   const { h, today, prettyDate, toast, sheet } = Life;
@@ -344,7 +344,7 @@
     const out = h('div', { class: 'stack' });
     const go = h('button', { class: 'btn primary', type: 'button', onclick: async () => {
       go.disabled = true;
-      const id = Life.newId() + Math.random().toString(36).slice(2, 6);
+      const id = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => 'abcdefghijkmnpqrstuvwxyz23456789'[b % 32]).join(''); // 짐작할 수 없는 공유 주소
       const items = list.slice(0, 100).map(x => ({ name: x.name, category: x.category || '', address: x.address || '', phone: x.phone || '', kakaoUrl: safeUrl(x.kakaoUrl), x: x.x || null, y: x.y || null, myRating: x.myRating || 0, memo: x.memo || '', status: x.status || 'want' }));
       try {
         await CS.K.setDoc(CS.K.doc(CS.db, 'shares', id), { owner: CS.user.uid, title: title.value.trim() || '맛집 목록', items, createdAt: Date.now(), deleted: false });

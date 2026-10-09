@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261010e" />
+<link rel="stylesheet" href="life.css?v=20261010f" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .places{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:start}
@@ -49,12 +49,12 @@
   <p class="small muted">날씨·미세먼지 정보: Open-Meteo · 미세먼지 등급은 환경부 기준(좋음·보통·나쁨·매우 나쁨)으로 나눴어요.</p>
 </main>
 
-<script src="firebase.js?v=20261010e"></script>
-<script src="sync.js?v=20261010e"></script>
-<script src="life-config.js?v=20261010e"></script>
-<script src="life.js?v=20261010e"></script>
-<script src="shell.js?v=20261010e"></script>
-<script src="notify.js?v=20261010e"></script>
+<script src="firebase.js?v=20261010f"></script>
+<script src="sync.js?v=20261010f"></script>
+<script src="life-config.js?v=20261010f"></script>
+<script src="life.js?v=20261010f"></script>
+<script src="shell.js?v=20261010f"></script>
+<script src="notify.js?v=20261010f"></script>
 <script>
 (function () {
   const { h, today, prettyDate, toast, sheet, WD } = Life;
@@ -188,7 +188,13 @@
   Life.store('settings').subscribe(() => { const now = JSON.stringify(Life.weatherPlaces()); if (now !== lastList) { lastList = now; render(); } });
   render();
   // '몇 분 전' 글자를 1분마다 고침
-  setInterval(() => document.querySelectorAll('.wx-stamp').forEach(s => { if (s.dataset.at) s.textContent = Life.wxStamp({ obs: s.dataset.obs, fetchedAt: Number(s.dataset.at) }); }), 60000);
+  // 15분이 지났거나 시간이 바뀐 지역은 알아서 새로 받아옴
+  const stale = () => [...document.querySelectorAll('.wx-stamp')].some(s => s.dataset.at && (Date.now() - Number(s.dataset.at) > 15 * 60000 || new Date(Number(s.dataset.at)).getHours() !== new Date().getHours()));
+  setInterval(() => {
+    document.querySelectorAll('.wx-stamp').forEach(s => { if (s.dataset.at) s.textContent = Life.wxStamp({ obs: s.dataset.obs, fetchedAt: Number(s.dataset.at) }); });
+    if (!document.hidden && stale()) render(false);
+  }, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && stale()) render(false); });
 })();
 </script>
 </body>

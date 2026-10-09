@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261010e" />
+<link rel="stylesheet" href="life.css?v=20261010f" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .add-row{display:grid;grid-template-columns:1fr 92px auto;gap:8px}
@@ -43,13 +43,13 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261010e"></script>
-<script src="sync.js?v=20261010e"></script>
-<script src="life-config.js?v=20261010e"></script>
-<script src="life.js?v=20261010e"></script>
-<script src="shell.js?v=20261010e"></script>
-<script src="notify.js?v=20261010e"></script>
-<script src="import.js?v=20261010e"></script>
+<script src="firebase.js?v=20261010f"></script>
+<script src="sync.js?v=20261010f"></script>
+<script src="life-config.js?v=20261010f"></script>
+<script src="life.js?v=20261010f"></script>
+<script src="shell.js?v=20261010f"></script>
+<script src="notify.js?v=20261010f"></script>
+<script src="import.js?v=20261010f"></script>
 <script>
 (function () {
   const { h, today, prettyDate, toast, sheet } = Life;
@@ -128,7 +128,7 @@
     const up = unpaid().length; $('to-money').hidden = !up; $('to-money').textContent = '가계부에 적기 (' + up + '개)';
     const me = Life.user() && Life.user().uid;
     const row = x => h('li', { class: x.done ? 'done' : '' },
-      h('input', { type: 'checkbox', checked: !!x.done, 'aria-label': x.name + ' 샀어요', onchange: () => S.put(Object.assign({}, x, { done: !x.done })) }),
+      h('input', { type: 'checkbox', checked: !!x.done, 'aria-label': x.name + ' 샀어요', onchange: () => S.put(Object.assign({}, x, x.done ? { done: false, moneyed: null, price: null } : { done: true })) }),
       h('div', { class: 'grow' }, h('b', {}, x.name), x.moneyed ? h('span', { class: 'tiny muted', style: 'margin-left:6px' }, x.price ? x.price.toLocaleString('ko-KR') + '원 · 가계부에 적음' : '가계부에 적음') : null),
       x.qty ? h('span', { class: 'qty' }, x.qty) : null,
       shared && x.by && names[x.by] ? h('span', { class: 'who' }, x.by === me ? '나' : names[x.by]) : null,

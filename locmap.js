@@ -10,8 +10,8 @@
     if (window.L && window.L.map) return Promise.resolve(window.L);
     if (libP) return libP;
     libP = new Promise((ok, no) => {
-      const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'; document.head.append(css);
-      const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+      const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'vendor/leaflet/leaflet.css'; document.head.append(css);
+      const s = document.createElement('script'); s.src = 'vendor/leaflet/leaflet.js';
       s.onload = () => ok(window.L); s.onerror = () => { libP = null; no(new Error('지도를 불러오지 못했어요.')); };
       document.head.append(s);
     });
@@ -98,11 +98,11 @@
       const L = await loadLeaflet();
       pins.clearLayers();
       const pts = [[cur.y, cur.x]];
-      (list || []).slice(0, 15).forEach((p, i) => {
+      (list || []).slice(0, 45).forEach((p, i) => {
         if (!p.x || !p.y) return;
         const y = Number(p.y), x = Number(p.x); pts.push([y, x]);
         L.marker([y, x], { icon: L.divIcon({ className: '', html: '<div class="lm-pin"><span>' + (i + 1) + '</span></div>', iconSize: [24, 24], iconAnchor: [12, 24] }), title: p.name })
-          .bindTooltip((i + 1) + '. ' + p.name, { direction: 'top', offset: [0, -22] }).addTo(pins);
+          .bindTooltip((() => { const el = document.createElement('span'); el.textContent = (i + 1) + '. ' + p.name; return el; })(), { direction: 'top', offset: [0, -22] }).addTo(pins);
       });
       if (pts.length > 1) map.fitBounds(pts, { padding: [28, 28], maxZoom: 16 });
     }
