@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261009v" />
+<link rel="stylesheet" href="life.css?v=20261009x" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .meta .phone{user-select:all}
@@ -60,6 +60,7 @@
       </div>
       <p class="note" id="search-note" hidden></p>
     </form>
+    <section class="card" id="map-card" hidden></section>
     <div id="results" class="stack" style="gap:10px"></div>
     <div class="row" id="more-row" hidden><button class="btn" type="button" id="more">더 보기</button></div>
   </section>
@@ -87,11 +88,12 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261009v"></script>
-<script src="sync.js?v=20261009v"></script>
-<script src="life-config.js?v=20261009v"></script>
-<script src="life.js?v=20261009v"></script>
-<script src="shell.js?v=20261009v"></script>
+<script src="firebase.js?v=20261009x"></script>
+<script src="sync.js?v=20261009x"></script>
+<script src="life-config.js?v=20261009x"></script>
+<script src="life.js?v=20261009x"></script>
+<script src="shell.js?v=20261009x"></script>
+<script src="locmap.js?v=20261009x"></script>
 <script>
 (function () {
   const { h, today, prettyDate, toast, sheet } = Life;
@@ -135,7 +137,7 @@
     } finally { btn.disabled = false; }
   }
 
-  function placeCard(p) {
+  function placeCard(p, num) {
     const saved = savedOf(p);
     const panel = h('div', { class: 'gpanel', hidden: true });
     const gbtn = h('button', { class: 'btn sm', type: 'button', onclick: () => loadGoogle(p, panel, gbtn) }, '구글 평점·후기');
@@ -146,7 +148,7 @@
       const now = savedOf(p); save.setAttribute('aria-pressed', String(!!now)); save.textContent = now ? '★ 담김' : '☆ 담기';
     } }, saved ? '★ 담김' : '☆ 담기');
     return h('article', { class: 'place' },
-      h('div', { class: 'place-top' }, h('div', { class: 'grow' }, h('h3', {}, p.name),
+      h('div', { class: 'place-top' }, h('div', { class: 'grow' }, h('h3', {}, num ? h('span', { class: 'pin-no' }, num) : null, p.name),
         h('div', { class: 'meta' }, p.category ? h('span', {}, p.category) : null, p.distance != null ? h('span', { class: 'num' }, dist(p.distance)) : null)), save),
       h('div', { class: 'meta' }, p.address ? h('span', {}, p.address) : null, p.phone ? h('span', { class: 'phone num' }, p.phone) : null),
       h('div', { class: 'links' }, gbtn,
@@ -157,11 +159,14 @@
   }
 
   /* ---------- 검색 ---------- */
-  let locMode = 'me', page = 1, lastQuery = null, coords = null;
+  let locMode = 'me', page = 1, lastQuery = null, coords = null, found = [];
+  // 내 위치 지도 (지도를 눌러 위치를 고치면 그 자리 기준으로 다시 찾음)
+  const lm = Life.locMap($('map-card'), { onPick: c => { coords = c; if ($('q').value.trim()) search(false, true); } });
   function setLoc(m) {
     locMode = m;
     $('loc-me').setAttribute('aria-pressed', String(m === 'me')); $('loc-area').setAttribute('aria-pressed', String(m === 'area'));
     $('area').hidden = m !== 'area'; $('radius').hidden = m !== 'me'; $('sort').hidden = m !== 'me'; $('loc-help').hidden = m !== 'me';
+    if (m !== 'me') $('map-card').hidden = true; else if (lm && lm.get()) $('map-card').hidden = false;
     try { localStorage.setItem('food_loc_mode', m); } catch (e) {}
   }
   $('loc-help').onclick = locHelp;
@@ -205,7 +210,7 @@
   }
   function note(msg, kind) { const n = $('search-note'); n.hidden = !msg; n.className = 'note' + (kind === 'warn' ? ' warn' : ''); if (typeof msg === 'string') n.textContent = msg; else if (msg) n.replaceChildren(msg); }
 
-  async function search(more) {
+  async function search(more, keep) {
     const q = $('q').value.trim();
     if (!q) { $('q').focus(); return; }
     if (!Life.hasServer()) { note('맛집 검색은 서버 연결 후에 쓸 수 있어요. 지금은 아래 지도 링크로 찾아보세요.', 'warn'); showFallback(q); return; }
@@ -215,8 +220,9 @@
     const query = { q, cat: $('cat').value, page };
     try {
       if (locMode === 'me') {
-        if (!more || !coords) coords = await getCoords();
-        Object.assign(query, coords, { radius: $('radius').value, sort: $('sort').value });
+        if (!coords || (!more && !keep)) coords = await Life.myCoords();
+        if (!more) lm.show(coords);
+        Object.assign(query, { x: coords.x, y: coords.y }, { radius: $('radius').value, sort: $('sort').value });
       } else {
         const area = $('area').value.trim();
         if (!area) { note('동네 이름을 넣어 주세요. (예: 수지구청역)', 'warn'); $('area').focus(); $('results').replaceChildren(); return; }
@@ -225,9 +231,10 @@
       }
       const r = await Life.api('places', { query });
       lastQuery = q;
-      if (!more) $('results').replaceChildren();
+      if (!more) { $('results').replaceChildren(); found = []; }
       if (!r.places.length && !more) $('results').append(h('p', { class: 'empty' }, '"' + q + '" 검색 결과가 없어요. 거리를 넓히거나 다른 말로 찾아보세요.'));
-      r.places.forEach(p => $('results').append(placeCard(p)));
+      r.places.forEach(p => { found.push(p); $('results').append(placeCard(p, locMode === 'me' ? found.length : 0)); });
+      if (locMode === 'me') lm.places(found);
       $('more-row').hidden = r.isEnd || !r.places.length;
     } catch (e) {
       if (!more) $('results').replaceChildren();

@@ -36,25 +36,20 @@
     $('q').addEventListener('input', () => { pick = null; document.querySelectorAll('#chips .chip').forEach(x => x.setAttribute('aria-pressed', 'false')); });
 
     /* 위치 */
-    let locMode = 'me', coords = null, page = 1;
+    let locMode = 'me', coords = null, page = 1, found = [];
+    // 내 위치 지도 (지도를 눌러 위치를 고치면 그 자리 기준으로 다시 찾음)
+    const lm = L.locMap($('map-card'), { onPick: c => { coords = c; if ($('q').value.trim()) search(false, true); } });
     const LK = 'nearby_' + cfg.kind + '_';
     function setLoc(m) {
       locMode = m;
       $('loc-me').setAttribute('aria-pressed', String(m === 'me')); $('loc-area').setAttribute('aria-pressed', String(m === 'area'));
       $('area').hidden = m !== 'area'; $('radius').hidden = m !== 'me';
+      if (m !== 'me') $('map-card').hidden = true; else if (lm.get()) $('map-card').hidden = false;
       try { localStorage.setItem(LK + 'loc', m); } catch (e) {}
     }
     $('loc-me').onclick = () => setLoc('me'); $('loc-area').onclick = () => { setLoc('area'); $('area').focus(); };
     $('radius').replaceChildren(...cfg.radius.map(([v, l]) => h('option', { value: v, selected: v === cfg.radiusDefault }, l)));
     try { setLoc(localStorage.getItem(LK + 'loc') || 'me'); $('area').value = localStorage.getItem(LK + 'area') || localStorage.getItem('food_area') || ''; } catch (e) {}
-    function getCoords() {
-      return new Promise((res, rej) => {
-        if (!navigator.geolocation) return rej(Object.assign(new Error('이 기기에서는 위치를 쓸 수 없어요.'), { geo: true }));
-        navigator.geolocation.getCurrentPosition(p => res({ x: p.coords.longitude, y: p.coords.latitude }),
-          e => rej(Object.assign(new Error(e.code === 1 ? '위치 사용이 막혀 있어요.' : '현재 위치를 찾지 못했어요. 위치(GPS)가 켜져 있는지 확인해 주세요.'), { geo: true })),
-          { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 });
-      });
-    }
     $('loc-help').onclick = () => sheet('위치 허용하는 방법', h('div', { class: 'stack', style: 'gap:12px' },
       h('p', { class: 'small muted' }, '두 가지가 켜져 있어야 해요. ① 폰(또는 PC)의 위치 기능 ② 이 사이트에 위치를 알려줘도 된다는 브라우저 허락.'),
       h('ol', { class: 'small', style: 'margin:0;padding-left:20px;display:grid;gap:6px' },
@@ -73,7 +68,7 @@
           h('a', { class: 'btn sm', href: 'https://map.naver.com/p/search/' + enc(area + q), target: '_blank', rel: 'noopener' }, '네이버지도에서 찾기'))));
     }
 
-    function card(p) {
+    function card(p, num) {
       const save = h('button', { class: 'btn sm save-btn', type: 'button', onclick: () => {
         const s = savedOf(p);
         if (s) { S.remove(s.id); toast('저장한 곳에서 뺐어요'); }
@@ -83,7 +78,7 @@
       const paint = () => { const on = !!savedOf(p); save.setAttribute('aria-pressed', String(on)); save.textContent = on ? '저장됨' : '저장'; };
       paint();
       return h('article', { class: 'place' },
-        h('div', { class: 'place-top' }, h('div', { class: 'grow' }, h('h3', {}, p.name),
+        h('div', { class: 'place-top' }, h('div', { class: 'grow' }, h('h3', {}, num ? h('span', { class: 'pin-no' }, num) : null, p.name),
           h('div', { class: 'meta' }, p.category ? h('span', {}, p.category) : null, p.distance != null ? h('span', { class: 'num' }, dist(p.distance)) : null)), save),
         h('div', { class: 'meta' }, p.address ? h('span', {}, p.address) : null, p.phone ? h('span', { class: 'num' }, p.phone) : null),
         h('div', { class: 'links' },
@@ -93,7 +88,7 @@
           h('a', { class: 'btn sm ghost', href: naverUrl(p), target: '_blank', rel: 'noopener' }, '네이버지도')));
     }
 
-    async function search(more) {
+    async function search(more, keep) {
       const q = $('q').value.trim();
       if (!q) { $('q').focus(); return; }
       if (!L.hasServer()) { note('검색은 서버 연결 후에 쓸 수 있어요. 지금은 아래 지도 링크로 찾아보세요.', true); fallback(q); return; }
@@ -105,8 +100,9 @@
       if (kind) query.kind = kind;
       try {
         if (locMode === 'me') {
-          if (!more || !coords) coords = await getCoords();
-          Object.assign(query, coords, { radius: $('radius').value, sort: 'distance' });
+          if (!coords || (!more && !keep)) coords = await L.myCoords();
+          if (!more) lm.show(coords);
+          Object.assign(query, { x: coords.x, y: coords.y }, { radius: $('radius').value, sort: 'distance' });
         } else {
           const area = $('area').value.trim();
           if (!area) { note('동네 이름을 넣어 주세요. (예: 수지구청역)', true); $('area').focus(); $('results').replaceChildren(); return; }
@@ -114,9 +110,10 @@
           query.q = area + ' ' + q;
         }
         const r = await L.api('places', { query });
-        if (!more) $('results').replaceChildren();
+        if (!more) { $('results').replaceChildren(); found = []; }
         if (!r.places.length && !more) $('results').append(h('p', { class: 'empty' }, '"' + q + '" 검색 결과가 없어요. ' + (locMode === 'me' ? '거리를 넓히거나 ' : '') + '다른 말로 찾아보세요.'));
-        r.places.forEach(p => $('results').append(card(p)));
+        r.places.forEach(p => { found.push(p); $('results').append(card(p, locMode === 'me' ? found.length : 0)); });
+        if (locMode === 'me') lm.places(found);
         $('more-row').hidden = r.isEnd || !r.places.length;
       } catch (e) {
         if (!more) $('results').replaceChildren();

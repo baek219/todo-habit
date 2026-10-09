@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261009v" />
+<link rel="stylesheet" href="life.css?v=20261009x" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .tabs{display:grid;grid-template-columns:1fr 1fr;width:100%}
@@ -46,6 +46,7 @@
       <p class="note" id="note" hidden></p>
     </form>
 
+    <section class="card" id="map-card" hidden></section>
     <div id="results" class="stack" style="gap:10px"></div>
     <div class="row" id="more-row" hidden><button class="btn" type="button" id="more">더 보기</button></div>
   </section>
@@ -58,12 +59,13 @@
   </section>
 </main>
 
-<script src="firebase.js?v=20261009v"></script>
-<script src="sync.js?v=20261009v"></script>
-<script src="life-config.js?v=20261009v"></script>
-<script src="life.js?v=20261009v"></script>
-<script src="shell.js?v=20261009v"></script>
-<script src="nearby.js?v=20261009v"></script>
+<script src="firebase.js?v=20261009x"></script>
+<script src="sync.js?v=20261009x"></script>
+<script src="life-config.js?v=20261009x"></script>
+<script src="life.js?v=20261009x"></script>
+<script src="shell.js?v=20261009x"></script>
+<script src="locmap.js?v=20261009x"></script>
+<script src="nearby.js?v=20261009x"></script>
 <script>
 Nearby({
   kind: 'tour',
