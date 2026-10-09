@@ -197,3 +197,4 @@ html.ln-dark .note.warn{background:#2E2914}
 .trend-x{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:6px;font-size:12px;color:var(--muted);text-align:center}
 .trend-x .on{color:var(--fg);font-weight:750}
 .amount-input{font-size:22px!important;font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
+.page-head .btn:not(.primary):not(.soft):not(.ghost){background:var(--surface)}
