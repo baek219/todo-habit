@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <meta name="theme-color" content="#F3F4F6" />
-<link rel="stylesheet" href="life.css?v=20261010f" />
+<link rel="stylesheet" href="life.css?v=20261010g" />
 <script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
 <style>
   .places{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:start}
@@ -49,12 +49,12 @@
   <p class="small muted">날씨·미세먼지 정보: Open-Meteo · 미세먼지 등급은 환경부 기준(좋음·보통·나쁨·매우 나쁨)으로 나눴어요.</p>
 </main>
 
-<script src="firebase.js?v=20261010f"></script>
-<script src="sync.js?v=20261010f"></script>
-<script src="life-config.js?v=20261010f"></script>
-<script src="life.js?v=20261010f"></script>
-<script src="shell.js?v=20261010f"></script>
-<script src="notify.js?v=20261010f"></script>
+<script src="firebase.js?v=20261010g"></script>
+<script src="sync.js?v=20261010g"></script>
+<script src="life-config.js?v=20261010g"></script>
+<script src="life.js?v=20261010g"></script>
+<script src="shell.js?v=20261010g"></script>
+<script src="notify.js?v=20261010g"></script>
 <script>
 (function () {
   const { h, today, prettyDate, toast, sheet, WD } = Life;
@@ -78,7 +78,7 @@
         const { list, source } = await Life.searchPlace(v);
         const tip = source !== 'kakao' ? h('p', { class: 'note' }, Life.user() ? '지금은 간단한 검색이라 동네 이름을 잘 못 찾아요. 서버를 새 버전으로 바꾸면 "수지구 동천동"처럼 정확히 찾아요.' : 'Google로 로그인하면 카카오 지도로 "수지구 동천동"처럼 동네 이름까지 정확하게 찾아요.') : null;
         results.replaceChildren(...(list.length ? list.map(x => h('button', { class: 'btn', type: 'button', onclick: () => add(x) }, h('span', {}, h('b', {}, x.name), x.sub ? h('span', { class: 'small muted' }, '  ' + x.sub) : null)))
-          : [h('span', { class: 'small muted' }, '못 찾았어요. "수지구 동천동", "부천시"처럼 시·구·동 이름으로 찾아보세요.')]), tip);
+          : [h('span', { class: 'small muted' }, '못 찾았어요. "수지구 동천동", "부천시"처럼 시·구·동 이름으로 찾아보세요.')]), ...(tip ? [tip] : []));
       } catch (e) { results.replaceChildren(h('span', { class: 'small muted' }, e.message || '검색하지 못했어요. 인터넷 연결을 확인해 주세요.')); }
     };
     q.addEventListener('keydown', e => { if (e.key === 'Enter') search(); });
