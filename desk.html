@@ -386,6 +386,7 @@
     if (stickyPanelOpen) openStickyPanel();
     return id;
   };
+  let stickyQ = '';
   function openStickyPanel() {
     const p = document.getElementById('day-panel');
     redrawDay = null;
@@ -396,16 +397,22 @@
       p.classList.add('show'); stickyPanelOpen = true; return;
     }
     load();
-    const list = notes.slice().sort((a, b) => (pinned.has(b.id) ? 1 : 0) - (pinned.has(a.id) ? 1 : 0) || (b.updatedAt || 0) - (a.updatedAt || 0));
+    const qq = stickyQ.trim().toLowerCase();
+    const list = notes.filter(n => !qq || (n.title || '').toLowerCase().includes(qq) || (n.body || '').toLowerCase().includes(qq))
+      .sort((a, b) => (pinned.has(b.id) ? 1 : 0) - (pinned.has(a.id) ? 1 : 0) || (b.updatedAt || 0) - (a.updatedAt || 0));
     p.innerHTML = `<h3>🗒 포스트잇 메모</h3>
       <div class="note" style="margin:0 0 10px;">메모를 바탕화면에 포스트잇처럼 붙여요. 포스트잇에서 바로 고치면 폰 메모장에도 같이 바뀌어요.<br>포스트잇 위쪽을 끌어서 옮기고, 오른쪽 아래 모서리로 크기를 바꿔요. <b>✕</b>는 떼기(메모는 남음), <b>⋯</b>에서 색 바꾸기·삭제.</div>
-      <button class="btn" id="s-new" style="width:100%; padding:9px;">＋ 새 포스트잇 만들기</button>
-      <div style="margin-top:10px; max-height:52vh; overflow:auto;">${list.length ? list.map(n => `<div class="row" style="cursor:default;">
+      <button class="btn" id="s-new" style="width:100%; padding:9px;">✨ 빈 포스트잇 새로 만들기</button>
+      <div style="margin-top:14px; font-weight:800;">📂 메모장에 있는 메모 꺼내기 <small style="font-weight:500; color:var(--muted)">(${notes.length}개 · 📌 붙이기를 누르면 바탕화면에 나와요)</small></div>
+      <div class="addrow" style="margin-top:6px;"><input id="s-q" placeholder="🔍 메모 찾기 (제목·내용)" value="${esc(stickyQ)}" autocomplete="off" /></div>
+      <div style="margin-top:6px; max-height:46vh; overflow:auto;">${list.length ? list.map(n => `<div class="row" style="cursor:default;">
           <span style="width:20px; text-align:center;">${pinned.has(n.id) ? '📌' : '✎'}</span>
           <div style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${n.important ? '⭐ ' : ''}<b>${esc(n.title || (n.body || '').split('\n')[0] || '빈 메모')}</b> <small style="color:var(--muted)">${esc((n.title ? (n.body || '') : '').split('\n')[0]).slice(0, 40)}</small></div>
           <button class="edit-b" data-pin-n="${n.id}">${pinned.has(n.id) ? '떼기' : '📌 붙이기'}</button></div>`).join('') : '<div class="note">아직 메모가 없어요.</div>'}</div>
       <div style="display:flex; justify-content:flex-end; margin-top:12px;"><button class="btn gray" id="s-close">닫기</button></div>`;
     document.getElementById('s-new').onclick = () => window.__newStickyNote();
+    const sq = document.getElementById('s-q');
+    sq.oninput = () => { stickyQ = sq.value; openStickyPanel(); const n = document.getElementById('s-q'); n.focus(); n.setSelectionRange(stickyQ.length, stickyQ.length); };
     p.querySelectorAll('[data-pin-n]').forEach(b => b.onclick = () => togglePin(b.getAttribute('data-pin-n')));
     document.getElementById('s-close').onclick = () => { stickyPanelOpen = false; p.classList.remove('show'); };
     p.classList.add('show'); stickyPanelOpen = true;
