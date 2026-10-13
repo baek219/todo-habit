@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>포스트잇 메모</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: transparent; overflow: hidden; font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; }
+  .note { position: absolute; inset: 6px; border-radius: 10px; display: flex; flex-direction: column; background: var(--bg, #FFF1A8); color: #3A3326;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.22); overflow: hidden; }
+  .head { display: flex; align-items: center; gap: 4px; padding: 6px 6px 4px 10px; background: rgba(0,0,0,0.06); -webkit-app-region: drag; user-select: none; cursor: move; }
+  .head input { flex: 1; min-width: 0; border: none; background: transparent; font: inherit; font-size: 14px; font-weight: 800; color: inherit; outline: none; -webkit-app-region: no-drag; padding: 2px 0; }
+  .head button { -webkit-app-region: no-drag; border: none; background: transparent; cursor: pointer; font-size: 14px; width: 24px; height: 24px; border-radius: 6px; color: inherit; opacity: .65; }
+  .head button:hover { background: rgba(0,0,0,0.1); opacity: 1; }
+  .meta { font-size: 11px; padding: 2px 10px 0; opacity: .7; font-weight: 700; }
+  textarea { flex: 1; border: none; background: transparent; resize: none; font: inherit; font-size: 13.5px; line-height: 1.55; color: inherit; padding: 6px 10px 10px; outline: none; }
+  .grip { position: absolute; right: 6px; bottom: 6px; width: 16px; height: 16px; cursor: nwse-resize; opacity: .4;
+    background: linear-gradient(135deg, transparent 50%, rgba(0,0,0,.35) 50%, rgba(0,0,0,.35) 60%, transparent 60%, transparent 75%, rgba(0,0,0,.35) 75%, rgba(0,0,0,.35) 85%, transparent 85%); }
+  .menu { position: absolute; top: 36px; right: 10px; background: #fff; color: #222; border-radius: 10px; box-shadow: 0 6px 18px rgba(0,0,0,.25); padding: 6px; display: none; z-index: 5; min-width: 170px; }
+  .menu.show { display: block; }
+  .menu .cols { display: flex; gap: 6px; padding: 4px 4px 8px; }
+  .menu .cols span { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(0,0,0,.15); cursor: pointer; }
+  .menu .cols span.on { border-color: #333; }
+  .menu button { display: block; width: 100%; text-align: left; border: none; background: transparent; font: inherit; font-size: 13px; padding: 7px 8px; border-radius: 7px; cursor: pointer; }
+  .menu button:hover { background: #F0F0F0; }
+  .saved { position: absolute; left: 12px; bottom: 6px; font-size: 10.5px; opacity: 0; transition: opacity .3s; }
+  .saved.on { opacity: .55; }
+  .gone { padding: 24px 12px; text-align: center; font-size: 13px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="note" id="note"></div>
+<script src="repeat.js"></script>
+<script>
+(function () {
+  const KEY_NOTES = 'notes_v1';
+  const id = new URLSearchParams(location.search).get('id') || '';
+  const BR = window.DesktopBridge || {};
+  // 포스트잇 색 (폰 메모 색과 같은 이름)
+  const COLORS = [
+    { key: 'yellow', bg: '#FFEB99' }, { key: 'green', bg: '#C8EFD4' }, { key: 'blue', bg: '#C9DEF7' },
+    { key: 'pink', bg: '#F9CFDF' }, { key: 'purple', bg: '#DED3F4' }, { key: '', bg: '#FFF7D1' }
+  ];
+  const bgOf = k => (COLORS.find(c => c.key === (k || '')) || COLORS[0]).bg;
+  const el = document.getElementById('note');
+  let note = null, saveTimer = null;
+
+  function readAll() { try { return JSON.parse(localStorage.getItem(KEY_NOTES) || '[]') || []; } catch (e) { return []; } }
+  function writeNote(patch) {
+    const all = readAll();
+    const i = all.findIndex(n => n.id === id);
+    if (i < 0) return;
+    all[i] = Object.assign({}, all[i], patch, { updatedAt: Date.now() });
+    note = all[i];
+    try { localStorage.setItem(KEY_NOTES, JSON.stringify(all)); } catch (e) {}
+    const s = document.getElementById('saved'); if (s) { s.classList.add('on'); setTimeout(() => s.classList.remove('on'), 900); }
+  }
+  function md(ds) { return (+ds.slice(5, 7)) + '/' + (+ds.slice(8, 10)); }
+  function metaText(n) {
+    if (!n.date) return '';
+    let t = '📅 ' + md(n.date) + (n.endDate && n.endDate > n.date ? ' ~ ' + md(n.endDate) : '');
+    try { if (window.Repeat && window.Repeat.isRepeat(n.repeat)) t += ' · 🔁 ' + window.Repeat.describe(n.date, n.repeat, !!n.lunar); } catch (e) {}
+    return (n.important ? '⭐ ' : '') + t;
+  }
+
+  function render() {
+    note = readAll().find(n => n.id === id) || null;
+    if (!note) {
+      el.style.setProperty('--bg', '#EEE');
+      el.innerHTML = `<div class="head"><input value="삭제된 메모" disabled /><button id="b-x" title="바탕화면에서 떼기">✕</button></div>
+        <div class="gone">이 메모는 폰이나 다른 곳에서 삭제됐어요.<br>✕를 눌러 떼어주세요.</div>`;
+      document.getElementById('b-x').onclick = () => BR.unpinNote && BR.unpinNote(id);
+      return;
+    }
+    el.style.setProperty('--bg', bgOf(note.color || 'yellow'));
+    el.innerHTML = `<div class="head">
+        <input id="t" placeholder="제목" maxlength="80" />
+        <button id="b-new" title="새 포스트잇">＋</button>
+        <button id="b-menu" title="색·삭제">⋯</button>
+        <button id="b-x" title="바탕화면에서 떼기 (메모는 남아요)">✕</button>
+      </div>
+      <div class="meta" id="meta">${metaText(note)}</div>
+      <textarea id="b" placeholder="여기에 메모를 적어요 (자동 저장)"></textarea>
+      <div class="saved" id="saved">저장됨 ✓</div>
+      <div class="grip" id="grip" title="끌어서 크기 조절"></div>
+      <div class="menu" id="menu">
+        <div class="cols">${COLORS.slice(0, 5).map(c => `<span data-c="${c.key}" style="background:${c.bg}" class="${(note.color || 'yellow') === c.key ? 'on' : ''}"></span>`).join('')}</div>
+        <button id="m-app">📱 앱에서 열기 (날짜·반복 바꾸기)</button>
+        <button id="m-del" style="color:#C1543D;">🗑 메모 삭제하기</button>
+      </div>`;
+    const t = document.getElementById('t'), b = document.getElementById('b');
+    t.value = note.title || ''; b.value = note.body || '';
+    const later = () => { clearTimeout(saveTimer); saveTimer = setTimeout(() => writeNote({ title: t.value.trim(), body: b.value }), 500); };
+    t.addEventListener('input', later); b.addEventListener('input', later);
+    t.addEventListener('blur', () => { clearTimeout(saveTimer); writeNote({ title: t.value.trim(), body: b.value }); });
+    b.addEventListener('blur', () => { clearTimeout(saveTimer); writeNote({ title: t.value.trim(), body: b.value }); });
+    document.getElementById('b-x').onclick = () => { clearTimeout(saveTimer); writeNote({ title: t.value.trim(), body: b.value }); BR.unpinNote && BR.unpinNote(id); };
+    document.getElementById('b-new').onclick = () => BR.newSticky && BR.newSticky();
+    const menu = document.getElementById('menu');
+    document.getElementById('b-menu').onclick = (e) => { e.stopPropagation(); menu.classList.toggle('show'); };
+    menu.querySelectorAll('[data-c]').forEach(s => s.onclick = () => { writeNote({ color: s.getAttribute('data-c') }); render(); });
+    document.getElementById('m-app').onclick = () => { menu.classList.remove('show'); BR.openApp && BR.openApp(); };
+    document.getElementById('m-del').onclick = () => {
+      if (!confirm('이 메모를 완전히 삭제할까요? 폰 메모장에서도 지워져요.')) return;
+      const all = readAll().filter(n => n.id !== id);
+      try { localStorage.setItem(KEY_NOTES, JSON.stringify(all)); } catch (e) {}
+      BR.unpinNote && BR.unpinNote(id);
+    };
+    // 크기 조절 (창 테두리가 없어서 오른쪽 아래 손잡이로)
+    const grip = document.getElementById('grip');
+    grip.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      let lx = e.screenX, ly = e.screenY;
+      const mv = (ev) => { const dx = ev.screenX - lx, dy = ev.screenY - ly; if (Math.abs(dx) + Math.abs(dy) < 3) return; lx = ev.screenX; ly = ev.screenY; BR.resizeSticky && BR.resizeSticky(id, dx, dy); };
+      const up = () => { window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up); };
+      window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
+    });
+  }
+
+  // 다른 창(바탕화면 달력·폰에서 받은 내용)에서 바뀌면 다시 그리기 — 글을 쓰는 중이면 건드리지 않음
+  window.addEventListener('storage', (e) => {
+    if (e.key !== KEY_NOTES) return;
+    const a = document.activeElement;
+    if (a && (a.id === 't' || a.id === 'b')) {
+      const n = readAll().find(x => x.id === id);
+      if (!n) render(); else { const m = document.getElementById('meta'); if (m) m.textContent = metaText(n); }
+      return;
+    }
+    render();
+  });
+  document.addEventListener('click', (e) => { const m = document.getElementById('menu'); if (m && !m.contains(e.target) && e.target.id !== 'b-menu') m.classList.remove('show'); });
+  render();
+})();
+</script>
+</body>
+</html>

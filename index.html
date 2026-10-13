@@ -115,8 +115,7 @@
   .qex { display:inline-block; border:1px dashed var(--border); border-radius: 8px; padding: 1px 7px; margin: 2px 2px; cursor:pointer; color: var(--text); font-weight:700; }
   .dd-edit { flex: none; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 9px; width: 34px; height: 30px; font-size: 15px; cursor: pointer; margin-left: 6px; }
   .quick-bar { padding: 10px 16px 0; }
-  .quick-bar button { width: 100%; text-align: left; border: 1.5px solid var(--primary); background: var(--primary-soft, var(--surface)); color: var(--primary-dark, var(--primary)); border-radius: 14px; padding: 13px 14px; font-size: 15px; font-weight: 800; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.05); }
-  .quick-bar button::after { content: '누르기 ›'; margin-left: auto; font-size: 12.5px; font-weight: 700; opacity: .8; }
+  .quick-bar button { width: 100%; text-align: left; border: 1.5px dashed var(--border); background: var(--surface); color: var(--text); border-radius: 14px; padding: 12px 14px; font-size: 14px; font-weight: 800; font-family: inherit; cursor: pointer; }
   .quick-bar button small { font-weight: 600; color: var(--text-muted); margin-left: 6px; }
   #dday-box:empty { display: none; }
   .dday-card { margin: 10px 16px 0; border-radius: 14px; border: 1.5px solid var(--imp); background: linear-gradient(90deg, var(--imp-soft), transparent 80%), var(--surface); padding: 10px 14px; }
@@ -655,7 +654,7 @@
     <div class="settings-card">
       <button class="settings-btn danger" id="reset-btn">전체 데이터 초기화</button>
     </div>
-    <div class="footer-note">할일습관 앱 · v2.3</div>
+    <div class="footer-note">할일습관 앱 · v2.4</div>
   </div>
 </div>
 
@@ -673,7 +672,6 @@
 <script src="lunar.js"></script>
 <script src="repeat.js"></script>
 <script src="quick.js"></script>
-<script src="shell.js"></script>
 <script>
 (function () {
   const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -728,6 +726,12 @@
     const box = root.parentElement;
     box.querySelectorAll('[data-rep]').forEach(c => c.onclick = () => { st.repeat = c.getAttribute('data-rep'); if (st.repeat === 'weekly' || st.repeat === 'none' || st.repeat === 'monthEnd') st.lunar = false; onChange(); });
     box.querySelectorAll('[data-lunar]').forEach(c => c.onclick = () => { st.lunar = c.getAttribute('data-lunar') === '1'; onChange(); });
+  }
+  // 주중·주말 묶음
+  const PRESET_DAYS = { weekday: [1, 2, 3, 4, 5], weekend: [0, 6], all: [0, 1, 2, 3, 4, 5, 6] };
+  function dayPresetKey(days) {
+    const k = [...new Set(days || [])].sort((a, b) => a - b).join(',');
+    return k === '1,2,3,4,5' ? 'weekday' : k === '0,6' ? 'weekend' : k === '0,1,2,3,4,5,6' ? 'all' : '';
   }
   function md(ds) { return parseInt(ds.slice(5, 7), 10) + '/' + parseInt(ds.slice(8, 10), 10); }
   function minusMinutes(hhmm, m) { const [h, mi] = hhmm.split(':').map(Number); let t = Math.max(0, h * 60 + mi - (m || 0)); return pad(Math.floor(t / 60)) + ':' + pad(t % 60); }
@@ -849,7 +853,7 @@
     return toISODate(sunday);
   }
   function uid() { return 't' + Date.now() + Math.random().toString(36).slice(2, 7); }
-  function escapeHtml(str) { return String(str == null ? '' : str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+  function escapeHtml(str) { const div = document.createElement('div'); div.textContent = str; return div.innerHTML; }
   function getAllCategories() {
     const defaults = DEFAULT_CATEGORIES_BASE.map(c => ({ name: c.name, color: defaultColorOverrides[c.name] || c.color }));
     return defaults.concat(customCategories);
@@ -1829,7 +1833,7 @@
       <div class="modal-sub">말하듯이 쓰면 날짜·시간·반복을 알아서 넣어요</div>
       <input class="modal-input" id="quick-input" placeholder="예: 내일 오후 3시 치과" autocomplete="off" />
       <div id="quick-preview" class="quick-prev"></div>
-      <div class="hint" style="line-height:1.7;">이렇게 써보세요 👉 <span class="qex">다음주 금요일 9시 병원</span> <span class="qex">10/20~10/23 제주도 여행</span> <span class="qex">매달 말일 카드값 정리</span> <span class="qex">엄마 생신 음력 9월 3일 매년 중요</span> <span class="qex">매주 화요일 분리수거</span></div>
+      <div class="hint" style="line-height:1.7;">이렇게 써보세요 👉 <span class="qex">다음주 금요일 9시 병원</span> <span class="qex">10/20~10/23 제주도 여행</span> <span class="qex">매달 말일 카드값 정리</span> <span class="qex">엄마 생신 음력 9월 3일 매년 중요</span> <span class="qex">매주 화요일 분리수거</span> <span class="qex">평일마다 출근 체크</span> <span class="qex">주말에만 대청소</span></div>
       <div class="modal-actions"><button class="modal-btn cancel" id="quick-cancel">닫기</button><button class="modal-btn confirm" id="quick-ok" disabled>추가하기</button></div>
     </div></div>`;
     const inp = document.getElementById('quick-input');
@@ -1844,6 +1848,12 @@
       const pv = document.getElementById('quick-preview');
       if (!cur) { pv.innerHTML = ''; return; }
       const chips = [];
+      if (cur.habitDays) {
+        chips.push(`<span class="qc">■ ${escapeHtml(cur.title || '(이름을 써주세요)')}</span>`);
+        chips.push(`<span class="qc">${cur.habitDays.length === 2 ? '🏖 주말(토·일)마다' : '💼 주중(월~금)마다'} · 매주 습관</span>`);
+        if (cur.time) chips.push(`<span class="qc">🔔 ${shortTime(cur.time)} 알림</span>`);
+        pv.innerHTML = chips.join(''); return;
+      }
       chips.push(`<span class="qc">◆ ${escapeHtml(cur.title || '(이름을 써주세요)')}</span>`);
       chips.push(`<span class="qc">📅 ${cur.endDate ? lab(cur.date) + ' → ' + lab(cur.endDate) : lab(cur.date)}</span>`);
       if (cur.time) chips.push(`<span class="qc">🕘 ${shortTime(cur.time)}</span>`);
@@ -1855,6 +1865,13 @@
     container.querySelectorAll('.qex').forEach(e => e.onclick = () => { inp.value = e.textContent; update(); inp.focus(); });
     function addIt() {
       if (!cur || !cur.title) return;
+      if (cur.habitDays) {
+        tasks.unshift({ id: uid(), type: 'habit', frequency: 'weekly', title: cur.title.slice(0, 60), category: null, memo: '', repeatDays: cur.habitDays.slice(), monthDay: 1,
+          completedDates: [], target: 1, counts: {}, pauses: [], reminderTime: cur.time || null, createdAt: toISODate(new Date()) });
+        saveTasks(); renderAll();
+        showToast(`⚡ '${cur.title}' · ${cur.habitDays.length === 2 ? '주말' : '주중'}마다 습관으로 추가했어요`);
+        inp.value = ''; update(); inp.focus(); return;
+      }
       tasks.unshift({ id: uid(), type: 'todo', title: cur.title.slice(0, 60), category: null, memo: '', done: false, createdAt: toISODate(new Date()), completedAt: null,
         dueDate: cur.date, endDate: cur.endDate || null, repeat: cur.repeat || null, lunar: !!cur.repeat && !!cur.lunar, doneDates: [],
         time: cur.time || null, remindBefore: cur.time ? 0 : null, reminderTime: cur.time || null, preAlert: null, important: !!cur.important });
@@ -1911,7 +1928,9 @@
     const remindHtml = (h.reminderTime && window.AndroidBridge) ? `<span class="mini-badge">⏰ ${timeLabel(h.reminderTime)}</span>` : '';
     const target = habitTarget(h);
     const targetHtml = target > 1 ? `<span class="mini-badge">🎯 하루 ${target}회</span>` : '';
-    const badgeRow = (badge || streakHtml || pauseHtml || remindHtml || targetHtml) ? `<div>${badge}${streakHtml}${targetHtml}${remindHtml}${pauseHtml}</div>` : '';
+    const pk = h.frequency === 'weekly' ? dayPresetKey(h.repeatDays) : '';
+    const dayTag = pk === 'weekday' ? '<span class="mini-badge">💼 주중</span>' : pk === 'weekend' ? '<span class="mini-badge">🏖 주말</span>' : '';
+    const badgeRow = (badge || streakHtml || pauseHtml || remindHtml || targetHtml || dayTag) ? `<div>${badge}${dayTag}${streakHtml}${targetHtml}${remindHtml}${pauseHtml}</div>` : '';
     const memoHtml = h.memo ? `<div class="habit-memo">${escapeHtml(h.memo)}</div>` : '';
     const actions = `<div class="habit-actions"><button class="drag-handle" aria-label="순서 바꾸기">☰</button><button class="icon-btn" data-memo="${h.id}">✎</button><button class="icon-btn" data-delete="${h.id}">✕</button></div>`;
     if (h.frequency === 'monthly') {
@@ -2444,7 +2463,7 @@
       : `<div class="type-toggle" style="margin-top:14px; flex-wrap:wrap;">
           <div class="type-btn active" data-type="todo" style="flex-basis:47%;">할일<small>날짜 지정 가능</small></div>
           <div class="type-btn" data-type="daily" style="flex-basis:47%;">매일 습관<small>매일 반복</small></div>
-          <div class="type-btn" data-type="weekly" style="flex-basis:47%;">매주 습관<small>요일 지정</small></div>
+          <div class="type-btn" data-type="weekly" style="flex-basis:47%;">매주 습관<small>요일·주중·주말</small></div>
           <div class="type-btn" data-type="monthly" style="flex-basis:47%;">매달 습관<small>날짜 지정</small></div>
         </div>`;
 
@@ -2491,7 +2510,10 @@
           </div>
           <div id="repeat-field" style="display:${modalType === 'weekly' ? 'block' : 'none'};">
             <div class="field-label">반복할 요일</div>
+            <div class="chip-row" id="day-preset-row" style="margin-bottom:8px;">
+              <div class="chip" data-preset="weekday">💼 주중만 (월~금)</div><div class="chip" data-preset="weekend">🏖 주말만 (토·일)</div><div class="chip" data-preset="all">매일</div></div>
             <div class="chip-row" id="day-row">${dayChips}</div>
+            <div class="hint" id="day-preset-hint"></div>
           </div>
           <div id="monthday-field" style="display:${modalType === 'monthly' ? 'block' : 'none'};">
             <div class="field-label">매달 며칠에 반복할까요?</div>
@@ -2711,14 +2733,24 @@
       else doAdd();
     });
 
+    function drawDayPreset() {
+      const k = dayPresetKey(modalRepeatDays);
+      document.querySelectorAll('#day-preset-row [data-preset]').forEach(c => c.classList.toggle('active-day', c.getAttribute('data-preset') === k));
+      dayRow.querySelectorAll('.chip').forEach(c => c.classList.toggle('active-day', modalRepeatDays.includes(parseInt(c.getAttribute('data-day'), 10))));
+      document.getElementById('day-preset-hint').textContent = k === 'weekday' ? '월요일부터 금요일까지만 나와요 (주말엔 쉬어요)' : k === 'weekend' ? '토요일·일요일에만 나와요' : '';
+    }
+    document.querySelectorAll('#day-preset-row [data-preset]').forEach(c => c.addEventListener('click', () => {
+      modalRepeatDays = PRESET_DAYS[c.getAttribute('data-preset')].slice(); drawDayPreset();
+    }));
     dayRow.querySelectorAll('.chip').forEach(chip => {
       chip.addEventListener('click', () => {
         const day = parseInt(chip.getAttribute('data-day'), 10);
         const idx = modalRepeatDays.indexOf(day);
-        if (idx >= 0) { modalRepeatDays.splice(idx, 1); chip.classList.remove('active-day'); }
-        else { modalRepeatDays.push(day); chip.classList.add('active-day'); }
+        if (idx >= 0) modalRepeatDays.splice(idx, 1); else modalRepeatDays.push(day);
+        drawDayPreset();
       });
     });
+    drawDayPreset();
 
     confirmBtn.addEventListener('click', () => {
       const text = input.value.trim(); if (!text) return;
@@ -2935,7 +2967,7 @@
   }
 
   // ---- 날짜를 누르면: 그날 항목 체크 + 그 날짜 기준으로 추가 ----
-  let calAddType = 'todo', calAddEnd = null, calAddEndFor = null, calAddStart = null, calAddImp = false;
+  let calAddType = 'todo', calAddEnd = null, calAddEndFor = null, calAddStart = null, calAddImp = false, calAddDays = 'one';
   const calAddRep = { repeat: 'none', lunar: false, start: null };
   function renderCalDetail() {
     const ds = calSelectedDate;
@@ -2948,7 +2980,7 @@
     const NAME = { daily: '매일', weekly: '매주', monthly: '매달', todo: '할일', memo: '메모', shift: '교대' };
     const HINT = {
       todo: calAddEnd ? `여러 날 하는 할일 (예: 여행) · 아래 날짜를 눌러 바꿀 수 있어요` : `하루짜리 할일 · 여행처럼 여러 날이면 아래 날짜를 눌러 끝나는 날을 고르세요`, daily: `${mo}월 ${dd}일부터 매일 반복`,
-      weekly: `매주 ${wd}요일마다 반복 (${mo}월 ${dd}일부터)`, monthly: `매달 ${dd}일마다 반복`, memo: `${mo}월 ${dd}일 날짜가 붙은 메모`
+      weekly: calAddDays === 'weekday' ? `주중(월~금)마다 반복 (${mo}월 ${dd}일부터)` : calAddDays === 'weekend' ? `주말(토·일)마다 반복 (${mo}월 ${dd}일부터)` : `매주 ${wd}요일마다 반복 (${mo}월 ${dd}일부터)`, monthly: `매달 ${dd}일마다 반복`, memo: `${mo}월 ${dd}일 날짜가 붙은 메모`
     };
     const holidayName = HOLIDAYS[ds];
     const dlog = dayLogs[ds];
@@ -2977,6 +3009,7 @@
         : `${calAddType === 'todo' ? `<button type="button" class="modal-input" id="cal-add-end" style="text-align:left; cursor:pointer; margin-top:8px; padding:10px 12px; font-size:13.5px;">${rangeButtonHtml(calAddStart, calAddEnd)}</button>
              <div style="margin-top:8px;">${repeatPickerHtml('cal-add-rep', calAddRep)}</div>
              <div style="margin-top:8px;"><button type="button" class="imp-toggle ${calAddImp ? 'on' : ''}" id="cal-add-imp">${calAddImp ? '⭐ 중요한 날 (켜짐)' : '☆ 중요한 날로 강조'}</button></div>` : ''}
+           ${calAddType === 'weekly' ? `<div class="chip-row" style="margin-top:8px;">${[['one', wd + '요일만'], ['weekday', '💼 주중 (월~금)'], ['weekend', '🏖 주말 (토·일)']].map(([k, l]) => `<div class="chip ${calAddDays === k ? 'active-day' : ''}" data-adddays="${k}">${l}</div>`).join('')}</div>` : ''}
            <div class="inline-row" style="margin-top:8px; flex-wrap:nowrap;"><input class="modal-input" id="cal-add-input" placeholder="${({ todo: '예: 우유 사기', daily: '예: 물 마시기', weekly: '예: 헬스장 가기', monthly: '예: 공과금 내기' })[calAddType]}" maxlength="60" style="padding:10px 12px;" />
            <button class="modal-btn confirm" id="cal-add-btn" style="flex:none; padding:11px 16px; background:${TYPE_COLORS[calAddType]};">추가</button></div>`}`;
     box.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', (e) => {
@@ -3012,6 +3045,10 @@
         calAddStart = st; calAddEnd = en; renderCalDetail(); document.getElementById('cal-add-input').value = keep;
       }, { step: 'end', title: '시작 ~ 끝 고르기' });
     };
+    box.querySelectorAll('[data-adddays]').forEach(c => c.onclick = () => {
+      const keep = (document.getElementById('cal-add-input') || {}).value || '';
+      calAddDays = c.getAttribute('data-adddays'); renderCalDetail(); document.getElementById('cal-add-input').value = keep;
+    });
     const impT = document.getElementById('cal-add-imp');
     if (impT) impT.onclick = () => {
       const keep = (document.getElementById('cal-add-input') || {}).value || '';
@@ -3026,7 +3063,7 @@
         const base = { id: uid(), title: v, category: null, memo: '', reminderTime: null };
         if (calAddType === 'todo') tasks.unshift(Object.assign(base, { type: 'todo', done: false, createdAt: toISODate(new Date()), completedAt: null, dueDate: calAddStart, endDate: calAddEnd && calAddEnd > calAddStart ? calAddEnd : null,
           repeat: calAddRep.repeat !== 'none' ? calAddRep.repeat : null, lunar: calAddRep.repeat !== 'none' && calAddRep.lunar, doneDates: [], important: !!calAddImp }));
-        else tasks.unshift(Object.assign(base, { type: 'habit', frequency: calAddType, repeatDays: calAddType === 'weekly' ? [d.getDay()] : [0, 1, 2, 3, 4, 5, 6],
+        else tasks.unshift(Object.assign(base, { type: 'habit', frequency: calAddType, repeatDays: calAddType === 'weekly' ? (calAddDays === 'one' ? [d.getDay()] : PRESET_DAYS[calAddDays].slice()) : [0, 1, 2, 3, 4, 5, 6],
           monthDay: calAddType === 'monthly' ? dd : 1, completedDates: [], target: 1, counts: {}, pauses: [], createdAt: ds, startDate: ds }));
         calAddEnd = null; calAddStart = ds; calAddImp = false; calAddRep.repeat = 'none'; calAddRep.lunar = false;
         saveTasks(); renderCalendar();
@@ -3055,6 +3092,9 @@
   function freqDetail(h) {
     if (h.frequency === 'daily') return '매일';
     if (h.frequency === 'monthly') return `매달 ${h.monthDay}일`;
+    const pk = dayPresetKey(h.repeatDays || []);
+    if (pk === 'weekday') return '주중 (월~금)';
+    if (pk === 'weekend') return '주말 (토·일)';
     const days = [...h.repeatDays].sort((a,b) => a-b).map(i => DAY_LABELS[i]).join(',');
     return `매주 ${days || '(요일 없음)'}`;
   }
@@ -3705,8 +3745,6 @@
   renderNav();
   renderAll();
   if (appSettings.startTab && appSettings.startTab !== 'checklist' && ['calendar', 'notes'].includes(appSettings.startTab)) switchTab(appSettings.startTab);
-  // 생활노트 왼쪽 메뉴에서 '달력'·'메모장'을 눌러 들어온 경우 (index.html?tab=calendar)
-  try { const qt = new URLSearchParams(location.search).get('tab'); if (qt && ['checklist', 'calendar', 'notes', 'stats', 'settings'].includes(qt)) switchTab(qt); } catch (e) {}
   document.getElementById('cal-prev').addEventListener('click', () => { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } calSelectedDate = null; renderCalendar(); });
   document.getElementById('cal-next').addEventListener('click', () => { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } calSelectedDate = null; renderCalendar(); });
 })();
