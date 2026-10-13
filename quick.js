@@ -45,9 +45,25 @@
     cut(/\s(?:매\s?)?(평일|주중|주말)(?:마다|에만|만|에)?(?=\s)/, m => { out.habitDays = m[1] === '주말' ? [0, 6] : [1, 2, 3, 4, 5]; });
     // 따로 떨어진 '매년'/'매달'/'매주' (예: '엄마 생신 음력 9월 3일 매년')
     let loose = null;
-    cut(/\s매(년|해|달|월|주)(?:마다)?(?=\s)(?!\s?\d|\s?[일월화수목금토]요일|\s?말일)/, m => { loose = /년|해/.test(m[1]) ? 'yearly' : /주/.test(m[1]) ? 'weekly' : 'monthly'; });
+    cut(/\s매(년|해|달|월|주)(?:마다)?(?=\s)(?!\s?\d|\s?[일월화수목금토]요일|\s?말일|\s?마지막|\s?(?:첫|둘|셋|넷)째?\s?주)/, m => { loose = /년|해/.test(m[1]) ? 'yearly' : /주/.test(m[1]) ? 'weekly' : 'monthly'; });
     // ---- 반복 ----
-    cut(/\s매주\s?([일월화수목금토])요일(?:마다)?(?=\s)/, m => { out.repeat = 'weekly'; const w = WD[m[1]]; out.date = iso(add(base, (w - base.getDay() + 7) % 7)); });
+    const ORD = { '첫째': 1, '첫': 1, '1': 1, '둘째': 2, '2': 2, '셋째': 3, '3': 3, '넷째': 4, '4': 4, '마지막': 5 };
+    cut(/\s격주\s?([일월화수목금토])요일(?:마다)?(?=\s)/, m => { out.repeat = 'biweekly'; const w = WD[m[1]]; out.date = iso(add(base, (w - base.getDay() + 7) % 7)); });
+    if (!out.repeat) cut(/\s(\d{1,3})\s?일\s?(?:마다|간격으로|에 한 번)(?=\s)/, m => { out.repeat = 'every' + Math.max(1, Math.min(365, +m[1])); out.date = iso(base); });
+    if (!out.repeat) cut(/\s매(?:달|월)\s?(첫째|첫|둘째|셋째|넷째|마지막|[1-4])\s?(?:째)?\s?주\s?([일월화수목금토])요일(?:마다)?(?=\s)/, m => {
+      const n = ORD[m[1]], w = WD[m[2]];
+      // 이번 달부터 그 '몇째 주 요일'을 찾아서 첫 날짜로
+      for (let k = 0; k < 3; k++) {
+        const y = base.getFullYear(), mo = base.getMonth() + k;
+        const days = [];
+        const last = new Date(y, mo + 1, 0).getDate();
+        for (let d = 1; d <= last; d++) { const x = new Date(y, mo, d); if (x.getDay() === w) days.push(x); }
+        const pick = n === 5 ? days[days.length - 1] : days[n - 1];
+        if (pick && pick >= base) { out.date = iso(pick); break; }
+      }
+      out.repeat = n === 5 ? 'lastWeek' : 'nthWeek';
+    });
+    if (!out.repeat) cut(/\s매주\s?([일월화수목금토])요일(?:마다)?(?=\s)/, m => { out.repeat = 'weekly'; const w = WD[m[1]]; out.date = iso(add(base, (w - base.getDay() + 7) % 7)); });
     if (!out.repeat) cut(/\s매(?:달|월)\s?(?:말일|마지막\s?날)(?:마다)?(?=\s)/, () => { out.repeat = 'monthEnd'; out.lunar = false; out.date = iso(new Date(base.getFullYear(), base.getMonth() + 1, 0)); });
     if (!out.repeat) cut(/\s매(?:달|월)\s?(\d{1,2})일(?:마다)?(?=\s)/, m => {
       out.repeat = 'monthly'; const day = +m[1];

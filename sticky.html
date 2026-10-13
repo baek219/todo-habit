@@ -40,6 +40,17 @@
   .pick .it .tx small { color: #888; margin-left: 4px; }
   .pick .it .on { font-size: 11px; color: #B08A00; font-weight: 800; flex: none; }
   .pick .empty { text-align: center; color: #888; font-size: 12.5px; padding: 18px 8px; }
+  .items { padding: 2px 10px 0; max-height: 45%; overflow-y: auto; }
+  .ci { display: flex; align-items: center; gap: 7px; font-size: 13px; padding: 2px 0; }
+  .ci .bx { width: 15px; height: 15px; border-radius: 4px; border: 1.6px solid rgba(0,0,0,.45); display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 900; cursor: pointer; flex: none; }
+  .ci.on .bx { background: rgba(0,0,0,.55); color: #fff; border-color: transparent; }
+  .ci.on .tx { text-decoration: line-through; opacity: .55; }
+  .ci .tx { flex: 1; min-width: 0; word-break: break-word; }
+  .ci .dl { opacity: 0; border: none; background: transparent; cursor: pointer; font-size: 11px; }
+  .ci:hover .dl { opacity: .5; }
+  .ci.add input { flex: 1; border: none; border-bottom: 1px dashed rgba(0,0,0,.25); background: transparent; font: inherit; font-size: 12.5px; outline: none; padding: 2px 0; color: inherit; }
+  .lockbox { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; font-size: 13px; padding: 10px; text-align: center; }
+  .lockbox input { width: 110px; text-align: center; font-size: 18px; letter-spacing: 6px; border: 1px solid rgba(0,0,0,.2); border-radius: 8px; padding: 5px; background: rgba(255,255,255,.6); }
   .saved { position: absolute; left: 12px; bottom: 6px; font-size: 10.5px; opacity: 0; transition: opacity .3s; }
   .saved.on { opacity: .55; }
   .gone { padding: 24px 12px; text-align: center; font-size: 13px; line-height: 1.6; }
@@ -80,8 +91,21 @@
     return (n.important ? '⭐ ' : '') + t;
   }
 
+  let unlocked = false;
+  function pinHash(pin) { let h = 2166136261; const str = 'kokbu-memo:' + pin; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return 'p' + h.toString(36); }
+  function pinHashSet() { try { return (JSON.parse(localStorage.getItem('app_settings_v1') || '{}') || {}).memoPinHash || ''; } catch (e) { return ''; } }
   function render() {
     note = readAll().find(n => n.id === id) || null;
+    if (note && note.locked && pinHashSet() && !unlocked) {
+      el.style.setProperty('--bg', bgOf(note.color || 'yellow'));
+      el.innerHTML = `<div class="head"><input value="🔒 ${(note.title || '잠긴 메모').replace(/"/g, '&quot;')}" disabled /><button id="b-x" title="바탕화면에서 떼기">✕</button></div>
+        <div class="lockbox">잠긴 메모예요<br>PIN 4자리를 넣으면 열려요<input id="pin" type="password" inputmode="numeric" maxlength="4" autocomplete="off" /><span id="pinmsg" style="color:#C1543D; font-size:12px;"></span></div>`;
+      document.getElementById('b-x').onclick = () => BR.unpinNote && BR.unpinNote(id);
+      const pi = document.getElementById('pin');
+      pi.oninput = () => { if (pi.value.length < 4) return; if (pinHash(pi.value) === pinHashSet()) { unlocked = true; render(); } else { document.getElementById('pinmsg').textContent = 'PIN이 달라요'; pi.value = ''; } };
+      setTimeout(() => pi.focus(), 50);
+      return;
+    }
     if (!note) {
       el.style.setProperty('--bg', '#EEE');
       el.innerHTML = `<div class="head"><input value="삭제된 메모" disabled /><button id="b-x" title="바탕화면에서 떼기">✕</button></div>
@@ -97,6 +121,7 @@
         <button id="b-x" title="바탕화면에서 떼기 (메모는 남아요)">✕</button>
       </div>
       <div class="meta" id="meta">${metaText(note)}</div>
+      <div class="items" id="items"></div>
       <textarea id="b" placeholder="여기에 메모를 적어요 (자동 저장)"></textarea>
       <div class="saved" id="saved">저장됨 ✓</div>
       <div class="grip" id="grip" title="끌어서 크기 조절"></div>
@@ -106,6 +131,7 @@
         <button id="m-del" style="color:#C1543D;">🗑 메모 삭제하기</button>
       </div>`;
     const t = document.getElementById('t'), b = document.getElementById('b');
+    drawItems();
     t.value = note.title || ''; b.value = note.body || '';
     const later = () => { clearTimeout(saveTimer); saveTimer = setTimeout(() => writeNote({ title: t.value.trim(), body: b.value }), 500); };
     t.addEventListener('input', later); b.addEventListener('input', later);
@@ -134,13 +160,27 @@
     });
   }
 
+  // ☑ 체크 목록: 체크·추가·지우기
+  function drawItems() {
+    const box = document.getElementById('items'); if (!box || !note) return;
+    const it = Array.isArray(note.items) ? note.items : [];
+    const esc = t => String(t || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+    box.innerHTML = it.map(x => `<div class="ci ${x.done ? 'on' : ''}"><span class="bx" data-tg="${esc(x.id)}">${x.done ? '✓' : ''}</span><span class="tx">${esc(x.t)}</span><button class="dl" data-dl="${esc(x.id)}" title="지우기">✕</button></div>`).join('')
+      + `<div class="ci add"><span class="bx" style="border-style:dashed;">＋</span><input id="newitem" placeholder="체크 항목 추가 후 Enter" maxlength="80" /></div>`;
+    const save = (arr) => { writeNote({ items: arr }); drawItems(); };
+    box.querySelectorAll('[data-tg]').forEach(b => b.onclick = () => save(it.map(x => x.id === b.getAttribute('data-tg') ? Object.assign({}, x, { done: !x.done }) : x)));
+    box.querySelectorAll('[data-dl]').forEach(b => b.onclick = () => save(it.filter(x => x.id !== b.getAttribute('data-dl'))));
+    const ni = document.getElementById('newitem');
+    ni.onkeydown = (e) => { if (e.key !== 'Enter') return; e.preventDefault(); const v = ni.value.trim(); if (!v) return; save(it.concat({ id: 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), t: v, done: false })); const n2 = document.getElementById('newitem'); if (n2) n2.focus(); };
+  }
+
   // 다른 창(바탕화면 달력·폰에서 받은 내용)에서 바뀌면 다시 그리기 — 글을 쓰는 중이면 건드리지 않음
   window.addEventListener('storage', (e) => {
     if (e.key !== KEY_NOTES) return;
     const a = document.activeElement;
-    if (a && (a.id === 't' || a.id === 'b')) {
+    if (a && (a.id === 't' || a.id === 'b' || a.id === 'newitem' || a.id === 'pin')) {
       const n = readAll().find(x => x.id === id);
-      if (!n) render(); else { const m = document.getElementById('meta'); if (m) m.textContent = metaText(n); }
+      if (!n) render(); else { const m = document.getElementById('meta'); if (m) m.textContent = metaText(n); if (a.id !== 'newitem') { note = n; drawItems(); } }
       return;
     }
     render();
@@ -157,15 +197,15 @@
   function drawPick(pinned, q) {
     const all = readAll().filter(n => n.id !== id);
     const qq = q.trim().toLowerCase();
-    const list = all.filter(n => !qq || (n.title || '').toLowerCase().includes(qq) || (n.body || '').toLowerCase().includes(qq))
+    const list = all.filter(n => !qq || (n.title || '').toLowerCase().includes(qq) || (!n.locked && (n.body || '').toLowerCase().includes(qq)))
       .sort((a, b) => (pinned.has(a.id) ? 1 : 0) - (pinned.has(b.id) ? 1 : 0) || (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (b.updatedAt || 0) - (a.updatedAt || 0));
     const esc = t => String(t || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
     pick.innerHTML = `<div class="ph"><span>＋ 포스트잇 더 붙이기</span><button id="p-x" title="닫기">✕</button></div>
       <button class="new" id="p-new">✨ 빈 포스트잇 새로 만들기</button>
       <input id="p-q" placeholder="🔍 메모장에서 찾기" value="${esc(q)}" />
       <div class="list">${list.length ? list.map(n => {
-        const title = n.title || (n.body || '').split('\n')[0] || '빈 메모';
-        const sub = n.title ? (n.body || '').split('\n')[0] : '';
+        const title = (n.locked ? '🔒 ' : '') + (n.title || (n.locked ? '잠긴 메모' : (n.body || '').split('\n')[0]) || '빈 메모');
+        const sub = n.locked ? '' : n.title ? (n.body || '').split('\n')[0] : '';
         return `<div class="it" data-pick="${esc(n.id)}"><span class="dot" style="background:${bgOf(n.color || 'yellow')}"></span><span class="tx">${n.important ? '⭐' : ''}${esc(title)}<small>${esc(sub).slice(0, 30)}</small></span>${pinned.has(n.id) ? '<span class="on">📌 붙어 있음</span>' : ''}</div>`;
       }).join('') : `<div class="empty">${qq ? '찾는 메모가 없어요' : '메모장에 다른 메모가 없어요'}</div>`}</div>`;
     pick.classList.add('show');

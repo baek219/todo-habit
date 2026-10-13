@@ -114,6 +114,45 @@
   .quick-prev .qc.imp { background: var(--imp); color: #fff; }
   .qex { display:inline-block; border:1px dashed var(--border); border-radius: 8px; padding: 1px 7px; margin: 2px 2px; cursor:pointer; color: var(--text); font-weight:700; }
   .dd-edit { flex: none; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 9px; width: 34px; height: 30px; font-size: 15px; cursor: pointer; margin-left: 6px; }
+  .sub-badge { display:inline-block; font-size: 11px; font-weight: 800; color: var(--primary); background: var(--primary-soft); border-radius: 6px; padding: 1px 6px; margin-right: 4px; }
+  .sub-badge.all { color: #fff; background: var(--primary); }
+  .sub-list { margin-top: 6px; }
+  .sub-it { display: flex; align-items: center; gap: 8px; font-size: 13.5px; padding: 3px 0; cursor: pointer; }
+  .sub-it .sb, .sub-ed .sb { flex: none; width: 18px; height: 18px; border-radius: 5px; border: 1.8px solid var(--primary); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 900; color: #fff; }
+  .sub-it.done .sb, .sub-ed .sb.on { background: var(--primary); }
+  .sub-it.done span:last-child { text-decoration: line-through; color: var(--text-muted); }
+  .sub-more { font-size: 12px; color: var(--text-muted); padding-left: 26px; }
+  .sub-ed { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+  .sub-ed .sb { cursor: pointer; }
+  .sub-ed.add .sb { border-style: dashed; color: var(--primary); }
+  .sub-ed input { flex: 1; min-width: 0; border: none; border-bottom: 1px solid var(--border); background: transparent; color: var(--text); font: inherit; font-size: 14px; padding: 6px 2px; outline: none; }
+  .sub-ed button { flex: none; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 8px; padding: 5px 9px; font-family: inherit; cursor: pointer; }
+  .pp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .pp-grid .settings-btn { margin: 0; }
+  .icon-btn.pp { font-size: 14px; }
+  .overdue-card { margin: 10px 16px 0; border-radius: 14px; border: 1.5px solid #E2A08F; background: rgba(214, 69, 69, 0.07); padding: 10px 14px; display: flex; align-items: center; gap: 10px; font-size: 13.5px; font-weight: 700; }
+  .overdue-card button { margin-left: auto; flex: none; border: none; background: #D6694F; color: #fff; border-radius: 10px; padding: 7px 11px; font-weight: 800; font-family: inherit; cursor: pointer; }
+  .week-card { margin: 10px 16px 0; border-radius: 14px; border: 1.5px solid var(--primary); background: var(--primary-soft); padding: 10px 12px 10px 14px; display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 700; }
+  .week-card span { flex: 1; }
+  .week-card button { flex: none; border: none; background: var(--primary); color: #fff; border-radius: 10px; padding: 7px 11px; font-weight: 800; font-family: inherit; cursor: pointer; }
+  .week-card button.x { background: transparent; color: var(--text-muted); padding: 7px 4px; }
+  .wr-top { display: flex; align-items: center; gap: 14px; margin: 12px 0; }
+  .wr-big { font-size: 40px; font-weight: 900; color: var(--primary); }
+  .wr-top small { color: var(--text-muted); font-size: 12.5px; }
+  .wr-bars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin: 6px 0 12px; }
+  .wr-b { text-align: center; font-size: 12px; }
+  .wr-col { height: 70px; background: var(--bg); border-radius: 8px; display: flex; align-items: flex-end; overflow: hidden; }
+  .wr-col div { width: 100%; border-radius: 8px; }
+  .wr-b small { display: block; margin-top: 3px; color: var(--text-muted); font-weight: 700; }
+  .wr-row { font-size: 13.5px; line-height: 1.5; padding: 8px 0; border-top: 1px solid var(--border); }
+  .wr-mini { border: none; background: #D6694F; color: #fff; border-radius: 8px; padding: 3px 8px; font-weight: 800; font-family: inherit; font-size: 12px; cursor: pointer; margin-left: 4px; }
+  .pin-dots { display: flex; justify-content: center; gap: 14px; margin: 14px 0 18px; }
+  .pin-dots span { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--primary); }
+  .pin-dots span.on { background: var(--primary); }
+  .pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 280px; margin: 0 auto; }
+  .pin-pad button { border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 14px; padding: 14px 0; font-size: 20px; font-weight: 800; font-family: inherit; cursor: pointer; }
+  .pin-pad button[data-k="x"], .pin-pad button[data-k="⌫"] { font-size: 14px; color: var(--text-muted); }
+  .note-card.locked .nt { color: var(--text-muted); }
   .quick-bar { padding: 10px 16px 0; }
   .quick-bar button { width: 100%; text-align: left; border: 1.5px dashed var(--border); background: var(--surface); color: var(--text); border-radius: 14px; padding: 12px 14px; font-size: 14px; font-weight: 800; font-family: inherit; cursor: pointer; }
   .quick-bar button small { font-weight: 600; color: var(--text-muted); margin-left: 6px; }
@@ -507,6 +546,7 @@
 
 <!-- 탭3: 내것 -->
 <div id="tab-stats" class="tab-page" style="display:none;">
+  <div class="stats-block"><button class="settings-btn" id="week-review-btn" style="margin:0;">📅 이번 주 돌아보기</button></div>
   <div class="stats-block">
     <div class="stats-title" style="display:flex; align-items:center; gap:6px;">내 정원 <button class="help-btn" id="garden-help-btn">?</button></div>
     <div class="garden-card" id="garden-card"></div>
@@ -544,6 +584,13 @@
   <div class="settings-block">
     <div class="settings-title">교대근무 일정</div>
     <div class="settings-card" id="shift-card"></div>
+  </div>
+  <div class="settings-block">
+    <div class="settings-title">메모 잠금</div>
+    <div class="settings-card">
+      <div style="font-size:13px; color:var(--text-muted); line-height:1.5;">메모 편집 화면의 <b>🔓 잠금</b>을 누르면 그 메모는 PIN 4자리를 넣어야 열려요. 다른 사람이 폰을 잠깐 볼 때 내용을 가려주는 용도예요.</div>
+      <button class="settings-btn" id="pin-set-btn"></button>
+    </div>
   </div>
   <div class="settings-block">
     <div class="settings-title">화면</div>
@@ -654,7 +701,7 @@
     <div class="settings-card">
       <button class="settings-btn danger" id="reset-btn">전체 데이터 초기화</button>
     </div>
-    <div class="footer-note">할일습관 앱 · v2.4</div>
+    <div class="footer-note">할일습관 앱 · v2.5</div>
   </div>
 </div>
 
@@ -713,18 +760,36 @@
   function currentOcc(t) { return isRep(t) ? R.nextOcc(t.dueDate, t.endDate, t.repeat, !!t.lunar, toISODate(new Date())) : t.dueDate; }
   function repeatText(start, rep, lunar) { return R && R.isRepeat(rep) ? R.describe(start, rep, !!lunar) : ''; }
   // 반복 선택 버튼 (할일 창·메모 편집·달력 추가에서 같이 씀)
+  // 반복 고르기 버튼 목록 (시작 날짜에 맞춰 'n째 주 X요일' 글자가 바뀜)
+  function repeatChoices(start) {
+    const out = [['none', '반복 안 함'], ['weekly', '매주'], ['biweekly', '격주'], ['everyN', 'N일마다'], ['monthly', '매달'], ['monthEnd', '매달 말일']];
+    if (start && R && R.nthOf) {
+      const wd = '일월화수목금토'[new Date(start + 'T00:00:00').getDay()], n = R.nthOf(start);
+      if (n <= 4) out.push(['nthWeek', `매달 ${['', '첫째', '둘째', '셋째', '넷째'][n]} 주 ${wd}요일`]);
+      if (R.isLastWeekOf(start)) out.push(['lastWeek', `매달 마지막 주 ${wd}요일`]);
+    }
+    out.push(['yearly', '매년']);
+    return out;
+  }
   function repeatPickerHtml(id, st) {
     const lunarable = st.repeat === 'monthly' || st.repeat === 'yearly';
     return `<div class="chip-row" id="${id}">
-        ${[['none', '반복 안 함'], ['weekly', '매주'], ['monthly', '매달'], ['monthEnd', '매달 말일'], ['yearly', '매년']].map(([k, l]) => `<div class="chip ${(st.repeat || 'none') === k ? 'active-day' : ''}" data-rep="${k}">${k === 'none' ? l : '🔁 ' + l}</div>`).join('')}
+        ${repeatChoices(st.start).map(([k, l]) => `<div class="chip ${((st.repeat || 'none') === k || (k === 'everyN' && R && R.everyN(st.repeat))) ? 'active-day' : ''}" data-rep="${k}">${k === 'none' ? l : '🔁 ' + l}</div>`).join('')}
       </div>
+      ${R && R.everyN(st.repeat) ? `<div class="inline-row" style="margin-top:6px;"><input type="number" class="modal-input" min="1" max="365" value="${R.everyN(st.repeat)}" data-everyn style="width:80px; flex:none; padding:8px 10px;" /><span>일마다 반복</span></div>` : ''}
       ${lunarable ? `<div class="chip-row" style="margin-top:6px;"><div class="chip ${!st.lunar ? 'active-day' : ''}" data-lunar="0">☀️ 양력</div><div class="chip ${st.lunar ? 'active-day' : ''}" data-lunar="1">🌙 음력</div></div>` : ''}
-      ${st.repeat && st.repeat !== 'none' && st.start ? `<div class="hint" style="color:var(--primary); font-weight:700;">→ ${repeatText(st.start, st.repeat, st.lunar)}마다 나타나요${st.lunar ? ' (윤달은 건너뛰어요)' : ''}${st.repeat === 'monthEnd' ? ' (2월은 28·29일, 4월은 30일, 3월은 31일처럼 그달 마지막 날)' : ''}</div>` : ''}`;
+      ${st.repeat && st.repeat !== 'none' && st.start ? `<div class="hint" style="color:var(--primary); font-weight:700;">→ ${repeatText(st.start, st.repeat, st.lunar).replace(/마다$/, '')}마다 나타나요${st.lunar ? ' (윤달은 건너뛰어요)' : ''}${st.repeat === 'monthEnd' ? ' (2월은 28·29일, 4월은 30일, 3월은 31일처럼 그달 마지막 날)' : ''}</div>` : ''}`;
   }
   function wireRepeatPicker(id, st, onChange) {
     const root = document.getElementById(id); if (!root) return;
     const box = root.parentElement;
-    box.querySelectorAll('[data-rep]').forEach(c => c.onclick = () => { st.repeat = c.getAttribute('data-rep'); if (st.repeat === 'weekly' || st.repeat === 'none' || st.repeat === 'monthEnd') st.lunar = false; onChange(); });
+    box.querySelectorAll('[data-rep]').forEach(c => c.onclick = () => {
+      st.repeat = c.getAttribute('data-rep');
+      if (st.repeat === 'everyN') st.repeat = 'every' + (st.lastEvery || 3);
+      if (st.repeat !== 'monthly' && st.repeat !== 'yearly') st.lunar = false;
+      onChange();
+    });
+    box.querySelectorAll('[data-everyn]').forEach(inp => inp.onchange = () => { let n = parseInt(inp.value, 10); if (!n || n < 1) n = 1; if (n > 365) n = 365; st.repeat = 'every' + n; st.lastEvery = n; onChange(); });
     box.querySelectorAll('[data-lunar]').forEach(c => c.onclick = () => { st.lunar = c.getAttribute('data-lunar') === '1'; onChange(); });
   }
   // 주중·주말 묶음
@@ -938,7 +1003,7 @@
   function renderNotes() {
     const el = document.getElementById('note-list'); if (!el) return;
     const q = (document.getElementById('note-search').value || '').trim().toLowerCase();
-    let list = notes.filter(n => !q || (n.title || '').toLowerCase().includes(q) || (n.body || '').toLowerCase().includes(q));
+    let list = notes.filter(n => !q || (n.title || '').toLowerCase().includes(q) || (!n.locked && (n.body || '').toLowerCase().includes(q)));
     list.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (b.updatedAt || 0) - (a.updatedAt || 0));
     // 검색 중이면 몇 개가 걸러졌는지 보여주고, 바로 지울 수 있게
     const info = document.getElementById('note-search-info');
@@ -951,15 +1016,28 @@
       el.innerHTML = `<div class="empty-box" style="margin-top:12px;">${q ? '찾는 메모가 없어요.' : '오른쪽 아래 + 버튼을 눌러<br>자유롭게 메모를 남겨보세요.<br><small>예: 장보기 목록, 아이디어, 회의 메모</small>'}</div>`;
       return;
     }
-    el.innerHTML = `<div class="note-grid">${list.map(n => `<div class="note-card ${n.important ? 'imp' : ''}" data-note="${n.id}" style="background:${noteBg(n.color)};">
+    el.innerHTML = `<div class="note-grid">${list.map(n => n.locked ? `<div class="note-card locked" data-note="${n.id}" style="background:${noteBg(n.color)};">
+        ${n.pinned ? '<span class="npin">📌</span>' : ''}
+        <div class="nt">🔒 ${escapeHtml(n.title || '잠긴 메모')}</div>
+        <div class="nb" style="opacity:.7;">눌러서 PIN을 넣으면 열려요</div>
+        <div class="nd">${noteDateLabel(n.updatedAt || n.createdAt || Date.now())}</div>
+      </div>` : `<div class="note-card ${n.important ? 'imp' : ''}" data-note="${n.id}" style="background:${noteBg(n.color)};">
         ${n.pinned ? '<span class="npin">📌</span>' : ''}
         <div class="nt">${n.important ? '<span class="imp-badge">⭐</span>' : ''}${escapeHtml(n.title || (n.body || '').split('\n')[0] || '제목 없음')}</div>
         <div class="nb">${escapeHtml(n.title ? (n.body || '') : (n.body || '').split('\n').slice(1).join('\n'))}</div>
+        ${subItems(n).length ? `<div style="margin-top:4px;">${subBadge(n)}</div>${subListHtml(n, 'n', 4)}` : ''}
         <div class="nd">${n.date ? `<b style="color:${TYPE_COLORS.memo};">📅 ${rangeLabel(n.date, n.endDate)}${isRep(n) ? ' 🔁 ' + repeatText(n.date, n.repeat, n.lunar) : ''}</b> · ` : ''}${noteDateLabel(n.updatedAt || n.createdAt || Date.now())}</div>
       </div>`).join('')}</div>`;
     el.querySelectorAll('[data-note]').forEach(c => c.addEventListener('click', () => openNoteEditor(c.getAttribute('data-note'))));
+    wireSubToggles(el, () => renderNotes());
   }
+  // 🔒 잠긴 메모는 PIN을 확인한 뒤 열기
   function openNoteEditor(id, presetDate) {
+    const n0 = id ? notes.find(n => n.id === id) : null;
+    if (n0 && n0.locked && appSettings.memoPinHash) { askPin('check', () => openNoteEditorRaw(id, presetDate)); return; }
+    openNoteEditorRaw(id, presetDate);
+  }
+  function openNoteEditorRaw(id, presetDate) {
     let note = id ? notes.find(n => n.id === id) : null;
     const isNew = !note;
     const draft = note ? Object.assign({}, note) : { id: 'n' + Date.now() + Math.random().toString(36).slice(2, 6), title: '', body: '', color: '', pinned: false, date: presetDate || null, createdAt: Date.now(), updatedAt: Date.now() };
@@ -969,6 +1047,8 @@
         <div class="modal-sheet" id="note-sheet" style="background:var(--surface); max-height:92vh;">
           <input class="note-editor-title" id="note-title" placeholder="제목" value="${escapeHtml(draft.title)}" maxlength="80" />
           <textarea class="note-editor-body" id="note-body" placeholder="내용을 자유롭게 적어보세요">${escapeHtml(draft.body)}</textarea>
+          <div class="field-label" style="margin-top:4px;">☑ 체크 목록 <small style="font-weight:500; color:var(--text-muted)">(장보기·준비물처럼 하나씩 체크)</small></div>
+          <div id="note-sub-box"></div>
           <div class="inline-row" style="margin-top:8px;"><button class="tb" id="note-date" style="border:1.5px solid var(--border); background:var(--bg); color:var(--text); border-radius:10px; padding:7px 11px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit;"></button>
             <button type="button" class="imp-toggle" id="note-imp"></button>
             <button class="tb" id="note-enddate" style="display:none; border:1.5px solid var(--border); background:var(--bg); color:var(--text); border-radius:10px; padding:7px 11px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit;"></button>
@@ -981,6 +1061,8 @@
             <div style="display:flex; gap:6px;">
               <button class="tb ${draft.pinned ? 'on' : ''}" id="note-pin">📌 ${draft.pinned ? '고정됨' : '고정'}</button>
               <button class="tb" id="note-share">📤 공유</button>
+              <button class="tb ${draft.locked ? 'on' : ''}" id="note-lock">${draft.locked ? '🔒 잠김' : '🔓 잠금'}</button>
+              <button class="tb ${appSettings.widgetMemoId === draft.id ? 'on' : ''}" id="note-widget">📱 ${appSettings.widgetMemoId === draft.id ? '위젯에 표시 중' : '위젯'}</button>
               ${isNew ? '' : '<button class="tb" id="note-del" style="color:#C1543D;">🗑 삭제</button>'}
             </div>
             <button class="tb on" id="note-done">완료</button>
@@ -993,7 +1075,8 @@
     function persist() {
       draft.title = titleEl.value.trim();
       draft.body = bodyEl.value;
-      if (!draft.title && !draft.body.trim()) return false; // 빈 메모는 저장 안 함
+      draft.items = (draft.items || []).filter(x => x.t.trim()).map(x => ({ id: x.id, t: x.t.trim(), done: !!x.done }));
+      if (!draft.title && !draft.body.trim() && !draft.items.length) return false; // 빈 메모는 저장 안 함
       draft.updatedAt = Date.now();
       const i = notes.findIndex(n => n.id === draft.id);
       if (i >= 0) notes[i] = Object.assign({}, draft); else notes.unshift(Object.assign({}, draft));
@@ -1003,6 +1086,23 @@
     }
     let t = null;
     const later = () => { clearTimeout(t); t = setTimeout(persist, 700); };
+    // 체크 목록
+    const subArr = Array.isArray(draft.items) ? JSON.parse(JSON.stringify(draft.items)) : [];
+    mountSubEditor(document.getElementById('note-sub-box'), subArr, () => { draft.items = subArr; later(); });
+    draft.items = subArr;
+    // 🔒 잠금
+    document.getElementById('note-lock').onclick = () => {
+      const apply = () => { draft.locked = !draft.locked; const b = document.getElementById('note-lock'); b.classList.toggle('on', !!draft.locked); b.textContent = draft.locked ? '🔒 잠김' : '🔓 잠금'; persist(); showToast(draft.locked ? '🔒 이 메모를 잠갔어요. 열 때 PIN이 필요해요' : '🔓 잠금을 풀었어요'); };
+      if (!draft.locked && !appSettings.memoPinHash) askPin('set', apply); else apply();
+    };
+    // 📱 홈 화면 메모 위젯에 표시
+    document.getElementById('note-widget').onclick = () => {
+      if (!persist() && !notes.find(n => n.id === draft.id)) { showToast('먼저 내용을 적어주세요'); return; }
+      const on = appSettings.widgetMemoId !== draft.id;
+      appSettings.widgetMemoId = on ? draft.id : null; saveAppSettings();
+      const b = document.getElementById('note-widget'); b.classList.toggle('on', on); b.textContent = '📱 ' + (on ? '위젯에 표시 중' : '위젯');
+      showToast(on ? '📱 홈 화면 "메모" 위젯에 이 메모가 보여요' : '위젯 표시를 껐어요');
+    };
     titleEl.addEventListener('input', later);
     bodyEl.addEventListener('input', later);
     function close() { clearTimeout(t); persist(); closeModal(); renderNotes(); }
@@ -1469,6 +1569,7 @@
               reminderTime: t.reminderTime || null, streak: currentStreak(t), createdAt: t.createdAt || null, startDate: t.startDate || null };
           }
           const slim = { id: t.id, type: 'todo', title: t.title, done: !!t.done, dueDate: t.dueDate, endDate: t.endDate || null, completedAt: t.completedAt || null, reminderTime: t.reminderTime || null, important: !!t.important, time: t.time || null, preAlert: Array.isArray(t.preAlert) ? t.preAlert : null };
+          { const sp = subProg(t); if (sp.n) slim.title = t.title + ` ☑${sp.d}/${sp.n}`; }
           if (isRep(t)) {
             // 반복 할일: 위젯·알림용으로 회차 날짜를 미리 계산해서 보냄 (음력 계산은 여기서만 가능)
             const n0 = new Date();
@@ -1546,7 +1647,9 @@
     });
     const up = upcomingImportant(1)[0];
     const dday = up ? { t: up.title, ds: up.ds } : null;
-    return { lunar: lunarCache.map, holidays, moods, dayNotes, noteRanges, impDays, dday, shiftDays };
+    const wm = appSettings.widgetMemoId ? notes.find(n => n.id === appSettings.widgetMemoId) : null;
+    const widgetMemo = wm ? { id: wm.id, title: wm.title || '', body: wm.locked ? '' : (wm.body || '').slice(0, 1500), locked: !!wm.locked, color: wm.color || '', items: wm.locked ? [] : subItems(wm).map(x => ({ t: x.t, d: !!x.done })) } : null;
+    return { lunar: lunarCache.map, holidays, moods, dayNotes, noteRanges, impDays, dday, shiftDays, widgetMemo };
   }
   // 달력 위젯에서 날짜를 누르면 → 앱의 달력 탭에서 그 날짜 보여주기
   window.__openCalendarDate = function (ds) {
@@ -1824,6 +1927,181 @@
   }
 
   function renderAll() { renderFilters(); renderDday(); renderLists(); renderDayLog(); }
+  // ---- 🔒 메모 잠금 PIN (가벼운 가리개: 다른 사람이 폰을 볼 때 내용을 가려줘요) ----
+  function pinHash(pin) { let h = 2166136261; const str = 'kokbu-memo:' + pin; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return 'p' + h.toString(36); }
+  // mode: 'check'(확인) | 'set'(새로 정하기) | 'change'(바꾸기: 기존 확인 → 새로)
+  function askPin(mode, onOk) {
+    const c = document.getElementById('confirm-container');
+    let stage = mode === 'set' ? 'new' : 'check', buf = '', first = '', msg = '';
+    function title() { return stage === 'check' ? '🔒 PIN 4자리를 넣어주세요' : stage === 'new' ? '🔒 새 PIN 4자리를 정해주세요' : '🔒 한 번 더 넣어주세요'; }
+    function draw() {
+      c.innerHTML = `<div class="modal-overlay" style="z-index:70;"><div class="modal-sheet" style="text-align:center;">
+        <div class="modal-title">${title()}</div>
+        <div class="modal-sub" style="min-height:18px; color:${msg ? '#D64545' : 'var(--text-muted)'};">${msg || (stage === 'new' ? '잠긴 메모를 열 때 쓰는 번호예요' : '')}</div>
+        <div class="pin-dots">${[0, 1, 2, 3].map(i => `<span class="${i < buf.length ? 'on' : ''}"></span>`).join('')}</div>
+        <div class="pin-pad">${[1, 2, 3, 4, 5, 6, 7, 8, 9, 'x', 0, '⌫'].map(k => `<button data-k="${k}">${k === 'x' ? '취소' : k}</button>`).join('')}</div>
+        ${stage === 'check' ? '<button class="tb" id="pin-forgot" style="margin-top:10px; border:none; background:none; color:var(--text-muted); text-decoration:underline; font-family:inherit; cursor:pointer;">PIN을 잊어버렸어요</button>' : ''}
+      </div></div>`;
+      c.querySelectorAll('[data-k]').forEach(b => b.onclick = () => press(b.getAttribute('data-k')));
+      const f = document.getElementById('pin-forgot');
+      if (f) f.onclick = () => {
+        if (!confirm('PIN을 새로 정할까요?\n(잠긴 메모는 그대로 잠겨 있고, 새 PIN으로 열 수 있어요)')) return;
+        stage = 'new'; buf = ''; msg = ''; draw();
+      };
+    }
+    function press(k) {
+      if (k === 'x') { c.innerHTML = ''; return; }
+      if (k === '⌫') { buf = buf.slice(0, -1); draw(); return; }
+      if (buf.length >= 4) return;
+      buf += k; msg = ''; draw();
+      if (buf.length < 4) return;
+      setTimeout(() => {
+        if (stage === 'check') {
+          if (pinHash(buf) === appSettings.memoPinHash) { if (mode === 'change') { stage = 'new'; buf = ''; draw(); } else { c.innerHTML = ''; onOk && onOk(); } }
+          else { msg = 'PIN이 달라요. 다시 넣어주세요'; buf = ''; draw(); }
+        } else if (stage === 'new') { first = buf; buf = ''; stage = 'again'; draw(); }
+        else {
+          if (buf === first) { appSettings.memoPinHash = pinHash(buf); saveAppSettings(); c.innerHTML = ''; showToast('🔒 PIN을 정했어요'); onOk && onOk(); }
+          else { msg = '두 번 넣은 번호가 달라요. 처음부터 다시 정해주세요'; stage = 'new'; buf = ''; first = ''; draw(); }
+        }
+      }, 120);
+    }
+    draw();
+  }
+
+  // ---- ☑ 체크 목록 (할일·메모 안의 작은 항목) ----
+  function subItems(o) { return Array.isArray(o && o.items) ? o.items : []; }
+  function subProg(o) { const it = subItems(o); return { d: it.filter(x => x.done).length, n: it.length }; }
+  function subBadge(o) { const p = subProg(o); return p.n ? `<span class="sub-badge ${p.d === p.n ? 'all' : ''}">☑ ${p.d}/${p.n}</span>` : ''; }
+  // kind: 't'(할일) / 'n'(메모)
+  function subListHtml(o, kind, max) {
+    const it = subItems(o); if (!it.length) return '';
+    const shown = max ? it.slice(0, max) : it;
+    return `<div class="sub-list">${shown.map(x => `<div class="sub-it ${x.done ? 'done' : ''}" data-sub="${kind}|${o.id}|${x.id}"><span class="sb">${x.done ? '✓' : ''}</span><span>${escapeHtml(x.t)}</span></div>`).join('')}${it.length > shown.length ? `<div class="sub-more">+${it.length - shown.length}개 더</div>` : ''}</div>`;
+  }
+  function wireSubToggles(root, after) {
+    root.querySelectorAll('[data-sub]').forEach(el => el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const [kind, oid, iid] = el.getAttribute('data-sub').split('|');
+      const o = kind === 't' ? tasks.find(x => x.id === oid) : notes.find(x => x.id === oid);
+      const it = subItems(o).find(x => x.id === iid); if (!it) return;
+      it.done = !it.done;
+      if (kind === 't') saveTasks(); else { o.updatedAt = Date.now(); saveNotes(); }
+      after && after();
+    }));
+  }
+  // 체크 목록 편집기 (추가·체크·지우기)
+  function mountSubEditor(box, arr, onChange) {
+    function draw() {
+      box.innerHTML = `${arr.map((x, i) => `<div class="sub-ed"><span class="sb ${x.done ? 'on' : ''}" data-i="${i}">${x.done ? '✓' : ''}</span><input value="${escapeHtml(x.t)}" data-edit="${i}" maxlength="80" /><button type="button" data-del="${i}">✕</button></div>`).join('')}
+        <div class="sub-ed add"><span class="sb">＋</span><input placeholder="항목 추가 (예: 우유) 후 Enter" data-new maxlength="80" /><button type="button" data-addbtn>추가</button></div>`;
+      box.querySelectorAll('[data-i]').forEach(b => b.onclick = () => { const x = arr[+b.getAttribute('data-i')]; x.done = !x.done; draw(); onChange(); });
+      box.querySelectorAll('[data-edit]').forEach(inp => inp.oninput = () => { arr[+inp.getAttribute('data-edit')].t = inp.value; onChange(); });
+      box.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { arr.splice(+b.getAttribute('data-del'), 1); draw(); onChange(); });
+      const ni = box.querySelector('[data-new]');
+      const add = () => { const v = ni.value.trim(); if (!v) return; arr.push({ id: 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), t: v, done: false }); draw(); onChange(); box.querySelector('[data-new]').focus(); };
+      ni.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } };
+      box.querySelector('[data-addbtn]').onclick = add;
+    }
+    draw();
+  }
+
+  // ---- 📅 이번 주 돌아보기 ----
+  function mondayOf(ds) { const d = new Date(ds + 'T00:00:00'); return isoAdd(ds, -((d.getDay() + 6) % 7)); }
+  function weekStats(mon) {
+    const today = toISODate(new Date());
+    const days = [...Array(7)].map((_, i) => isoAdd(mon, i));
+    let sched = 0, done = 0;
+    const perDay = days.map(ds => {
+      if (ds > today) return null;
+      let a = 0, b = 0;
+      tasks.forEach(h => { if (h.type !== 'habit' || !isHabitScheduled(h, ds)) return; a++; if (h.completedDates.includes(ds)) b++; });
+      sched += a; done += b;
+      return a ? Math.round(b * 100 / a) : null;
+    });
+    const habitRank = tasks.filter(h => h.type === 'habit').map(h => {
+      let a = 0, b = 0; days.forEach(ds => { if (ds > today || !isHabitScheduled(h, ds)) return; a++; if (h.completedDates.includes(ds)) b++; });
+      return { h, a, b, r: a ? b / a : 0 };
+    }).filter(x => x.a > 0);
+    const best = habitRank.filter(x => x.a >= 2).sort((x, y) => y.r - x.r || y.b - x.b)[0];
+    const weak = habitRank.filter(x => x.r < 0.5).sort((x, y) => x.r - y.r).slice(0, 3);
+    const end = days[6];
+    const todoDone = [];
+    tasks.forEach(t => {
+      if (t.type !== 'todo') return;
+      if (isRep(t)) (t.doneDates || []).forEach(o => { if (o >= mon && o <= end) todoDone.push(t.title); });
+      else if (t.done && t.completedAt && t.completedAt >= mon && t.completedAt <= end) todoDone.push(t.title);
+    });
+    const missed = tasks.filter(t => t.type === 'todo' && !t.done && !isRep(t) && t.dueDate && t.dueDate >= mon && (t.endDate || t.dueDate) < today && t.dueDate <= end);
+    const moods = days.map(ds => (dayLogs[ds] && dayLogs[ds].mood) || '');
+    return { days, perDay, rate: sched ? Math.round(done * 100 / sched) : null, sched, done, best, weak, todoDone, missed, moods };
+  }
+  function weeklyReviewTarget() {
+    const d = new Date(), today = toISODate(d);
+    if (d.getDay() === 0) return mondayOf(today);          // 일요일: 이번 주
+    if (d.getDay() === 1) return isoAdd(mondayOf(today), -7); // 월요일: 지난주
+    return null;
+  }
+  function weeklyReviewCardHtml() {
+    const mon = weeklyReviewTarget();
+    if (!mon || appSettings.weekReviewSeen === mon) return '';
+    const st = weekStats(mon);
+    return `<div class="week-card" id="week-card"><span>📅 ${new Date().getDay() === 0 ? '이번 주' : '지난주'} 돌아보기${st.rate !== null ? ` · 습관 <b>${st.rate}%</b>` : ''} · 할일 <b>${st.todoDone.length}개</b> 완료</span><button id="week-open">보기</button><button id="week-x" class="x">✕</button></div>`;
+  }
+  function wireWeeklyCard() {
+    const o = document.getElementById('week-open'); if (!o) return;
+    o.onclick = () => openWeeklyReview(weeklyReviewTarget());
+    document.getElementById('week-x').onclick = () => { appSettings.weekReviewSeen = weeklyReviewTarget(); saveAppSettings(); renderDday(); };
+  }
+  function openWeeklyReview(mon) {
+    const st = weekStats(mon);
+    const W = ['월', '화', '수', '목', '금', '토', '일'];
+    const c = document.getElementById('modal-container');
+    const msg = st.rate === null ? '이번 주에 예정된 습관이 없었어요' : st.rate >= 90 ? '🎉 완벽에 가까운 한 주였어요!' : st.rate >= 70 ? '👏 아주 잘했어요! 이 흐름 그대로' : st.rate >= 40 ? '🙂 절반은 해냈어요. 다음 주엔 조금만 더!' : '🌱 바쁜 한 주였죠? 하나씩 다시 시작해봐요';
+    c.innerHTML = `<div class="modal-overlay" id="wr-overlay"><div class="modal-sheet">
+      <div class="modal-title">📅 ${md(st.days[0])} ~ ${md(st.days[6])} 돌아보기</div>
+      <div class="wr-top"><div class="wr-big">${st.rate === null ? '–' : st.rate + '%'}</div><div><b>습관 달성률</b><br><small>${st.done}/${st.sched}번 체크 · ${msg}</small></div></div>
+      <div class="wr-bars">${st.perDay.map((v, i) => `<div class="wr-b"><div class="wr-col"><div style="height:${v === null ? 0 : Math.max(4, v)}%; ${v === null ? '' : `background:${v >= 100 ? 'var(--primary)' : 'var(--primary-soft)'};`}"></div></div><small>${W[i]}</small><span>${st.moods[i] || ''}</span></div>`).join('')}</div>
+      ${st.best ? `<div class="wr-row">🏆 <b>가장 꾸준한 습관</b> · ${escapeHtml(st.best.h.title)} (${st.best.b}/${st.best.a})</div>` : ''}
+      <div class="wr-row">✅ <b>완료한 할일 ${st.todoDone.length}개</b>${st.todoDone.length ? ' · ' + st.todoDone.slice(0, 5).map(escapeHtml).join(', ') + (st.todoDone.length > 5 ? ' …' : '') : ''}</div>
+      ${st.missed.length ? `<div class="wr-row">⏰ <b>놓친 할일 ${st.missed.length}개</b> · ${st.missed.slice(0, 4).map(t => escapeHtml(t.title)).join(', ')} <button class="wr-mini" id="wr-move">모두 오늘로 ⏭</button></div>` : ''}
+      ${st.weak.length ? `<div class="wr-row">💪 <b>다음 주에 더 챙길 습관</b> · ${st.weak.map(x => escapeHtml(x.h.title) + ` (${x.b}/${x.a})`).join(', ')}</div>` : ''}
+      <div class="modal-actions"><button class="modal-btn confirm" id="wr-close">닫기</button></div></div></div>`;
+    document.getElementById('wr-close').onclick = () => { if (weeklyReviewTarget() === mon) { appSettings.weekReviewSeen = mon; saveAppSettings(); } closeModal(); renderDday(); };
+    const mv = document.getElementById('wr-move');
+    if (mv) mv.onclick = () => { const today = toISODate(new Date()); st.missed.forEach(t => moveTodo(t, today)); saveTasks(); showToast(`⏭ ${st.missed.length}개를 오늘로 옮겼어요`); openWeeklyReview(mon); renderAll(); };
+  }
+
+  // ---- ⏭ 미루기 ----
+  function nextMonday(ds) { const d = new Date(ds + 'T00:00:00'); const k = (8 - d.getDay()) % 7 || 7; return isoAdd(ds, k); }
+  function moveTodo(t, newStart) {
+    const span = t.endDate && t.endDate > t.dueDate ? Math.round((new Date(t.endDate + 'T00:00:00') - new Date(t.dueDate + 'T00:00:00')) / 86400000) : 0;
+    t.dueDate = newStart; t.endDate = span ? isoAdd(newStart, span) : null;
+  }
+  function openPostpone(t) {
+    const today = toISODate(new Date());
+    const c = document.getElementById('confirm-container');
+    c.innerHTML = `<div class="modal-overlay" style="z-index:60;" id="pp-overlay"><div class="modal-sheet">
+      <div class="modal-title">⏭ 언제로 미룰까요?</div>
+      <div class="modal-sub">'${escapeHtml(t.title)}'</div>
+      <div class="pp-grid">
+        <button class="settings-btn" data-pp="${today}">오늘</button>
+        <button class="settings-btn" data-pp="${isoAdd(today, 1)}">내일 (${md(isoAdd(today, 1))})</button>
+        <button class="settings-btn" data-pp="${isoAdd(today, 2)}">모레 (${md(isoAdd(today, 2))})</button>
+        <button class="settings-btn" data-pp="${nextMonday(today)}">다음 주 월요일 (${md(nextMonday(today))})</button>
+        <button class="settings-btn" data-pp="${isoAdd(today, 7)}">일주일 뒤 (${md(isoAdd(today, 7))})</button>
+        <button class="settings-btn" data-pp="pick">📅 날짜 고르기</button>
+      </div>
+      <div class="modal-actions"><button class="modal-btn cancel" id="pp-cancel">취소</button></div></div></div>`;
+    const done = (ds) => { moveTodo(t, ds); saveTasks(); c.innerHTML = ''; renderAll(); if (activeTab === 'calendar') renderCalendar(); showToast(`⏭ '${t.title}' → ${md(ds)}로 옮겼어요`); };
+    c.querySelectorAll('[data-pp]').forEach(b => b.onclick = () => { const v = b.getAttribute('data-pp'); if (v === 'pick') openDatePicker(isoAdd(today, 1), done); else done(v); });
+    document.getElementById('pp-cancel').onclick = () => { c.innerHTML = ''; };
+  }
+  function overdueTodos() {
+    const today = toISODate(new Date());
+    return tasks.filter(t => t.type === 'todo' && !t.done && !isRep(t) && t.dueDate && (t.endDate || t.dueDate) < today);
+  }
+
   // ---- ⚡ 빠른 추가 (말로 쓰면 날짜·시간을 알아서) ----
   function openQuickAdd() {
     if (activeTab !== 'checklist') switchTab('checklist');
@@ -1885,6 +2163,7 @@
     setTimeout(() => inp.focus(), 80);
   }
   window.__openQuickAdd = function () { closeModal(); openQuickAdd(); };
+  window.__openNote = function (id) { closeModal(); switchTab('notes'); if (id && notes.find(n => n.id === id)) openNoteEditor(id); else openNoteEditor(null); };
 
   // ---- 다가오는 중요한 날 (D-day) ----
   function upcomingImportant(limit) {
@@ -1908,11 +2187,15 @@
   function renderDday() {
     const box = document.getElementById('dday-box'); if (!box) return;
     const list = upcomingImportant(3);
-    if (!list.length) { box.innerHTML = ''; return; }
-    box.innerHTML = `<div class="dday-card"><div class="hd">⭐ 다가오는 중요한 날</div>${list.map(x => {
+    const od = overdueTodos();
+    const odHtml = od.length ? `<div class="overdue-card"><span>⏰ 지난 날짜의 못 한 할일 <b>${od.length}개</b></span><button id="overdue-today">모두 오늘로 ⏭</button></div>` : '';
+    const wireOd = () => { const b = document.getElementById('overdue-today'); if (b) b.onclick = () => { const today = toISODate(new Date()); overdueTodos().forEach(t => moveTodo(t, today)); saveTasks(); renderAll(); showToast(`⏭ ${od.length}개를 오늘로 옮겼어요`); }; };
+    if (!list.length) { box.innerHTML = odHtml + weeklyReviewCardHtml(); wireOd(); wireWeeklyCard(); return; }
+    box.innerHTML = odHtml + weeklyReviewCardHtml() + `<div class="dday-card"><div class="hd">⭐ 다가오는 중요한 날</div>${list.map(x => {
       const d = new Date(x.ds + 'T00:00:00');
       return `<div class="dday-row" data-dday="${x.ds}"><span>${escapeHtml(x.title)}</span><span class="dt">${d.getMonth() + 1}/${d.getDate()} (${'일월화수목금토'[d.getDay()]})</span><span class="dn">${ddayText(x.d)}</span></div>`;
     }).join('')}</div>`;
+    wireOd(); wireWeeklyCard();
     box.querySelectorAll('[data-dday]').forEach(r => r.onclick = () => {
       const ds = r.getAttribute('data-dday'); const d = new Date(ds + 'T00:00:00');
       switchTab('calendar'); calYear = d.getFullYear(); calMonth = d.getMonth(); calSelectedDate = ds; renderCalendar();
@@ -2054,8 +2337,8 @@
       const impBadge = t.important ? '<span class="imp-badge">⭐ 중요</span>' : '';
       return `<div class="todo-item ${t.important ? 'imp' : ''}" ${isDone ? '' : `data-task-id="${t.id}"`}>
         <div class="todo-check ${(isRep(t) ? occDone : t.done) ? 'done' : ''}" data-toggle="${t.id}">${(isRep(t) ? occDone : t.done) ? '✓' : ''}</div>
-        <div class="todo-body"><div>${impBadge}${dateBadge}${remindBadge}${catBadge}</div><div class="todo-text ${(isRep(t) ? occDone : t.done) ? 'done' : ''}">${escapeHtml(t.title)}</div>${memoHtml}</div>
-        <div class="todo-actions">${isDone ? '' : '<button class="drag-handle" aria-label="순서 바꾸기">☰</button>'}<button class="icon-btn" data-memo="${t.id}">✎</button><button class="todo-delete" data-delete="${t.id}">✕</button></div>
+        <div class="todo-body"><div>${impBadge}${dateBadge}${remindBadge}${subBadge(t)}${catBadge}</div><div class="todo-text ${(isRep(t) ? occDone : t.done) ? 'done' : ''}">${escapeHtml(t.title)}</div>${isDone ? '' : subListHtml(t, 't')}${memoHtml}</div>
+        <div class="todo-actions">${isDone ? '' : '<button class="drag-handle" aria-label="순서 바꾸기">☰</button>'}${!isDone && !isRep(t) ? `<button class="icon-btn pp" data-postpone="${t.id}" aria-label="미루기">⏭</button>` : ''}<button class="icon-btn" data-memo="${t.id}">✎</button><button class="todo-delete" data-delete="${t.id}">✕</button></div>
       </div>`;
     }
 
@@ -2108,6 +2391,8 @@
       });
     });
     document.querySelectorAll('[data-delete]').forEach(btn => btn.addEventListener('click', () => confirmDeleteTask(btn.getAttribute('data-delete'))));
+    document.querySelectorAll('[data-postpone]').forEach(btn => btn.addEventListener('click', () => { const t = tasks.find(x => x.id === btn.getAttribute('data-postpone')); if (t) openPostpone(t); }));
+    wireSubToggles(document.getElementById('todo-list'), () => renderLists());
     document.querySelectorAll('[data-memo]').forEach(btn => btn.addEventListener('click', () => {
       const t = tasks.find(x => x.id === btn.getAttribute('data-memo'));
       if (t) openModal(t);
@@ -2488,6 +2773,8 @@
             <div class="field-label">강조</div>
             <button type="button" class="imp-toggle" id="todo-imp"></button>
             <div class="hint" style="margin:6px 2px 0;">중요한 날로 정하면 목록·달력·위젯·PC 달력에서 ⭐ 노란색으로 눈에 띄게 보여요</div>
+            <div class="field-label">☑ 체크 목록 (선택)</div>
+            <div id="todo-sub-box"></div>
             <div class="field-label">시간 (선택)</div>
             <div class="inline-row"><input type="time" class="modal-input" id="todo-time" style="width:auto; flex:none; padding:9px 12px;" value="${todoTime0 || ''}" />
               <div class="chip" id="todo-time-clear" style="display:${todoTime0 ? '' : 'none'};">✕ 시간 빼기</div></div>
@@ -2567,6 +2854,8 @@
       document.getElementById('duedate-tomorrow-chip').classList.toggle('active-day', !selectedEndDate && selectedDueDate === isoAdd(t, 1));
     };
     let modalImportant = !!(isEdit && editTask.important);
+    const modalItems = isEdit && Array.isArray(editTask.items) ? JSON.parse(JSON.stringify(editTask.items)) : [];
+    mountSubEditor(document.getElementById('todo-sub-box'), modalItems, () => {});
     const impBtn = document.getElementById('todo-imp');
     const drawImp = () => { impBtn.classList.toggle('on', modalImportant); impBtn.textContent = modalImportant ? '⭐ 중요한 날 (켜짐)' : '☆ 중요한 날로 강조하기'; };
     impBtn.addEventListener('click', () => { modalImportant = !modalImportant; drawImp(); });
@@ -2777,6 +3066,7 @@
           editTask.repeat = repState.repeat !== 'none' ? repState.repeat : null;
           editTask.lunar = !!editTask.repeat && !!repState.lunar;
           editTask.important = !!modalImportant;
+          editTask.items = modalItems.filter(x => x.t.trim()).map(x => ({ id: x.id, t: x.t.trim(), done: !!x.done }));
           Object.assign(editTask, todoTimeFields());
           if (editTask.repeat) { editTask.done = false; editTask.completedAt = null; editTask.doneDates = editTask.doneDates || []; }
         }
@@ -2791,7 +3081,7 @@
       } else if (modalType === 'todo') {
         const dueDate = selectedDueDate || toISODate(new Date());
         tasks.unshift({ id: uid(), type: 'todo', title: text, category: modalCategory, memo, done: false, createdAt: toISODate(new Date()), completedAt: null, dueDate, endDate: selectedEndDate && selectedEndDate > dueDate ? selectedEndDate : null,
-          repeat: repState.repeat !== 'none' ? repState.repeat : null, lunar: repState.repeat !== 'none' && !!repState.lunar, doneDates: [], important: !!modalImportant, ...todoTimeFields() });
+          repeat: repState.repeat !== 'none' ? repState.repeat : null, lunar: repState.repeat !== 'none' && !!repState.lunar, doneDates: [], important: !!modalImportant, items: modalItems.filter(x => x.t.trim()).map(x => ({ id: x.id, t: x.t.trim(), done: !!x.done })), ...todoTimeFields() });
       } else if (modalType === 'daily') {
         tasks.unshift({ id: uid(), type: 'habit', frequency: 'daily', title: text, category: modalCategory, memo, repeatDays: [0,1,2,3,4,5,6], monthDay: 1, completedDates: [], target: modalTarget, counts: {}, pauses: [], reminderTime: readRemind(), createdAt: toISODate(new Date()) });
       } else if (modalType === 'weekly') {
@@ -3199,6 +3489,7 @@
 
   function renderStats() {
     renderGarden();
+    const wb = document.getElementById('week-review-btn'); if (wb) wb.onclick = () => openWeeklyReview(mondayOf(toISODate(new Date())));
     const totalHabitChecks = tasks.reduce((s, t) => s + (t.type === 'habit' ? t.completedDates.length : 0), 0);
     const totalTodoDone = tasks.filter(t => t.type === 'todo' && t.done).length;
     const activeHabits = tasks.filter(t => t.type === 'habit').length;
@@ -3459,6 +3750,8 @@
     renderAccountCard();
     renderShiftCard();
     wireBackup();
+    const pb = document.getElementById('pin-set-btn');
+    if (pb) { pb.textContent = appSettings.memoPinHash ? '🔒 PIN 바꾸기' : '🔒 PIN 정하기'; pb.onclick = () => askPin(appSettings.memoPinHash ? 'change' : 'set', () => renderSettings()); }
     // 테마 색상
     const themeRow = document.getElementById('theme-row');
     function drawThemes() {

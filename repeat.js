@@ -1,5 +1,6 @@
 /* 반복 계산 (할일·메모 공통, 폰 앱과 PC 달력이 같이 써요)
- * repeat: 'none' | 'weekly' | 'monthly' | 'monthEnd'(매달 말일) | 'yearly'
+ * repeat: 'none' | 'weekly' | 'biweekly'(격주) | 'everyN'(N일마다, 예: 'every3') | 'monthly' | 'monthEnd'(매달 말일)
+ *         | 'nthWeek'(매달 n째 주 X요일, 시작일 기준) | 'lastWeek'(매달 마지막 주 X요일) | 'yearly'
  * lunar : true 면 음력 기준 (매달 음력 15일, 매년 음력 8월 15일 같은 것)
  * start : 첫 날짜 'YYYY-MM-DD',  end : 기간이 있으면 끝나는 날 (없으면 하루짜리)
  */
@@ -28,7 +29,10 @@
   // 음력 그달의 마지막 날인지 (29일로 끝나는 달 대비)
   function isLunarMonthEnd(ds) { const n = lunarOf(addDays(ds, 1)); return !!n && n.day === 1; }
 
-  function isRepeat(rep) { return rep === 'weekly' || rep === 'monthly' || rep === 'monthEnd' || rep === 'yearly'; }
+  function everyN(rep) { const m = /^every(\d{1,3})$/.exec(rep || ''); return m ? Math.max(1, +m[1]) : 0; }
+  function isRepeat(rep) { return rep === 'weekly' || rep === 'biweekly' || rep === 'monthly' || rep === 'monthEnd' || rep === 'yearly' || rep === 'nthWeek' || rep === 'lastWeek' || everyN(rep) > 0; }
+  function nthOf(ds) { return Math.ceil(+ds.slice(8, 10) / 7); } // 그달 몇째 주(그 요일 기준)
+  function isLastWeekOf(ds) { return +ds.slice(8, 10) + 7 > dim(+ds.slice(0, 4), +ds.slice(5, 7)); }
   function isMonthEnd(ds) { return addDays(ds, 1).slice(8, 10) === '01'; }
 
   // c 날짜가 '한 회차의 시작일'인가?
@@ -36,6 +40,13 @@
     if (!start || c < start) return false;
     if (!isRepeat(rep)) return c === start;
     if (rep === 'weekly') return diffDays(start, c) % 7 === 0;
+    if (rep === 'biweekly') return diffDays(start, c) % 14 === 0;
+    if (everyN(rep)) return diffDays(start, c) % everyN(rep) === 0;
+    if (rep === 'nthWeek' || rep === 'lastWeek') {
+      if (new Date(c + 'T00:00:00').getDay() !== new Date(start + 'T00:00:00').getDay()) return false;
+      if (rep === 'lastWeek' || nthOf(start) >= 5) return isLastWeekOf(c);
+      return nthOf(c) === nthOf(start);
+    }
     if (rep === 'monthEnd') return isMonthEnd(c); // 매달 말일 (2월 28·29일, 4월 30일, 3월 31일 …)
     const sm = +start.slice(5, 7), sd = +start.slice(8, 10);
     const cy = +c.slice(0, 4), cm = +c.slice(5, 7), cd = +c.slice(8, 10);
@@ -94,6 +105,11 @@
     if (!start || !isRepeat(rep)) return '';
     if (rep === 'weekly') return '매주 ' + WD[new Date(start + 'T00:00:00').getDay()] + '요일';
     if (rep === 'monthEnd') return '매달 말일';
+    const wdn = WD[new Date(start + 'T00:00:00').getDay()];
+    if (rep === 'biweekly') return '격주 ' + wdn + '요일';
+    if (everyN(rep)) return everyN(rep) + '일마다';
+    if (rep === 'lastWeek' || (rep === 'nthWeek' && nthOf(start) >= 5)) return '매달 마지막 주 ' + wdn + '요일';
+    if (rep === 'nthWeek') return '매달 ' + ['', '첫째', '둘째', '셋째', '넷째'][nthOf(start)] + ' 주 ' + wdn + '요일';
     if (lunar) {
       const L = lunarOf(start);
       if (!L) return rep === 'yearly' ? '매년 (음력)' : '매달 (음력)';
@@ -132,5 +148,5 @@
     return { label: (sh.name ? sh.name + ' ' : '') + '쉬는날', s: r.s, e: r.e, code: '휴' };
   }
 
-  window.Repeat = { isRepeat, isStart, occStartOn, nextOcc, occList, describe, span, lunarOf, addDays, diffDays, isMonthEnd, shiftCode, shiftOff, shiftRun, shiftItem, SHIFT_NAMES };
+  window.Repeat = { everyN, nthOf, isLastWeekOf, isRepeat, isStart, occStartOn, nextOcc, occList, describe, span, lunarOf, addDays, diffDays, isMonthEnd, shiftCode, shiftOff, shiftRun, shiftItem, SHIFT_NAMES };
 })();
