@@ -13,7 +13,8 @@
  * Cloudflare에 넣어야 하는 설정 (설정 안내서 참고)
  *  비밀값(Secret): ANTHROPIC_API_KEY, KAKAO_REST_KEY, GOOGLE_PLACES_KEY
  *  변수(Variable): FIREBASE_PROJECT_ID (기본 checklist-3164e), ALLOWED_ORIGIN (기본 https://baek219.github.io)
- *                  CLAUDE_MODEL (기본 claude-opus-5), 각 기능 하루 제한 LIMIT_MENU / LIMIT_PLACES / LIMIT_GOOGLE / LIMIT_LOTTO
+ *                  CHAT_MODEL / MENU_MODEL (기본 claude-haiku-4-5: 가장 저렴. 더 똑똑하게 하려면 claude-sonnet-5 또는 claude-opus-5),
+ *                  각 기능 하루 제한 LIMIT_MENU / LIMIT_PLACES / LIMIT_GOOGLE / LIMIT_LOTTO / LIMIT_CHAT, 전체 합계 TOTAL_CHAT 등
  *  KV 저장소 연결: 이름 LIFE_KV
  */
 import Anthropic from '@anthropic-ai/sdk';
@@ -21,6 +22,8 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 const GOOGLE_JWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com'));
 
+// 기본 AI 모델: 가장 저렴한 Haiku 4.5 (Cloudflare 변수 CHAT_MODEL / MENU_MODEL로 바꿀 수 있어요)
+const CHEAP_MODEL = 'claude-haiku-4-5';
 const DEFAULT_LIMITS = { menu: 10, places: 150, google: 30, lotto: 60, geo: 200, chat: 40 };
 // 모든 사람을 합친 하루 최대 횟수 (누가 계정을 잔뜩 만들어도 요금이 크게 나가지 않게). 환경변수 TOTAL_MENU 등으로 바꿀 수 있어요.
 const DEFAULT_TOTAL = { menu: 200, places: 3000, google: 300, lotto: 600, geo: 3000, chat: 600 };
@@ -142,7 +145,7 @@ async function handleMenu(req, env, user) {
   ].join('\n');
 
   const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
-  const model = env.CLAUDE_MODEL || 'claude-opus-5';
+  const model = env.MENU_MODEL || CHEAP_MODEL;
   const params = {
     model,
     max_tokens: 4000,
@@ -178,7 +181,7 @@ async function handleMenu(req, env, user) {
 const OUT_CATS = ['식비', '카페·간식', '장보기', '교통', '생활·주거', '쇼핑', '의료·건강', '반려동물', '문화·여가', '경조사', '기타'];
 const IN_CATS = ['월급', '용돈·부수입', '환급·기타'];
 const nullable = t => ({ anyOf: [t, { type: 'null' }] });
-const ACTION_TYPES = ['todo', 'expense', 'income', 'shop', 'habit_done', 'chore_done', 'fridge', 'thing', 'dday', 'gift', 'workout', 'petlog', 'contacted', 'note'];
+const ACTION_TYPES = ['todo', 'expense', 'income', 'shop', 'habit_done', 'chore_done', 'fridge', 'thing', 'dday', 'gift', 'workout', 'petlog', 'contacted', 'note', 'fix', 'remove'];
 const CAT_OF = {
   expense: OUT_CATS, income: IN_CATS,
   thing: ['서류', '전자기기', '계절용품', '공구', '약·구급', '추억', '기타'],
@@ -209,9 +212,10 @@ const CHAT_SCHEMA = {
           minutes: { type: 'integer' },
           dir: { type: 'string', enum: ['give', 'get', ''] },
           kind: { type: 'string', enum: ['yearly', 'once', 'count', ''] },
-          memo: { type: 'string' }
+          memo: { type: 'string' },
+          ref: { type: 'integer' }
         },
-        required: ['type', 'title', 'date', 'time', 'amount', 'cat', 'qty', 'important', 'who', 'place', 'minutes', 'dir', 'kind', 'memo'],
+        required: ['type', 'title', 'date', 'time', 'amount', 'cat', 'qty', 'important', 'who', 'place', 'minutes', 'dir', 'kind', 'memo', 'ref'],
         additionalProperties: false
       }
     }
@@ -237,9 +241,12 @@ const CHAT_SYSTEM = [
   '- petlog: 반려동물 기록. who=[반려동물]에 있는 이름 그대로, title=기록 분류, date, amount=비용(말했으면), memo=짧은 메모.',
   '- contacted: 누구에게 연락했다고 하면. who=[연락 챙기기]에 있는 이름 그대로.',
   '- note: 메모해 달라고 하면. title=짧은 제목, memo=내용.',
+  '- fix: 사용자가 [최근에 AI가 적은 것] 중 하나를 고쳐 달라고 하면(예: "아까 9천원 아니고 1만원", "치과 4시로 바꿔줘"). ref=그 줄의 번호, 바꿀 칸만 채우고 나머지는 비워. 고칠 수 있는 칸: title(이름·메모), amount, date, time, cat, qty, place, minutes, memo, who.',
+  '- remove: [최근에 AI가 적은 것] 중 하나를 지워 달라고 하면. ref=그 줄의 번호.',
+  '- 고치기·지우기는 [최근에 AI가 적은 것]에 있는 것만 할 수 있어. 어느 것인지 애매하면 되물어. 그 목록에 없는 기록은 해당 메뉴에서 직접 고치라고 안내해.',
   '- 이름을 그대로 써야 하는 것(habit_done, chore_done, petlog, contacted)은 목록에 비슷한 이름이 없으면 기록하지 말고 되물어.',
   '- 분류(cat)는 아래 목록에서만 골라. 맞는 게 없으면 "기타".',
-  '- 쓰지 않는 칸: 글자 칸은 빈 문자열 "", 숫자 칸(amount, minutes)은 0, important는 false. date는 YYYY-MM-DD, time은 HH:MM(24시간).',
+  '- 쓰지 않는 칸: 글자 칸은 빈 문자열 "", 숫자 칸(amount, minutes, ref)은 0, important는 false. date는 YYYY-MM-DD, time은 HH:MM(24시간).',
   '',
   '분류 목록 — 지출: ' + OUT_CATS.join(', ') + ' / 수입: ' + IN_CATS.join(', ') + ' / 물건: ' + CAT_OF.thing.join(', ') + ' / 기념일: ' + CAT_OF.dday.join(', ') + ' / 경조사: ' + CAT_OF.gift.join(', ') + ' / 운동: ' + CAT_OF.workout.join(', ') + ' / 반려동물 기록: ' + CAT_OF.petlog.join(', '),
   '',
@@ -248,6 +255,7 @@ const CHAT_SYSTEM = [
   '- "만원"=10000, "9천원"=9000, "1.5만"=15000처럼 금액을 정수로 바꿔.',
   '- "내일", "모레", "다음 주 화요일" 같은 날짜는 아래 오늘 날짜 기준으로 YYYY-MM-DD로 바꿔.',
   '- 금액을 모르는 지출, 무엇을 할지 모르는 할 일처럼 정보가 모자라면 기록하지 말고 reply에서 짧게 되물어.',
+  '- [메모]가 있으면 "와이파이 비번 뭐였지?" 같은 질문에 메모 내용으로 답해. 메모에 없는 내용은 모른다고 해.',
   '- "여권 어디 뒀지?", "냉장고에 뭐 있어?", "다음 기념일 언제야?", "철수한테 얼마 냈지?" 같은 질문도 아래 기록으로 답해.',
   '- 질문(예: 이번 달 얼마 썼어?, 장볼 거 뭐 있어?)에는 아래 "지금 기록"만 보고 답하고, 없는 숫자는 지어내지 마. 질문만 했으면 actions는 빈 배열.',
   '- 날씨·옷차림 질문에는 "지금 기록"의 [날씨]만 보고 답해. 지금 날씨와 기온(체감), 비·미세먼지처럼 중요한 것, 옷 추천과 챙길 것을 짧게 알려줘. 내일을 물으면 내일 줄을 써. 질문에 지역이 없으면 기본 지역으로 답해.',
@@ -286,6 +294,8 @@ async function handleChat(req, env, user) {
     '[반려동물]', lines(c.pets, 6, 40),
     '[반려동물 최근 기록·다음 일정]', lines(c.petlogs, 15, 70),
     '[연락 챙기기]', lines(c.contacts, 25, 60),
+    '[최근에 AI가 적은 것] (고치기·지우기용 번호)', lines(c.recent, 12, 90),
+    ...(Array.isArray(c.notes) ? ['[메모] (잠기지 않은 메모만)', lines(c.notes, 30, 320)] : []),
     ...(Array.isArray(c.weather) ? ['[날씨] (생활노트 날씨 메뉴에 저장된 지역, Open-Meteo 기준)', lines(c.weather, 8, 400)] : [])
   ].join('\n');
 
@@ -301,7 +311,7 @@ async function handleChat(req, env, user) {
   messages.push({ role: 'user', content: ctx + '\n\n사용자가 방금 한 말:\n' + text });
 
   const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
-  const model = env.CHAT_MODEL || env.CLAUDE_MODEL || 'claude-opus-5';
+  const model = env.CHAT_MODEL || CHEAP_MODEL;
   const params = {
     model,
     max_tokens: 4000,
@@ -340,8 +350,10 @@ async function handleChat(req, env, user) {
     minutes: Number.isFinite(a.minutes) && a.minutes > 0 && a.minutes < 1440 ? Math.round(a.minutes) : null,
     dir: a.dir === 'give' || a.dir === 'get' ? a.dir : null,
     kind: ['yearly', 'once', 'count'].includes(a.kind) ? a.kind : null,
-    memo: a.memo ? clip(a.memo, 300).trim() : ''
+    memo: a.memo ? clip(a.memo, 300).trim() : '',
+    ref: Number.isInteger(a.ref) && a.ref > 0 && a.ref < 100 ? a.ref : null
   })).filter(a => {
+    if (a.type === 'fix' || a.type === 'remove') return !!a.ref;
     if (!ACTION_TYPES.includes(a.type)) return false;
     if (['expense', 'income', 'gift'].includes(a.type) && !a.amount) return false;
     if (['petlog', 'contacted', 'gift'].includes(a.type) && !a.who) return false;

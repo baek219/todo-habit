@@ -31,6 +31,9 @@
   .acts .tag.income{background:#E2F5EC;color:#0B8A5E} .acts .tag.shop{background:#E2F5EC;color:#0B8A5E}
   html.ln-dark .acts .tag.todo{background:#262446;color:#8F86F0} html.ln-dark .acts .tag.expense{background:#3A1F18;color:#F08A6E}
   html.ln-dark .acts .tag.income,html.ln-dark .acts .tag.shop{background:#15332A;color:#2FBF86}
+  .acts .tag.fix{background:#E8F0FD;color:#2563D9} .acts .tag.remove{background:#F1F2F4;color:#6B7684}
+  html.ln-dark .acts .tag.fix{background:#1B2A44;color:#5B9BFF} html.ln-dark .acts .tag.remove{background:#262C35;color:#9AA6B8}
+  .acts .tag.warn{background:#FFF1D6;color:#9A5B00} html.ln-dark .acts .tag.warn{background:#3A2A10;color:#F5B74E}
   .acts .what{flex:1;min-width:0}
   .acts a{font-size:12.5px;white-space:nowrap}
   .msg-foot{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -111,10 +114,12 @@
   $('today').textContent = prettyDate(today());
 
   /* ---------- 대화 기록 (이 기기에만, 최근 40개) ---------- */
-  let log = [];
-  try { const v = JSON.parse(localStorage.getItem(LOG_KEY)); if (v && Array.isArray(v.items)) log = v.items; } catch (e) {}
+  let log = [], logOwner = '';
+  try { const v = JSON.parse(localStorage.getItem(LOG_KEY)); if (v && Array.isArray(v.items)) { log = v.items; logOwner = v.uid || ''; } } catch (e) {}
+  // 대화는 쓴 계정으로 로그인했을 때만 보여줌 (공용 PC에서 로그아웃 뒤 다른 사람이 보지 못하게)
+  const canShow = () => { const u = Life.user(); return !!u && (!logOwner || logOwner === u.uid); };
   function uidNow() { const u = Life.user(); return u ? u.uid : ''; }
-  function saveLog() { log = log.slice(-40); try { localStorage.setItem(LOG_KEY, JSON.stringify({ uid: uidNow(), items: log })); } catch (e) {} }
+  function saveLog() { log = log.slice(-40); if (uidNow()) logOwner = uidNow(); try { localStorage.setItem(LOG_KEY, JSON.stringify({ uid: logOwner, items: log })); } catch (e) {} }
 
   /* ---------- 할일·습관 기록 읽고 쓰기 (할일습관 화면과 같은 저장소) ---------- */
   function readTasks() { try { return JSON.parse(localStorage.getItem(TASKS_KEY) || '[]') || []; } catch (e) { return []; } }
@@ -172,6 +177,7 @@
   }
 
   /* ---------- 날씨 (날씨·옷 이야기일 때만 붙여 보냄) ---------- */
+  const NOTE_WORDS = /메모|비번|비밀번호|번호|적어 ?[둔놨뒀놓]|뭐였|뭐더라|기억|코드|주소|아이디/;
   const WX_WORDS = /날씨|기온|온도|옷|입[고을지어는]|우산|비 ?[와오올온]|비가|눈 ?[와오올온]|추[워운울]|춥|더[워운울]|덥|쌀쌀|미세|먼지|바람|맑|흐[려림]|소나기|장마|태풍|외투|패딩|코트|반팔|반바지/;
   async function weatherLines() {
     const places = Life.weatherPlaces().slice(0, 4), out = [];
@@ -191,8 +197,13 @@
   }
 
   /* ---------- AI가 정한 것을 실제로 적기 ---------- */
-  function apply(a) {
+  function apply(a, refs) {
     const t = today();
+    if (a.type === 'fix' || a.type === 'remove') {
+      const ref = refs && refs[(a.ref || 0) - 1];
+      if (!ref) return { kind: 'warn', id: null, label: a.type === 'fix' ? '못 고침' : '못 지움', text: '어느 기록인지 찾지 못했어요. 그 메뉴에서 직접 고쳐 주세요.', href: 'chat.html' };
+      return a.type === 'fix' ? fixRec(a, ref) : removeRec(ref);
+    }
     if (a.type === 'todo') {
       const id = 't' + Date.now() + Math.random().toString(36).slice(2, 7);
       const tasks = readTasks();
@@ -292,8 +303,98 @@
     return null;
   }
   const STORES = { chores: CH, contacts: CO, fridge: FR, things: TH, dday: DD, gifts: GI, workout: WO, petlog: PL };
+
+  /* ---------- 말로 고치기·지우기: 최근에 AI가 적은 기록 ---------- */
+  const KSTORE = { expense: M, income: M, shop: S, fridge: FR, thing: TH, dday: DD, gift: GI, workout: WO, pet: PL };
+  const KLABEL = { expense: '지출', income: '수입', todo: '할 일', shop: '장보기', fridge: '냉장고', thing: '물건 위치', dday: '기념일', gift: '경조사', workout: '운동', pet: '반려동물', note: '메모' };
+  const KHREF = { expense: 'money.html', income: 'money.html', todo: 'index.html', shop: 'shop.html', fridge: 'fridge.html', thing: 'things.html', dday: 'dday.html', gift: 'gift.html', workout: 'workout.html', pet: 'pet.html', note: 'index.html?tab=notes' };
+  function readNotes() { try { return JSON.parse(localStorage.getItem(NOTES_KEY) || '[]') || []; } catch (e) { return []; } }
+  function writeNotes(n) { try { localStorage.setItem(NOTES_KEY, JSON.stringify(n)); } catch (e) {} const CS = window.CloudSync; if (CS && CS.schedulePush) CS.schedulePush(); }
+  const clone = o => o ? JSON.parse(JSON.stringify(o)) : null;
+  function getRec(kind, id) {
+    if (kind === 'todo') return readTasks().find(x => x.id === id) || null;
+    if (kind === 'note') return readNotes().find(x => x.id === id) || null;
+    return KSTORE[kind] ? KSTORE[kind].get(id) : null;
+  }
+  function putRec(kind, obj) {
+    if (kind === 'todo' || kind === 'note') {
+      const list = kind === 'todo' ? readTasks() : readNotes(), i = list.findIndex(x => x.id === obj.id);
+      if (i >= 0) list[i] = obj; else list.unshift(obj);
+      return kind === 'todo' ? writeTasks(list) : writeNotes(list);
+    }
+    KSTORE[kind].put(obj);
+  }
+  function delRec(kind, id) {
+    if (kind === 'todo') return writeTasks(readTasks().filter(x => x.id !== id));
+    if (kind === 'note') return writeNotes(readNotes().filter(x => x.id !== id));
+    KSTORE[kind].remove(id);
+  }
+  function describe(kind, x) {
+    if (!x) return '';
+    if (kind === 'expense' || kind === 'income') return (x.cat || '') + ' ' + won(x.amount) + (x.memo ? ' · ' + x.memo : '') + ' · ' + shortDate(x.date);
+    if (kind === 'todo') return x.title + ' · ' + shortDate(x.dueDate) + (x.time ? ' ' + x.time : '');
+    if (kind === 'shop') return x.name + (x.qty ? ' ' + x.qty : '');
+    if (kind === 'fridge') return x.name + (x.qty ? ' ' + x.qty : '') + ' · ' + (x.zone || '냉장') + (x.exp ? ' · 기한 ' + shortDate(x.exp) : '');
+    if (kind === 'thing') return x.name + ' → ' + (x.where || '?');
+    if (kind === 'dday') return x.title + ' · ' + x.date + (x.lunar ? ' (음력)' : '');
+    if (kind === 'gift') return x.person + (x.dir === 'give' ? '님께 낸 ' : '님께 받은 ') + (x.ev || '') + ' ' + won(x.amount);
+    if (kind === 'workout') return (x.type || '운동') + ' ' + (x.min || 0) + '분 · ' + shortDate(x.date);
+    if (kind === 'pet') { const p = PETS.get(x.petId); return (p ? p.name + ' ' : '') + x.type + (x.cost ? ' ' + won(x.cost) : '') + ' · ' + shortDate(x.date); }
+    if (kind === 'note') return x.title || String(x.body || '').slice(0, 30);
+    return '';
+  }
+  // 최근 대화에서 AI가 적은 기록 (지금도 남아 있는 것만, 최신 순, 최대 12개)
+  function buildRefs() {
+    const out = [], seen = new Set();
+    for (let i = log.length - 1; i >= 0 && out.length < 12; i--) {
+      const m = log[i]; if (m.role !== 'ai' || m.undone) continue;
+      for (const r of (m.results || []).slice().reverse()) {
+        if (!r.id || !KLABEL[r.kind] || seen.has(r.kind + r.id)) continue;
+        const rec = getRec(r.kind, r.id); if (!rec) continue;
+        seen.add(r.kind + r.id); out.push({ r, kind: r.kind, id: r.id });
+        if (out.length >= 12) break;
+      }
+    }
+    return out;
+  }
+  const OUT_OK = c => OUT_CATS.includes(c), IN_OK = c => IN_CATS.includes(c);
+  function fixRec(a, ref) {
+    const kind = ref.kind, prev = clone(getRec(kind, ref.id));
+    if (!prev) return null;
+    const x = clone(prev); let prevMoney = null;
+    const set = (k, v) => { if (v !== null && v !== undefined && v !== '' && v !== 0) x[k] = v; };
+    if (kind === 'expense' || kind === 'income') { set('amount', a.amount); if (a.cat && (kind === 'expense' ? OUT_OK(a.cat) : IN_OK(a.cat))) x.cat = a.cat; set('memo', a.title); set('date', a.date); }
+    else if (kind === 'todo') { set('title', a.title); set('dueDate', a.date); if (a.time) { x.time = a.time; x.reminderTime = a.time; x.remindBefore = 0; } }
+    else if (kind === 'shop') { set('name', a.title); set('qty', a.qty); }
+    else if (kind === 'fridge') { set('name', a.title); set('qty', a.qty); if (['냉장', '냉동', '실온'].includes(a.place)) x.zone = a.place; set('exp', a.date); }
+    else if (kind === 'thing') { set('name', a.title); set('where', a.place); set('cat', a.cat); x.moved = today(); }
+    else if (kind === 'dday') { set('title', a.title); set('date', a.date); set('label', a.cat); }
+    else if (kind === 'gift') { set('amount', a.amount); set('ev', a.cat); set('date', a.date); set('person', a.who); }
+    else if (kind === 'workout') { set('type', a.title); set('min', a.minutes); set('date', a.date); set('memo', a.memo); }
+    else if (kind === 'pet') { set('type', a.title); set('cost', a.amount); set('date', a.date); set('memo', a.memo); }
+    else if (kind === 'note') { set('title', a.title); set('body', a.memo); x.updatedAt = Date.now(); }
+    putRec(kind, x);
+    // 같이 적힌 가계부 기록도 맞춤
+    const linked = kind === 'gift' ? M.items().find(mm => mm.giftId === x.id) : kind === 'pet' && ref.r.moneyId ? M.get(ref.r.moneyId) : null;
+    if (linked) {
+      prevMoney = clone(linked);
+      const amt = kind === 'gift' ? x.amount : x.cost;
+      if (amt) M.put(Object.assign({}, linked, { amount: amt, date: x.date || linked.date, memo: kind === 'gift' ? x.person + ' ' + x.ev : linked.memo }));
+    }
+    return { kind: 'fix', id: x.id, fixKind: kind, prev, prevMoney, label: '고침', text: KLABEL[kind] + ' · ' + describe(kind, x), href: KHREF[kind] };
+  }
+  function removeRec(ref) {
+    const kind = ref.kind, prev = clone(getRec(kind, ref.id));
+    if (!prev) return null;
+    delRec(kind, ref.id);
+    let prevMoney = null;
+    const linked = kind === 'gift' ? M.items().find(mm => mm.giftId === ref.id) : kind === 'pet' && ref.r.moneyId ? M.get(ref.r.moneyId) : null;
+    if (linked) { prevMoney = clone(linked); M.remove(linked.id); }
+    return { kind: 'remove', id: ref.id, fixKind: kind, prev, prevMoney, label: '지움', text: KLABEL[kind] + ' · ' + describe(kind, prev), href: KHREF[kind] };
+  }
   function undo(r) {
     if (!r.id) return;
+    if (r.kind === 'fix' || r.kind === 'remove') { if (r.prev) putRec(r.fixKind, r.prev); if (r.prevMoney) M.put(r.prevMoney); return; }
     if (r.moneyId) M.remove(r.moneyId);
     if (r.kind === 'todo') writeTasks(readTasks().filter(x => x.id !== r.id));
     else if (r.kind === 'habit') { const tasks = readTasks(), hb = tasks.find(x => x.id === r.id); if (hb && r.prevHabit) { hb.completedDates = r.prevHabit.completedDates; hb.counts = r.prevHabit.counts; writeTasks(tasks); } }
@@ -326,9 +427,10 @@
         : h('button', { class: 'btn sm ghost', type: 'button', onclick: () => { done.forEach(undo); m.undone = true; saveLog(); render(); toast('방금 적은 ' + done.length + '개를 지웠어요'); } }, '되돌리기')) : null);
   }
   function render(waiting) {
-    $('intro').hidden = log.length > 0;
-    chat.replaceChildren(...log.map(bubble), waiting ? h('div', { class: 'msg wait', 'aria-label': '답을 만드는 중' }, h('span', {}, '●'), ' ', h('span', {}, '●'), ' ', h('span', {}, '●')) : []);
-    if (log.length || waiting) requestAnimationFrame(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }));
+    const shown = canShow() ? log : [];
+    $('intro').hidden = shown.length > 0;
+    chat.replaceChildren(...shown.map(bubble), waiting ? h('div', { class: 'msg wait', 'aria-label': '답을 만드는 중' }, h('span', {}, '●'), ' ', h('span', {}, '●'), ' ', h('span', {}, '●')) : []);
+    if (shown.length || waiting) requestAnimationFrame(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }));
   }
 
   const EX = ['오늘 날씨 어때? 뭐 입을까?', '점심 김치찌개 9천원', '내일 오후 3시 치과 예약', '우유랑 계란 2판 장보기에 넣어줘', '여권 서랍 둘째 칸에 뒀어', '30분 걷기 했어', '이번 달 얼마 썼어?'];
@@ -341,9 +443,13 @@
     if (!Life.user()) { g.hidden = false; g.replaceChildren('AI 비서는 로그인한 분만 쓸 수 있어요. ', h('button', { class: 'btn sm', type: 'button', onclick: () => Life.signIn() }, 'Google로 로그인')); return false; }
     g.hidden = true; return true;
   }
+  // 홈 화면 입력칸에서 넘어온 말 (?q=...) → 로그인이 확인되면 한 번 보냄
+  let pendingQ = new URLSearchParams(location.search).get('q') || '';
+  if (pendingQ) { try { history.replaceState(null, '', location.pathname); } catch (e) {} $('input').value = pendingQ; }
   Life.onUser(u => {
+    if (u && pendingQ) { const q = pendingQ; pendingQ = ''; setTimeout(() => send(q), 600); }
     // 다른 계정으로 바뀌면 대화 기록을 비움
-    try { const v = JSON.parse(localStorage.getItem(LOG_KEY)); if (u && v && v.uid && v.uid !== u.uid) { log = []; saveLog(); } } catch (e) {}
+    if (u && logOwner && logOwner !== u.uid) { log = []; logOwner = u.uid; saveLog(); } // 다른 계정이 로그인하면 예전 대화는 지움
     gate(); render();
   });
 
@@ -360,8 +466,16 @@
     try {
       const ctx = context(text);
       if (WX_WORDS.test(text)) ctx.weather = await weatherLines();
+      const refs = buildRefs();
+      ctx.recent = refs.map((x, i) => '#' + (i + 1) + ' ' + KLABEL[x.kind] + ' · ' + describe(x.kind, getRec(x.kind, x.id)));
+      if (NOTE_WORDS.test(text)) ctx.notes = readNotes().filter(n => !n.locked && (n.title || n.body)).slice(0, 30)
+        .map(n => (n.title || '(제목 없음)') + ': ' + String(n.body || '').replace(/\s+/g, ' ').slice(0, 300));
       const r = await Life.api('chat', { body: { message: text, history, context: ctx } });
-      const results = (r.actions || []).map(a => { try { return apply(a); } catch (e) { console.error(e); return null; } }).filter(Boolean);
+      // 화면이 모르는 종류(사이트가 예전 버전일 때)나 적다가 문제가 생긴 것은 조용히 넘기지 않고 알려줌
+      const results = (r.actions || []).map(a => {
+        let res = null; try { res = apply(a, refs); } catch (e) { console.error(e); }
+        return res || { kind: 'warn', id: null, label: '못 적음', text: (a.title || a.who || '기록') + ' · 화면이 예전 버전이라 적지 못했어요. 새로고침(Ctrl+F5) 후 다시 보내 주세요.', href: location.pathname.split('/').pop() || 'chat.html' };
+      });
       log.push({ role: 'ai', text: r.reply || '적었어요.', results, at: Date.now() });
       if (r.limit != null) $('left').textContent = '오늘 ' + r.remaining + '번 더 쓸 수 있어요';
     } catch (e) {

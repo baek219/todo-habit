@@ -36,6 +36,15 @@
   .edit-row.off .nm{color:var(--muted);text-decoration:line-through}
   .edit-row input[type=checkbox]{width:20px;height:20px;accent-color:var(--sec)}
   .gsearch{position:relative}
+  /* 오늘 요약 + AI 비서 입력칸 */
+  .today-sum{gap:12px;padding:18px}
+  .ts-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .ts-chip{display:inline-flex;align-items:center;gap:5px;font-size:13.5px;font-weight:650;background:var(--surface2);color:var(--fg);border-radius:999px;padding:6px 11px;text-decoration:none;white-space:nowrap}
+  .ts-chip:hover{filter:brightness(.97)}
+  .ts-chip.warn{background:#FFF1D6;color:#8A5300} html.ln-dark .ts-chip.warn{background:#3A2A10;color:#F5B74E}
+  .ts-chip.bad{background:#FDE8E4;color:#B3402A} html.ln-dark .ts-chip.bad{background:#3A1F18;color:#F08A6E}
+  .ask-row{display:grid;grid-template-columns:1fr auto;gap:8px}
+  .ask-row input{font-size:16px}
   .gsearch svg{position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
   .gsearch input{background:var(--surface)!important;padding:15px 16px 15px 46px!important;font-size:16px!important;border-radius:18px!important}
   .gr-group{display:grid;gap:4px}
@@ -65,6 +74,13 @@
     <button class="btn sm soft" type="button" id="edit-home-top" style="justify-self:start;margin-top:6px">홈 꾸미기</button>
   </header>
 
+  <section class="card today-sum" aria-label="오늘 요약">
+    <div class="ts-chips" id="ts-chips"></div>
+    <form id="ask" class="ask-row" autocomplete="off">
+      <input id="ask-q" type="text" maxlength="500" placeholder="AI 비서: 점심 9천원" aria-label="AI 비서에게 말하기" />
+      <button class="btn primary" type="submit">보내기</button>
+    </form>
+  </section>
   <div class="gsearch" role="search">
     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
     <input id="gq" type="search" placeholder="모든 기록에서 찾기 — 이름, 물건, 메모, 가게…" aria-label="모든 기록에서 찾기" autocomplete="off" />
@@ -224,7 +240,7 @@
         (() => { const g = Life.pmGrade(w.pm10, 'pm10'), g2 = Life.pmGrade(w.pm25, 'pm25'); return g || g2 ? h('div', { class: 'row', style: 'gap:6px' }, g ? h('span', { class: 'badge ' + g[1] }, '미세먼지 ' + g[0]) : null, g2 ? h('span', { class: 'badge ' + g2[1] }, '초미세 ' + g2[0]) : null) : ''; })(),
         (() => { const o = Life.outfit(w); return o ? h('span', { class: 'small' }, o.icon + ' ' + o.items.slice(0, 3).join(' · ') + (o.tips.some(t => t.startsWith('☔') || t.startsWith('🌂')) ? ' · 우산' : '')) : ''; })(),
         h('span', { class: 'tiny muted', id: 'wx-stamp' }, w.place + ' · ' + Life.wxStamp(w)));
-      lastWx = w;
+      lastWx = w; renderSummary();
     } catch (e) { box.replaceChildren(h('span', { class: 'small muted' }, '날씨를 불러오지 못했어요. 잠시 뒤 다시 열어 주세요.')); }
   }
   /* 설치 */
@@ -242,6 +258,36 @@
     const done = habits.filter(x => (x.completedDates || []).includes(t));
     return { todos, habits, done };
   }
+
+  /* ---------- 오늘 요약 ---------- */
+  let sumData = null;
+  function renderSummary(d) {
+    if (d) sumData = d; d = sumData; if (!d) return;
+    const chip = (href, text, cls) => h('a', { class: 'ts-chip' + (cls ? ' ' + cls : ''), href }, text);
+    const chips = [];
+    if (lastWx) {
+      const o = Life.outfit ? Life.outfit(lastWx) : null;
+      const rain = o && o.tips.some(x => /^☔|^🌂/.test(x));
+      chips.push(chip('weather.html', (o ? o.icon : lastWx.icon) + ' ' + lastWx.temp + '°' + (o ? ' ' + o.items.slice(0, 2).join('·') : '') + (rain ? ' · ☔우산' : ''), rain ? 'warn' : ''));
+    }
+    const late = d.ti.todos.filter(x => x.dueDate < t).length;
+    chips.push(chip('index.html', '✅ 할 일 ' + (d.ti.todos.length ? d.ti.todos.length + '개' + (late ? ' (밀림 ' + late + ')' : '') : '없음'), late ? 'warn' : ''));
+    if (d.ti.habits.length) chips.push(chip('index.html', '🔁 습관 ' + d.ti.done.length + '/' + d.ti.habits.length));
+    if (d.chDue.length) chips.push(chip('chores.html', '🧹 집안일 ' + d.chDue.length + '개', d.chDue.some(o => o.n < 0) ? 'warn' : ''));
+    const soon = d.fr.filter(o => o.n <= 3);
+    if (soon.length) chips.push(chip('fridge.html', '🥚 유통기한 임박 ' + soon.length + '개', soon.some(o => o.n < 0) ? 'bad' : 'warn'));
+    const dd = d.dlist.find(o => o.nx.n <= 7);
+    if (dd) chips.push(chip('dday.html', '🎂 ' + dd.x.title + ' ' + (dd.nx.n === 0 ? '오늘' : 'D-' + dd.nx.n), 'warn'));
+    const callN = d.clist.filter(o => o.n <= 0).length;
+    if (callN) chips.push(chip('contact.html', '📞 연락할 사람 ' + callN + '명'));
+    chips.push(chip('money.html', '💸 이번 달 ' + won(d.out) + (d.budget ? ' (' + Math.round(d.out / d.budget * 100) + '%)' : ''), d.budget && d.out > d.budget ? 'bad' : ''));
+    $('ts-chips').replaceChildren(...chips);
+  }
+  $('ask').addEventListener('submit', e => {
+    e.preventDefault();
+    const q = $('ask-q').value.trim(); if (!q) { $('ask-q').focus(); return; }
+    location.href = 'chat.html?q=' + encodeURIComponent(q);
+  });
 
   function render() {
     t = today(); $('today').textContent = prettyDate(t);
@@ -321,6 +367,8 @@
     const chDue = chl.filter(o => o.n <= 0);
     $('ch-list').replaceChildren(...(chl.length ? (chDue.length ? chDue : chl).slice(0, 4).map(({ x, n }) => h('li', {}, h('span', { class: 'badge ' + (n < 0 ? 'bad' : n === 0 ? 'warn' : 'go') }, n < 0 ? (-n) + '일 밀림' : n === 0 ? '오늘' : 'D-' + n), h('span', { class: 't' }, x.name)))
       : [h('li', { class: 'muted' }, '집안일에서 반복되는 일을 등록해 보세요.')]));
+    // 오늘 요약 (맨 위 한 줄)
+    renderSummary({ ti, out, budget, chDue, fr, dlist, clist });
     // 물건 위치
     const tq = ($('th-q').value || '').trim().toLowerCase();
     const tl = things.items().filter(x => !tq || [x.name, x.where, x.memo].join(' ').toLowerCase().includes(tq)).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 3);
