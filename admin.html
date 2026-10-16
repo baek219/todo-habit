@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>관리자 · 생활노트</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<meta name="theme-color" content="#F3F4F6" />
+<meta name="robots" content="noindex" />
+<link rel="stylesheet" href="life.css?v=20261016b" />
+<script>try{if(localStorage.getItem('dark_mode_v1')==='1')document.documentElement.classList.add('ln-dark')}catch(e){}</script>
+<style>
+  .models{display:grid;gap:8px}
+  .model{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;background:var(--surface2);border-radius:14px;padding:12px 14px;cursor:pointer}
+  .model input{margin-top:4px}
+  .model b{font-size:15px}
+  .model .small{display:block}
+  .stat-row{display:flex;gap:18px;flex-wrap:wrap}
+  .stat-row .big{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums}
+  .users{list-style:none;margin:0;padding:0;display:grid}
+  .users li{display:grid;grid-template-columns:1fr;gap:8px;padding:14px 0;border-top:1px solid var(--line)}
+  .users li:first-child{border-top:0}
+  .users .who b{font-size:15px}
+  .users .ctl{display:grid;grid-template-columns:1fr 120px;gap:8px}
+  .users select,.users input{font:inherit;font-size:14px}
+  .me-tag{font-size:11px;font-weight:800;border-radius:999px;padding:1px 7px;background:var(--primary-soft);color:var(--primary);margin-left:6px}
+  .off-tag{font-size:11px;font-weight:800;border-radius:999px;padding:1px 7px;background:#FDE8E4;color:#B3402A;margin-left:6px}
+  html.ln-dark .off-tag{background:#3A1F18;color:#F08A6E}
+  .savebar{position:sticky;bottom:calc(12px + env(safe-area-inset-bottom,0px));display:flex;gap:10px;align-items:center;justify-content:space-between;background:var(--surface);border-radius:16px;padding:12px 14px;box-shadow:0 6px 24px rgba(0,0,0,.12)}
+  html.ln-bnon .savebar{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+  @media (min-width:960px){html.ln-bnon .savebar{bottom:16px}}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="page-head">
+    <span class="date">관리자 전용</span>
+    <h1>관리자</h1>
+    <p>AI 모델과 사람별 사용 한도를 정해요. 저장하면 바로 적용돼요.</p>
+  </header>
+
+  <div class="note" id="gate">확인하는 중…</div>
+
+  <div id="body" class="stack" hidden style="gap:16px">
+    <section class="card">
+      <div class="card-head"><h2>오늘 AI 사용</h2><button class="btn sm ghost" type="button" id="reload">새로고침</button></div>
+      <div class="stat-row">
+        <div><span class="label">AI 비서</span><div class="big" id="t-chat">0</div></div>
+        <div><span class="label">메뉴 추천</span><div class="big" id="t-menu">0</div></div>
+        <div><span class="label">AI를 쓴 사람</span><div class="big" id="t-users">0</div></div>
+      </div>
+      <p class="small muted" id="t-cost"></p>
+      <p class="tiny muted">정확한 금액은 Claude Console(platform.claude.com)의 Usage·Billing에서 봐요. 그곳에서 한 달 사용 한도를 걸어두면 안전해요.</p>
+    </section>
+
+    <section class="card">
+      <h2>모든 사람의 기본 AI 모델</h2>
+      <div class="models" id="models"></div>
+      <p class="tiny muted">메시지 1번당 금액은 대략적인 값이에요. 실제 금액은 말의 길이와 기록 양에 따라 달라요.</p>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>사람별 설정</h2><span class="small muted" id="u-count"></span></div>
+      <p class="small muted">AI를 한 번이라도 쓴 사람만 보여요. 모델을 "기본 따름"으로 두면 위의 기본 모델을 써요. 하루 한도를 비워두면 기본값(AI 비서 <span id="d-chat"></span>번), <b>0</b>이면 AI 비서·메뉴 추천을 못 써요.</p>
+      <ul class="users" id="users"></ul>
+    </section>
+
+    <div class="savebar">
+      <span class="small muted" id="dirty">바꾼 내용이 없어요</span>
+      <button class="btn primary" type="button" id="save" disabled>저장</button>
+    </div>
+  </div>
+</main>
+
+<script src="firebase.js?v=20261016b"></script>
+<script src="sync.js?v=20261016b"></script>
+<script src="life-config.js?v=20261016b"></script>
+<script src="life.js?v=20261016b"></script>
+<script src="shell.js?v=20261016b"></script>
+<script>
+(function () {
+  const { h, toast } = Life;
+  const $ = id => document.getElementById(id);
+  const INFO = {
+    'claude-haiku-4-5': ['저렴', 'Claude Haiku 4.5', '가장 저렴하고 빨라요. 메시지 1번에 약 5~10원. 복잡한 문장은 가끔 잘못 알아들을 수 있어요.', 7],
+    'claude-sonnet-5': ['보통', 'Claude Sonnet 5', '정확도와 비용의 중간이에요. 약 15~25원.', 20],
+    'claude-opus-5': ['똑똑', 'Claude Opus 5', '가장 똑똑해요. 약 30~60원.', 45]
+  };
+  let data = null, def = '', sets = {}, saved = '';
+
+  function snapshot() { return JSON.stringify({ def, sets }); }
+  function markDirty() {
+    const d = snapshot() !== saved;
+    $('save').disabled = !d; $('dirty').textContent = d ? '저장하지 않은 변경이 있어요' : '바꾼 내용이 없어요';
+  }
+
+  async function load() {
+    $('gate').hidden = false; $('gate').textContent = '불러오는 중…';
+    if (!Life.hasServer()) { $('gate').textContent = '중간 서버가 연결되지 않았어요.'; return; }
+    if (!Life.user()) { $('gate').replaceChildren('관리자 계정으로 로그인해 주세요. ', h('button', { class: 'btn sm', type: 'button', onclick: () => Life.signIn() }, 'Google로 로그인')); $('body').hidden = true; return; }
+    try { data = await Life.api('admin/users'); }
+    catch (e) {
+      $('body').hidden = true;
+      if (e.code === 'not_admin') {
+        const me = await Life.api('me').catch(() => null);
+        $('gate').replaceChildren(h('div', { class: 'stack', style: 'gap:6px' },
+          h('b', {}, '관리자 계정이 아니에요.'),
+          h('span', { class: 'small' }, '이 계정을 관리자로 쓰려면 Cloudflare의 life-note 설정 → Variables에 ', h('b', {}, 'ADMIN_EMAILS'), ' 변수를 만들고 값에 이 이메일을 넣어 주세요.'),
+          me && me.email ? h('code', {}, me.email) : null));
+      } else $('gate').textContent = e.message || '불러오지 못했어요.';
+      return;
+    }
+    if (!data || !Array.isArray(data.users) || !Array.isArray(data.models)) {
+      $('body').hidden = true; $('gate').textContent = '서버가 예전 버전이에요. Cloudflare에 새 서버 코드(worker.js)를 붙여넣고 Deploy해 주세요.'; return;
+    }
+    def = data.defaultModel;
+    sets = {}; data.users.forEach(u => { sets[u.uid] = { model: u.set.model || '', limit: Number.isInteger(u.set.limit) ? String(u.set.limit) : '' }; });
+    saved = snapshot();
+    $('gate').hidden = true; $('body').hidden = false;
+    draw();
+  }
+
+  function draw() {
+    $('t-chat').textContent = data.today.chat; $('t-menu').textContent = data.today.menu;
+    $('t-users').textContent = data.users.filter(u => u.today.chat + u.today.menu > 0).length;
+    // 오늘 대략 금액 (사람마다 모델이 달라서 모델별로 셈)
+    let won = 0; data.users.forEach(u => { const m = (sets[u.uid] && sets[u.uid].model) || def; won += (u.today.chat + u.today.menu) * ((INFO[m] || INFO['claude-haiku-4-5'])[3]); });
+    $('t-cost').textContent = '오늘 대략 ' + won.toLocaleString('ko-KR') + '원 쓴 것으로 보여요 (어림값).';
+    $('d-chat').textContent = data.limits.chat;
+    $('models').replaceChildren(...data.models.map(m => {
+      const [tag, name, desc] = INFO[m] || ['', m, ''];
+      return h('label', { class: 'model' },
+        h('input', { type: 'radio', name: 'def', value: m, checked: m === def, onchange: () => { def = m; markDirty(); draw(); } }),
+        h('span', {}, h('b', {}, name), ' ', h('span', { class: 'badge' }, tag), h('span', { class: 'small muted' }, desc)));
+    }));
+    $('u-count').textContent = data.users.length + '명';
+    $('users').replaceChildren(...(data.users.length ? data.users.map(u => {
+      const st = sets[u.uid];
+      const sel = h('select', { 'aria-label': (u.name || u.email) + ' AI 모델', onchange: e => { st.model = e.target.value; markDirty(); draw(); } },
+        h('option', { value: '', selected: !st.model }, '기본 따름 (' + ((INFO[def] || [])[0] || '') + ')'),
+        data.models.map(m => h('option', { value: m, selected: st.model === m }, (INFO[m] || [])[0] + ' — ' + ((INFO[m] || [])[1] || m))));
+      const lim = h('input', { type: 'number', min: '0', max: '500', inputmode: 'numeric', placeholder: '기본 ' + data.limits.chat, value: st.limit, 'aria-label': (u.name || u.email) + ' 하루 한도',
+        oninput: e => { st.limit = e.target.value.trim(); markDirty(); } });
+      return h('li', {},
+        h('div', { class: 'who' }, h('b', {}, u.name || '(이름 없음)'), u.uid === data.me ? h('span', { class: 'me-tag' }, '나') : null, st.limit === '0' ? h('span', { class: 'off-tag' }, '사용 금지') : null,
+          h('div', { class: 'tiny muted' }, (u.email || '이메일 없음') + ' · 오늘 AI 비서 ' + u.today.chat + '번 · 메뉴 ' + u.today.menu + '번 · 마지막 사용 ' + (u.last || '-'))),
+        h('div', { class: 'ctl' }, sel, lim));
+    }) : [h('li', { class: 'muted' }, '아직 AI를 쓴 사람이 없어요.')]));
+  }
+
+  $('save').onclick = async () => {
+    const users = {};
+    Object.entries(sets).forEach(([uid, v]) => {
+      const o = {}; if (v.model) o.model = v.model;
+      if (v.limit !== '') { const n = Number(v.limit); if (!Number.isInteger(n) || n < 0 || n > 500) return; o.limit = n; }
+      if (Object.keys(o).length) users[uid] = o;
+    });
+    $('save').disabled = true;
+    try { await Life.api('admin/config', { body: { defaultModel: def, users } }); saved = snapshot(); markDirty(); toast('저장했어요. 바로 적용돼요.'); }
+    catch (e) { toast(e.message || '저장하지 못했어요.'); $('save').disabled = false; }
+  };
+  $('reload').onclick = () => { if (snapshot() !== saved) toast('저장하지 않은 변경은 사라졌어요'); load(); };
+  Life.onUser(() => load());
+})();
+</script>
+</body>
+</html>

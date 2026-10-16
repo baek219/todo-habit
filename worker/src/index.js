@@ -12,6 +12,7 @@
  *
  * Cloudflare에 넣어야 하는 설정 (설정 안내서 참고)
  *  비밀값(Secret): ANTHROPIC_API_KEY, KAKAO_REST_KEY, GOOGLE_PLACES_KEY
+ *  관리자: ADMIN_EMAILS (관리자 구글 이메일, 여러 명이면 쉼표로) → 생활노트 '관리자' 화면에서 AI 모델·사람별 한도를 바꿀 수 있어요
  *  변수(Variable): FIREBASE_PROJECT_ID (기본 checklist-3164e), ALLOWED_ORIGIN (기본 https://baek219.github.io)
  *                  CHAT_MODEL / MENU_MODEL (기본 claude-haiku-4-5: 가장 저렴. 더 똑똑하게 하려면 claude-sonnet-5 또는 claude-opus-5),
  *                  각 기능 하루 제한 LIMIT_MENU / LIMIT_PLACES / LIMIT_GOOGLE / LIMIT_LOTTO / LIMIT_CHAT, 전체 합계 TOTAL_CHAT 등
@@ -58,8 +59,38 @@ async function verifyUser(req, env) {
     const provider = payload.firebase && payload.firebase.sign_in_provider;
     if (provider !== 'google.com') return null;
     if (env.ALLOWED_UIDS && !env.ALLOWED_UIDS.split(',').map(x => x.trim()).includes(payload.sub)) return null;
-    return payload.sub ? { uid: payload.sub } : null;
+    if (!payload.sub) return null;
+    const email = payload.email_verified ? String(payload.email || '').toLowerCase() : '';
+    const admins = String(env.ADMIN_EMAILS || '').toLowerCase().split(',').map(x => x.trim()).filter(Boolean);
+    return { uid: payload.sub, email, name: String(payload.name || ''), admin: !!email && admins.includes(email) };
   } catch (e) { return null; }
+}
+
+/* ---------- 관리자 설정 (KV 'cfg:ai') ----------
+ * { defaultModel: 'claude-haiku-4-5', users: { uid: { model: '...', limit: 숫자 } } }
+ * 모델: 사람별 지정 → 관리자 기본값 → Cloudflare 변수(CHAT_MODEL/MENU_MODEL) → Haiku
+ */
+const MODELS = ['claude-haiku-4-5', 'claude-sonnet-5', 'claude-opus-5'];
+let cfgCache = null, cfgAt = 0;
+async function aiCfg(env) {
+  if (cfgCache && Date.now() - cfgAt < 30000) return cfgCache;
+  let c = null; try { c = env.LIFE_KV ? await env.LIFE_KV.get('cfg:ai', 'json') : null; } catch (e) {}
+  cfgCache = c && typeof c === 'object' ? c : { users: {} }; cfgAt = Date.now();
+  if (!cfgCache.users) cfgCache.users = {};
+  return cfgCache;
+}
+async function modelFor(env, user, kind) {
+  const c = await aiCfg(env), u = c.users[user.uid] || {};
+  return (MODELS.includes(u.model) && u.model) || (MODELS.includes(c.defaultModel) && c.defaultModel) || (kind === 'menu' ? env.MENU_MODEL : env.CHAT_MODEL) || CHEAP_MODEL;
+}
+// AI를 쓴 사람 기록 (관리자 화면용, 하루 한 번만 씀)
+async function trackUser(env, user) {
+  if (!env.LIFE_KV) return;
+  try {
+    const k = 'u:' + user.uid, d = kstDate(), cur = await env.LIFE_KV.get(k, 'json');
+    if (cur && cur.last === d && cur.email === user.email) return;
+    await env.LIFE_KV.put(k, JSON.stringify({ email: user.email, name: user.name, first: (cur && cur.first) || d, last: d }));
+  } catch (e) {}
 }
 
 /* ---------- 하루 사용량 제한 ---------- */
@@ -71,7 +102,12 @@ function limitFor(env, kind) {
 // 남은 횟수가 있으면 1 깎고 남은 수를 돌려줌, 없으면 -1
 async function useQuota(env, kind, uid) {
   if (!env.LIFE_KV) return { ok: false, setup: true };
-  const limit = limitFor(env, kind);
+  let limit = limitFor(env, kind);
+  if (kind === 'chat' || kind === 'menu') { // 관리자가 사람별로 정한 하루 한도 (0이면 사용 금지)
+    const u = (await aiCfg(env)).users[uid];
+    if (u && Number.isInteger(u.limit) && u.limit >= 0) limit = u.limit;
+    if (limit === 0) return { ok: false, remaining: 0, limit: 0, blocked: true };
+  }
   // 전체 합계 먼저 확인
   const tv = parseInt(env['TOTAL_' + kind.toUpperCase()], 10), total = Number.isFinite(tv) && tv >= 0 ? tv : DEFAULT_TOTAL[kind];
   const tkey = 'rl:' + kind + ':ALL:' + kstDate();
@@ -86,6 +122,7 @@ async function useQuota(env, kind, uid) {
 }
 function quotaFail(req, env, q, what) {
   if (q.setup) return fail(req, env, 503, 'server_setup', '서버에 KV 저장소(LIFE_KV)가 연결되지 않았어요.');
+  if (q.blocked) return fail(req, env, 403, 'blocked', '관리자가 이 계정의 ' + what + ' 사용을 막아 두었어요.');
   if (q.all) return fail(req, env, 429, 'daily_limit', '오늘은 ' + what + '을(를) 쓰는 사람이 많아서 하루 한도에 닿았어요. 내일 다시 써 주세요.');
   return fail(req, env, 429, 'daily_limit', '오늘 ' + what + ' 사용 횟수(' + q.limit + '번)를 다 썼어요. 내일 다시 써 주세요.');
 }
@@ -145,7 +182,7 @@ async function handleMenu(req, env, user) {
   ].join('\n');
 
   const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
-  const model = env.MENU_MODEL || CHEAP_MODEL;
+  const model = await modelFor(env, user, 'menu'); await trackUser(env, user);
   const params = {
     model,
     max_tokens: 4000,
@@ -311,7 +348,7 @@ async function handleChat(req, env, user) {
   messages.push({ role: 'user', content: ctx + '\n\n사용자가 방금 한 말:\n' + text });
 
   const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
-  const model = env.CHAT_MODEL || CHEAP_MODEL;
+  const model = await modelFor(env, user, 'chat'); await trackUser(env, user);
   const params = {
     model,
     max_tokens: 4000,
@@ -527,6 +564,49 @@ async function handleLotto(req, env, user) {
   return json(req, env, { last: st.last, counts: st.counts, recent: st.recent, complete: freshEnough || done, blocked, remaining: q.remaining });
 }
 
+/* ---------- 관리자 ---------- */
+async function handleAdminUsers(req, env, user) {
+  if (!env.LIFE_KV) return fail(req, env, 503, 'server_setup', '서버에 KV 저장소(LIFE_KV)가 연결되지 않았어요.');
+  const c = await aiCfg(env), d = kstDate(), users = [];
+  let cursor;
+  do { // AI를 한 번이라도 쓴 사람 (최대 500명)
+    const r = await env.LIFE_KV.list({ prefix: 'u:', cursor, limit: 1000 });
+    for (const k of r.keys) {
+      const uid = k.name.slice(2), info = (await env.LIFE_KV.get(k.name, 'json')) || {};
+      const [chat, menu] = await Promise.all(['chat', 'menu'].map(kind => env.LIFE_KV.get('rl:' + kind + ':' + uid + ':' + d)));
+      users.push({ uid, email: info.email || '', name: info.name || '', first: info.first || '', last: info.last || '',
+        today: { chat: parseInt(chat, 10) || 0, menu: parseInt(menu, 10) || 0 }, set: c.users[uid] || {} });
+      if (users.length >= 500) break;
+    }
+    cursor = r.list_complete || users.length >= 500 ? null : r.cursor;
+  } while (cursor);
+  users.sort((a, b) => (b.last || '').localeCompare(a.last || '') || (b.today.chat + b.today.menu) - (a.today.chat + a.today.menu));
+  const [tc, tm] = await Promise.all(['chat', 'menu'].map(kind => env.LIFE_KV.get('rl:' + kind + ':ALL:' + d)));
+  return json(req, env, {
+    me: user.uid, models: MODELS, defaultModel: (MODELS.includes(c.defaultModel) && c.defaultModel) || env.CHAT_MODEL || CHEAP_MODEL,
+    defaultFromServer: env.CHAT_MODEL || CHEAP_MODEL, limits: { chat: limitFor(env, 'chat'), menu: limitFor(env, 'menu') },
+    today: { chat: parseInt(tc, 10) || 0, menu: parseInt(tm, 10) || 0 }, users
+  });
+}
+async function handleAdminConfig(req, env, user) {
+  if (!env.LIFE_KV) return fail(req, env, 503, 'server_setup', '서버에 KV 저장소(LIFE_KV)가 연결되지 않았어요.');
+  let b; try { b = await req.json(); } catch (e) { return fail(req, env, 400, 'bad_request', '요청 형식이 잘못됐어요.'); }
+  const out = { users: {} };
+  if (b.defaultModel && MODELS.includes(b.defaultModel)) out.defaultModel = b.defaultModel;
+  Object.entries(b.users && typeof b.users === 'object' ? b.users : {}).slice(0, 500).forEach(([uid, v]) => {
+    if (!/^[A-Za-z0-9]{6,128}$/.test(uid) || !v || typeof v !== 'object') return;
+    const o = {};
+    if (MODELS.includes(v.model)) o.model = v.model;
+    const lim = Number(v.limit);
+    if (v.limit !== null && v.limit !== '' && v.limit !== undefined && Number.isInteger(lim) && lim >= 0 && lim <= 500) o.limit = lim;
+    if (Object.keys(o).length) out.users[uid] = o;
+  });
+  out.updatedAt = Date.now(); out.updatedBy = user.email;
+  await env.LIFE_KV.put('cfg:ai', JSON.stringify(out));
+  cfgCache = out; cfgAt = Date.now();
+  return json(req, env, { ok: true, saved: out });
+}
+
 /* ---------- 입구 ---------- */
 export default {
   async fetch(req, env) {
@@ -538,6 +618,12 @@ export default {
     try {
       if (url.pathname === '/menu' && req.method === 'POST') return await handleMenu(req, env, user);
       if (url.pathname === '/chat' && req.method === 'POST') return await handleChat(req, env, user);
+      if (url.pathname === '/me' && req.method === 'GET') return json(req, env, { uid: user.uid, email: user.email, admin: user.admin });
+      if (url.pathname.startsWith('/admin/')) {
+        if (!user.admin) return fail(req, env, 403, 'not_admin', '관리자만 쓸 수 있어요.');
+        if (url.pathname === '/admin/users' && req.method === 'GET') return await handleAdminUsers(req, env, user);
+        if (url.pathname === '/admin/config' && req.method === 'POST') return await handleAdminConfig(req, env, user);
+      }
       if (url.pathname === '/places' && req.method === 'GET') return await handlePlaces(req, env, user, url);
       if (url.pathname === '/place' && req.method === 'GET') return await handlePlace(req, env, user, url);
       if (url.pathname === '/lotto/stats' && req.method === 'GET') return await handleLotto(req, env, user);

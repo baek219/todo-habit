@@ -32,6 +32,11 @@
     <p class="small muted">왼쪽 메뉴 아래의 버튼으로도 바꿀 수 있어요. 할일·습관 화면도 같이 바뀌어요.</p>
   </section>
 
+  <section class="card" id="admin-card" hidden>
+    <div class="card-head"><h2>관리자</h2><span class="badge go">관리자 계정</span></div>
+    <p class="small muted">AI 모델을 바꾸고, 사람별로 AI 사용 한도를 정하거나 막을 수 있어요.</p>
+    <div class="row"><a class="btn primary" href="admin.html">관리자 화면 열기</a></div>
+  </section>
   <section class="card" id="noti-card">
     <div class="card-head"><h2>알림</h2><span class="badge" id="noti-state">꺼짐</span></div>
     <p class="small muted">기념일·연락할 날·집안일·유통기한·반려동물 일정이 있는 날, 정한 시간에 폰 알림으로 알려줘요.</p>
@@ -196,6 +201,13 @@
       : '지금은 로그인하지 않아서 이 브라우저에만 저장돼요. 브라우저 기록을 지우면 사라질 수 있으니, Google로 로그인하거나 위에서 백업 파일을 받아 두세요.';
   }
   Life.onUser(drawWhere);
+  // 관리자 계정이면 관리자 화면 입구를 보여줌 (서버가 확인)
+  let adminChecked = '';
+  Life.onUser(u => {
+    if (!u || !Life.hasServer() || adminChecked === u.uid) { if (!u) document.getElementById('admin-card').hidden = true; return; }
+    adminChecked = u.uid;
+    Life.api('me').then(r => { document.getElementById('admin-card').hidden = !(r && r.admin); }).catch(() => {});
+  });
 })();
 </script>
 </body>
