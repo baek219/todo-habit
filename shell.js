@@ -31,6 +31,7 @@
     phone: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2"/>',
     box: '<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>',
     run: '<circle cx="14" cy="4.5" r="1.8"/><path d="M8 21l3-6 3 3v4M6 12l3-4 4 1 2 3h3M11 15l-2-2"/>',
+    chat: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8.5 10.5h.01M12 10.5h.01M15.5 10.5h.01" stroke-width="2.6"/>',
     more: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
     help: '<circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 014.8.9c0 1.7-2.4 2.2-2.4 3.6"/><circle cx="12" cy="17" r=".6" fill="currentColor"/>',
     x: '<path d="M6 6l12 12M18 6L6 18"/>',
@@ -43,7 +44,7 @@
   const svg = (k) => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICON[k] + '</svg>';
 
   const GROUPS = [
-    { sec: 'home', items: [{ href: 'home.html', label: '홈', icon: 'home' }, { href: 'weather.html', label: '날씨', icon: 'sun' }] },
+    { sec: 'home', items: [{ href: 'home.html', label: '홈', icon: 'home' }, { href: 'weather.html', label: '날씨', icon: 'sun' }, { href: 'chat.html', label: 'AI 비서', icon: 'chat' }] },
     { title: '기록', sec: 'rec', items: [
       { href: 'index.html', label: '할일·습관', icon: 'check' },
       { href: 'money.html', label: '가계부', icon: 'won' },
@@ -235,6 +236,14 @@
       '<b>+ 소모품</b>에 사료·모래를 산 날과 며칠 가는지 넣으면, 떨어질 날짜를 미리 알려줘요.',
       '새로 사면 <b>새로 샀어요</b>를 눌러요. 누를수록 실제 간격에 맞춰 날짜가 정확해져요.'
     ], tips: ['<b>장보기에 담기</b>를 누르면 장보기 목록에 바로 들어가요.'] },
+    'chat.html': { title: 'AI 비서 사용법', sub: '말하듯 적으면 할 일·가계부·장보기에 대신 적어줘요.', steps: [
+      '아래 칸에 평소 말하듯 적고 <b>보내기</b>를 눌러요. (로그인 필요, 하루 40번)',
+      '<b>할 일</b>: "내일 오후 3시 치과" → 할일·습관에 날짜·시간과 함께 들어가요.',
+      '<b>가계부</b>: "점심 김치찌개 9천원" → 분류(식비 등)를 알아서 골라 지출로 적어요. "월급 들어옴 300만원"은 수입으로 적어요.',
+      '<b>장보기</b>: "우유랑 계란 사야 돼" → 장보기 목록에 하나씩 담겨요.',
+      '"이번 달 얼마 썼어?", "장볼 거 뭐 있어?"처럼 물어보면 지금 기록을 보고 답해요.',
+      '잘못 적혔으면 답 아래 <b>되돌리기</b>를 눌러요. 적은 것만 지워져요.'
+    ], tips: ['폰에서는 🎤 버튼으로 말로 입력할 수 있어요.', '대화 내용은 이 기기에만 남고, 적힌 기록은 다른 기기와 똑같이 맞춰져요.'] },
     'menu.html': { title: '메뉴 추천 사용법', sub: '오늘 뭐 먹을지 3가지를 골라줘요.', steps: [
       '끼니·누구랑·기분을 골라요. 날씨는 오늘 날씨로 자동 선택돼요.',
       '<b>AI에게 추천받기</b>: 조건에 맞춰 AI가 골라줘요. (로그인 필요, 하루 10번)',
