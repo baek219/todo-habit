@@ -57,7 +57,7 @@
   <header class="page-head">
     <span class="date" id="today"></span>
     <h1>AI 비서</h1>
-    <p>말하듯 적으면 할 일·가계부·장보기에 대신 적어 드려요.</p>
+    <p>말하듯 적으면 할 일·가계부·장보기에 대신 적어 드려요. 날씨와 옷차림도 물어보세요.</p>
   </header>
 
   <div class="note" id="gate" hidden></div>
@@ -134,6 +134,25 @@
     };
   }
 
+  /* ---------- 날씨 (날씨·옷 이야기일 때만 붙여 보냄) ---------- */
+  const WX_WORDS = /날씨|기온|온도|옷|입[고을지어는]|우산|비 ?[와오올온]|비가|눈 ?[와오올온]|추[워운울]|춥|더[워운울]|덥|쌀쌀|미세|먼지|바람|맑|흐[려림]|소나기|장마|태풍|외투|패딩|코트|반팔|반바지/;
+  async function weatherLines() {
+    const places = Life.weatherPlaces().slice(0, 4), out = [];
+    for (const p of places) {
+      try {
+        const w = await Life.weather(false, p);
+        const o = Life.outfit ? Life.outfit(w) : null;
+        const t = w.days[1];
+        const tw = t && Life.outfit ? Life.outfit({ feels: Math.round((t.max + t.min) / 2), max: t.max, min: t.min, rain: t.rain, code: 0, wind: 0, humidity: 0 }) : null;
+        out.push(p.name + (out.length ? '' : '(기본 지역)') + ' 지금: ' + w.label + ' ' + w.temp + '° (체감 ' + w.feels + '°), 오늘 최고 ' + w.max + '° 최저 ' + w.min + '°, 비 올 확률 ' + w.rain + '%, 습도 ' + w.humidity + '%, 바람 ' + w.wind + 'm/s'
+          + (w.pm10 != null ? ', 미세먼지 ' + (Life.pmGrade(w.pm10, 'pm10') || [''])[0] : '') + (w.pm25 != null ? ', 초미세먼지 ' + (Life.pmGrade(w.pm25, 'pm25') || [''])[0] : '')
+          + (o ? ' / 오늘 옷 추천: ' + o.items.join(', ') + (o.tips.length ? ' / 챙길 것: ' + o.tips.map(x => x.replace(/^\S+\s/, '')).join(' ') : '') : ''));
+        if (t) out.push(p.name + ' 내일: ' + t.label + ' 최고 ' + t.max + '° 최저 ' + t.min + '°, 비 올 확률 ' + t.rain + '%' + (tw ? ' / 내일 옷 추천: ' + tw.items.join(', ') : ''));
+      } catch (e) {}
+    }
+    return out;
+  }
+
   /* ---------- AI가 정한 것을 실제로 적기 ---------- */
   function apply(a) {
     const t = today();
@@ -197,7 +216,7 @@
     if (log.length || waiting) requestAnimationFrame(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }));
   }
 
-  const EX = ['점심 김치찌개 9천원', '내일 오후 3시 치과 예약', '우유랑 계란 2판 장보기에 넣어줘', '이번 달 얼마 썼어?', '이번 주 남은 할 일 알려줘'];
+  const EX = ['오늘 날씨 어때? 뭐 입을까?', '점심 김치찌개 9천원', '내일 오후 3시 치과 예약', '우유랑 계란 2판 장보기에 넣어줘', '이번 달 얼마 썼어?'];
   $('examples').replaceChildren(...EX.map(t => h('button', { class: 'chip', type: 'button', onclick: () => send(t) }, t)));
 
   /* ---------- 로그인·서버 확인 ---------- */
@@ -224,7 +243,9 @@
     log.push({ role: 'user', text, at: Date.now() }); saveLog();
     $('input').value = ''; grow(); render(true);
     try {
-      const r = await Life.api('chat', { body: { message: text, history, context: context() } });
+      const ctx = context();
+      if (WX_WORDS.test(text)) ctx.weather = await weatherLines();
+      const r = await Life.api('chat', { body: { message: text, history, context: ctx } });
       const results = (r.actions || []).map(a => { try { return apply(a); } catch (e) { console.error(e); return null; } }).filter(Boolean);
       log.push({ role: 'ai', text: r.reply || '적었어요.', results, at: Date.now() });
       if (r.limit != null) $('left').textContent = '오늘 ' + r.remaining + '번 더 쓸 수 있어요';

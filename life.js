@@ -456,6 +456,40 @@
     try { const r = await api('geo/reverse', { query: { x: lon, y: lat } }); return r.found ? { name: r.name, sub: r.sub } : null; } catch (e) { return null; }
   }
 
+  /* ---------- 오늘 옷차림 (날씨·홈 공용) ----------
+   * 체감온도 기준 8단계 + 일교차·비·바람·미세먼지·자외선 팁. 열쇠·AI 없이 계산만 해요.
+   */
+  const OUTFIT = [
+    [28, '🩳', '무더워요', ['민소매', '반팔', '반바지', '린넨 옷', '원피스']],
+    [23, '👕', '더워요', ['반팔', '얇은 셔츠', '반바지', '면바지']],
+    [20, '👔', '살짝 따뜻해요', ['얇은 긴팔', '얇은 가디건', '면바지', '청바지']],
+    [17, '🧶', '선선해요', ['맨투맨', '얇은 니트', '가디건', '청바지']],
+    [12, '🧥', '쌀쌀해요', ['자켓', '가디건', '야상', '니트', '청바지']],
+    [9, '🧥', '꽤 추워요', ['트렌치코트', '자켓', '니트', '기모 바지']],
+    [5, '🧣', '추워요', ['코트', '가죽 자켓', '히트텍', '니트', '기모 바지']],
+    [-99, '🥶', '아주 추워요', ['패딩', '두꺼운 코트', '목도리', '장갑', '히트텍', '기모 제품']]
+  ];
+  const outfitStep = t => OUTFIT.find(o => t >= o[0]);
+  function outfit(w) {
+    if (!w) return null;
+    const base = w.feels, step = outfitStep(base), tips = [];
+    // 일교차: 지금보다 많이 춥거나 더워지는 때
+    if (w.max - base >= 6 && outfitStep(w.max) !== step) tips.push('☀️ 낮엔 ' + w.max + '°까지 올라가요. 벗기 쉬운 겉옷이 좋아요.');
+    if (base - w.min >= 6 || w.max - w.min >= 10) {
+      const cold = outfitStep(w.min);
+      tips.push('🌙 아침·저녁엔 ' + w.min + '°까지 내려가요' + (cold !== step ? '. ' + cold[3].slice(0, 2).join(', ') + ' 같은 걸 하나 챙기세요.' : '. 일교차가 커요.'));
+    }
+    if (w.wet || w.rain >= 60) tips.push('☔ 비가 와요(올 확률 ' + w.rain + '%). 우산 꼭 챙기세요.');
+    else if (w.rain >= 30) tips.push('🌂 비 올 수도 있어요(' + w.rain + '%). 접는 우산 하나 챙기세요.');
+    if (w.code >= 71 && w.code <= 86) tips.push('❄️ 눈 소식이 있어요. 미끄럽지 않은 신발이 좋아요.');
+    if (w.wind >= 7) tips.push('💨 바람이 강해요(' + w.wind + 'm/s). ' + (base <= 8 ? '목도리·모자로 바람을 막으세요.' : '바람막이가 있으면 좋아요.'));
+    const g = pmGrade(w.pm25, 'pm25'), g2 = pmGrade(w.pm10, 'pm10');
+    if ((g && /나쁨/.test(g[0])) || (g2 && /나쁨/.test(g2[0]))) tips.push('😷 미세먼지가 나빠요. 마스크를 챙기세요.');
+    if (w.max >= 27 && w.code <= 2) tips.push('🧴 햇볕이 강해요. 모자·선크림 챙기세요.');
+    if (base >= 25 && w.humidity >= 75) tips.push('💦 습해요. 통풍 잘 되는 옷이 좋아요.');
+    return { icon: step[1], feel: step[2], items: step[3], base, tips };
+  }
+
   /* ---------- 기념일: 다음에 돌아오는 날 (홈·기념일 페이지 공용) ---------- */
   function ddayNext(x) {
     const t = today(), [oy, om, od] = String(x.date).split('-').map(Number), ty = Number(t.slice(0, 4));
@@ -565,7 +599,7 @@
 
   window.Life = {
     h, iso, today, won, newId, daysBetween, prettyDate, WD, toast, sheet, choice, usedValues, pager, daysChoice, everyText,
-    store, api, hasServer, group, weather, wxStamp, weatherChip, weatherPlaces, setWeatherPlaces, pmGrade, searchPlace, reversePlace,
+    store, api, hasServer, group, weather, wxStamp, weatherChip, outfit, weatherPlaces, setWeatherPlaces, pmGrade, searchPlace, reversePlace,
     isDark, setDark, ensureFixed,
     canInstall: () => !!installEvt, install, standalone, ddayNext,
     onUser(fn) { userSubs.add(fn); try { fn(window.CloudSync && window.CloudSync.user); } catch (e) {} return () => userSubs.delete(fn); },

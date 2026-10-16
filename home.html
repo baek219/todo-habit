@@ -222,6 +222,7 @@
         h('div', { class: 'wx-now' }, h('span', { class: 'ic', 'aria-hidden': 'true' }, w.icon), h('div', {}, h('b', {}, w.temp + '°'), h('div', { class: 'small muted' }, w.label + ' · 체감 ' + w.feels + '°'))),
         h('span', { class: 'small' }, '최고 ' + w.max + '° · 최저 ' + w.min + '° · 비 올 확률 ' + w.rain + '%'),
         (() => { const g = Life.pmGrade(w.pm10, 'pm10'), g2 = Life.pmGrade(w.pm25, 'pm25'); return g || g2 ? h('div', { class: 'row', style: 'gap:6px' }, g ? h('span', { class: 'badge ' + g[1] }, '미세먼지 ' + g[0]) : null, g2 ? h('span', { class: 'badge ' + g2[1] }, '초미세 ' + g2[0]) : null) : ''; })(),
+        (() => { const o = Life.outfit(w); return o ? h('span', { class: 'small' }, o.icon + ' ' + o.items.slice(0, 3).join(' · ') + (o.tips.some(t => t.startsWith('☔') || t.startsWith('🌂')) ? ' · 우산' : '')) : ''; })(),
         h('span', { class: 'tiny muted', id: 'wx-stamp' }, w.place + ' · ' + Life.wxStamp(w)));
       lastWx = w;
     } catch (e) { box.replaceChildren(h('span', { class: 'small muted' }, '날씨를 불러오지 못했어요. 잠시 뒤 다시 열어 주세요.')); }

@@ -35,6 +35,12 @@
   details[open] summary{margin-bottom:10px}
   .results{display:grid;gap:6px}
   .results button{justify-content:flex-start;text-align:left}
+  .wear{background:var(--surface2);border-radius:14px;padding:12px 14px;display:grid;gap:8px}
+  .wear .top{display:flex;align-items:center;gap:8px;font-weight:750}
+  .wear .top .e{font-size:22px;line-height:1}
+  .wear .items{display:flex;flex-wrap:wrap;gap:6px}
+  .wear .items span{font-size:13px;font-weight:650;background:var(--surface);border-radius:999px;padding:3px 10px}
+  .wear ul{margin:0;padding:0;list-style:none;display:grid;gap:3px;font-size:13.5px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -114,6 +120,13 @@
     const name = list[i].name; list.splice(i, 1); Life.setWeatherPlaces(list); toast(name + ' 날씨를 뺐어요'); render();
   }
 
+  function wear(w) {
+    const o = Life.outfit(w); if (!o) return null;
+    return h('div', { class: 'wear', 'aria-label': '오늘 옷차림' },
+      h('div', { class: 'top' }, h('span', { class: 'e', 'aria-hidden': 'true' }, o.icon), '오늘 뭐 입지? ', h('span', { class: 'small muted', style: 'font-weight:600' }, o.feel + ' · 체감 ' + o.base + '°')),
+      h('div', { class: 'items' }, o.items.map(x => h('span', {}, x))),
+      o.tips.length ? h('ul', {}, o.tips.map(t => h('li', {}, t))) : null);
+  }
   function card(place, i, total, force) {
     const body = h('div', { class: 'stack', style: 'gap:12px' }, h('span', { class: 'small muted' }, '불러오는 중…'));
     const stamp = h('span', { class: 'tiny muted wx-stamp' }, '');
@@ -144,6 +157,7 @@
           h('span', { class: 'badge' }, '바람 ' + w.wind + 'm/s'),
           g10 ? h('span', { class: 'badge ' + g10[1] }, '미세먼지 ' + g10[0]) : null,
           g25 ? h('span', { class: 'badge ' + g25[1] }, '초미세 ' + g25[0]) : null),
+        wear(w),
         h('details', i === 0 ? { open: true } : {},
           h('summary', {}, '시간별·주간 예보'),
           h('div', { class: 'stack', style: 'gap:12px' },
