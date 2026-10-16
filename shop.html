@@ -16,6 +16,19 @@
   .qty{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px;white-space:nowrap}
   .who{font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px;background:var(--surface2);color:var(--muted)}
   .group-head{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.06em;padding:12px 2px 2px}
+  .cp{font:inherit;font-size:12.5px;font-weight:750;border:0;border-radius:10px;padding:6px 10px;cursor:pointer;white-space:nowrap;background:#FDECE6;color:#C1412A}
+  .cp:hover{filter:brightness(.97)}
+  html.ln-dark .cp{background:#3A1F18;color:#F08A6E}
+  .cp:focus-visible{outline:2px solid var(--sec);outline-offset:2px}
+  .nm{background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left}
+  .nm:hover b{text-decoration:underline;text-underline-offset:3px}
+  .mine{display:inline-block;margin-left:6px;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px;background:#FDECE6;color:#C1412A;vertical-align:1px}
+  html.ln-dark .mine{background:#3A1F18;color:#F08A6E}
+  .lp{font:inherit;font-size:12.5px;font-weight:750;border:0;border-radius:10px;padding:6px 10px;cursor:pointer;white-space:nowrap;background:#E3F6E8;color:#03873A}
+  html.ln-dark .lp{background:#123322;color:#3DD27A}
+  .lp:focus-visible{outline:2px solid var(--sec);outline-offset:2px}
+  .seq{display:grid;gap:10px;background:var(--surface2);border-radius:14px;padding:12px 14px}
+  .seq .now{font-size:15px}
   @media (max-width:420px){.add-row{grid-template-columns:1fr 70px auto}}
 </style>
 </head>
@@ -38,7 +51,9 @@
 
   <section class="card">
     <div class="card-head"><h2 id="left-title">살 것</h2>
-      <div class="row" style="gap:6px"><button class="btn sm soft" type="button" id="to-money" hidden>가계부에 적기</button><button class="btn sm ghost" type="button" id="clear">산 것 지우기</button></div></div>
+      <div class="row" style="gap:6px"><button class="btn sm soft" type="button" id="cp-all" hidden>쿠팡에서 차례로 열기</button><button class="btn sm soft" type="button" id="to-money" hidden>가계부에 적기</button><button class="btn sm ghost" type="button" id="clear">산 것 지우기</button></div></div>
+    <p class="tiny muted" id="cp-hint" hidden>💡 물건 <b>이름을 누르면</b> 늘 사는 쿠팡 상품을 정해 둘 수 있어요.</p>
+    <div class="seq" id="seq" hidden></div>
     <ul class="list shop" id="list"></ul>
   </section>
 </main>
@@ -118,6 +133,98 @@
     render();
   }
 
+  /* ---------- 쿠팡 ----------
+   * 내 상품 주소를 저장해 둔 물건 → 그 상품 페이지, 아니면 → 쿠팡 검색 결과.
+   * 폰에 쿠팡 앱이 있으면 보통 앱으로 열려요. 장바구니 담기·결제는 내가 직접 해요.
+   * 주소는 물건 이름별로 장보기 설정(meta.links)에 저장 → 다음에 같은 물건을 담아도 그대로 쓰고, 가족 공유도 같이 돼요.
+   */
+  const links = () => S.meta().links || {};
+  const cpUrl = name => links()[name] || 'https://www.coupang.com/np/search?q=' + encodeURIComponent(name);
+  function openCp(name) { window.open(cpUrl(name), '_blank', 'noopener'); }
+  function pickUrl(text) {
+    const m = String(text || '').match(/https?:\/\/[^\s"'<>]+/);
+    if (!m) return null;
+    try { const u = new URL(m[0]); return /(^|\.)coupang\.com$|(^|\.)coupa\.ng$/.test(u.hostname) ? u.href : ''; } catch (e) { return null; }
+  }
+  function setLink(name, url) {
+    const l = Object.assign({}, links());
+    if (url) l[name] = url; else delete l[name];
+    S.setMeta({ links: l });
+  }
+  function editLink(x) {
+    const cur = links()[x.name] || '';
+    const inp = h('textarea', { rows: '3', maxlength: '600', placeholder: '쿠팡 앱에서 공유 → 링크 복사 후 여기에 붙여넣기', style: 'width:100%;box-sizing:border-box;font:inherit;font-size:15px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);color:var(--fg);resize:vertical' }, cur);
+    const msg = h('p', { class: 'small', style: 'color:var(--danger)', hidden: true });
+    const close = sheet('"' + x.name + '" 쿠팡 상품 정하기', h('div', { class: 'stack' },
+      h('p', { class: 'small muted' }, '늘 사는 상품을 정해 두면, 다음부터 쿠팡 버튼을 눌렀을 때 검색 없이 그 상품이 바로 열려요.'),
+      h('ol', { class: 'small muted', style: 'margin:0;padding-left:20px;display:grid;gap:2px' },
+        h('li', {}, '아래 ', h('b', {}, '쿠팡에서 찾기'), '로 상품을 열어요.'),
+        h('li', {}, '상품 화면의 ', h('b', {}, '공유'), ' 버튼 → ', h('b', {}, '링크 복사'), '를 눌러요.'),
+        h('li', {}, '여기로 돌아와 칸을 꾹 눌러 ', h('b', {}, '붙여넣기'), ' → ', h('b', {}, '저장'), '.')),
+      inp, msg,
+      h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap' },
+        h('button', { class: 'btn primary', type: 'button', onclick: () => {
+          const v = inp.value.trim();
+          if (!v) { setLink(x.name, ''); close(); toast('저장한 상품을 지웠어요'); return; }
+          const u = pickUrl(v);
+          if (!u) { msg.hidden = false; msg.textContent = u === '' ? '쿠팡 주소가 아니에요. 쿠팡 상품의 링크를 붙여넣어 주세요.' : '주소를 찾지 못했어요. "링크 복사"한 내용을 그대로 붙여넣어 주세요.'; return; }
+          setLink(x.name, u); close(); toast('"' + x.name + '"은(는) 이제 이 상품으로 바로 열려요');
+        } }, '저장'),
+        h('button', { class: 'btn soft', type: 'button', onclick: () => window.open('https://www.coupang.com/np/search?q=' + encodeURIComponent(x.name), '_blank', 'noopener') }, '쿠팡에서 찾기'),
+        cur ? h('button', { class: 'btn ghost', type: 'button', onclick: () => { setLink(x.name, ''); close(); toast('저장한 상품을 지웠어요. 다시 검색으로 열려요'); } }, '정한 상품 지우기') : null)));
+  }
+
+  /* ---------- 쇼핑몰 비교: 각자 폰·PC에서 정렬된 검색 결과를 바로 열어요 (열쇠·비용 없음) ---------- */
+  function shopLinks(name) {
+    const q = encodeURIComponent(name);
+    return [
+      ['네이버 쇼핑', [
+        ['인기순', 'https://search.shopping.naver.com/search/all?sort=rel&query=' + q],
+        ['리뷰 많은순', 'https://search.shopping.naver.com/search/all?sort=review&query=' + q],
+        ['낮은 가격순', 'https://search.shopping.naver.com/search/all?sort=price_asc&query=' + q]]],
+      ['쿠팡', [
+        ['판매량순', 'https://www.coupang.com/np/search?sorter=saleCountDesc&q=' + q],
+        ['낮은 가격순', 'https://www.coupang.com/np/search?sorter=salePriceAsc&q=' + q]]],
+      ['다나와 (여러 쇼핑몰 모아보기)', [
+        ['인기순', 'https://search.danawa.com/dsearch.php?query=' + q]]]
+    ];
+  }
+  function compare(x) {
+    sheet('"' + x.name + '" 비교하기', h('div', { class: 'stack' },
+      h('p', { class: 'small muted' }, '보고 싶은 순서를 누르면 그 쇼핑몰 검색 결과가 바로 열려요. 앱이 깔려 있으면 앱으로 열려요.'),
+      shopLinks(x.name).map(([mall, list]) => h('div', { class: 'stack', style: 'gap:6px' },
+        h('span', { class: 'label' }, mall),
+        h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap' }, list.map(([label, url]) =>
+          h('a', { href: url, target: '_blank', rel: 'noopener', class: 'btn sm soft' }, label))))),
+      links()[x.name] ? h('div', { class: 'row' }, h('button', { class: 'btn sm', type: 'button', onclick: () => openCp(x.name) }, '정해 둔 내 상품 열기')) : null,
+      h('p', { class: 'tiny muted' }, '"서울우유 1L"처럼 브랜드·용량까지 적으면 더 딱 맞게 찾아요. 가격에는 배송비·할인이 빠져 있을 수 있어요.')));
+  }
+
+  // 쿠팡에서 차례로 열기: 한 번에 여러 창을 열면 폰이 막아서, 하나 열고 돌아오면 다음 것을 보여줘요
+  let seq = null; // { ids: [...], i }
+  $('cp-all').onclick = () => {
+    const ids = S.items().filter(x => !x.done).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).map(x => x.id);
+    if (!ids.length) return;
+    seq = { ids, i: 0 }; drawSeq();
+  };
+  function drawSeq() {
+    const box = $('seq');
+    if (seq) seq.ids = seq.ids.filter(id => { const x = S.get(id); return x && !x.done; }).concat([]);
+    if (!seq || seq.i >= seq.ids.length) {
+      if (seq) { toast('목록을 다 열어봤어요. 쿠팡 장바구니에서 결제하시면 돼요'); }
+      seq = null; box.hidden = true; box.replaceChildren(); return;
+    }
+    const x = S.get(seq.ids[seq.i]);
+    box.hidden = false;
+    box.replaceChildren(
+      h('div', { class: 'now' }, h('span', { class: 'tiny muted' }, (seq.i + 1) + ' / ' + seq.ids.length + '  '), h('b', {}, x.name), x.qty ? ' ' + x.qty : '', links()[x.name] ? h('span', { class: 'mine' }, '내 상품') : null),
+      h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap' },
+        h('button', { class: 'btn primary sm', type: 'button', onclick: () => { openCp(x.name); seq.i++; drawSeq(); } }, '쿠팡에서 열기'),
+        h('button', { class: 'btn sm soft', type: 'button', onclick: () => { seq.i++; drawSeq(); } }, '건너뛰기'),
+        h('button', { class: 'btn sm ghost', type: 'button', onclick: () => { seq = null; drawSeq(); } }, '그만')),
+      h('p', { class: 'tiny muted' }, '쿠팡에서 장바구니에 담고 이 화면으로 돌아오면 다음 물건이 보여요.'));
+  }
+
   function render() {
     const shared = S.isShared();
     $('sub').textContent = shared ? '가족과 같이 보는 목록이에요. 누가 담았는지도 표시돼요.' : '살 것을 적어두고, 마트에서 하나씩 체크하세요. 가족 공유를 켜면 같이 쓸 수 있어요.';
@@ -125,13 +232,19 @@
     const left = all.filter(x => !x.done).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     const done = all.filter(x => x.done).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
     $('left-title').textContent = '살 것 ' + left.length + '개';
+    $('cp-all').hidden = left.length < 2;
+    $('cp-hint').hidden = !left.length || left.some(x => links()[x.name]);
+    if (seq) drawSeq();
     const up = unpaid().length; $('to-money').hidden = !up; $('to-money').textContent = '가계부에 적기 (' + up + '개)';
     const me = Life.user() && Life.user().uid;
     const row = x => h('li', { class: x.done ? 'done' : '' },
       h('input', { type: 'checkbox', checked: !!x.done, 'aria-label': x.name + ' 샀어요', onchange: () => S.put(Object.assign({}, x, x.done ? { done: false, moneyed: null, price: null } : { done: true })) }),
-      h('div', { class: 'grow' }, h('b', {}, x.name), x.moneyed ? h('span', { class: 'tiny muted', style: 'margin-left:6px' }, x.price ? x.price.toLocaleString('ko-KR') + '원 · 가계부에 적음' : '가계부에 적음') : null),
+      h('div', { class: 'grow' }, x.done ? h('b', {}, x.name) : h('button', { class: 'nm', type: 'button', 'aria-label': x.name + ' 쿠팡 상품 정하기', onclick: () => editLink(x) }, h('b', {}, x.name)),
+        !x.done && links()[x.name] ? h('span', { class: 'mine' }, '내 상품') : null, x.moneyed ? h('span', { class: 'tiny muted', style: 'margin-left:6px' }, x.price ? x.price.toLocaleString('ko-KR') + '원 · 가계부에 적음' : '가계부에 적음') : null),
       x.qty ? h('span', { class: 'qty' }, x.qty) : null,
       shared && x.by && names[x.by] ? h('span', { class: 'who' }, x.by === me ? '나' : names[x.by]) : null,
+      x.done ? null : h('button', { class: 'lp', type: 'button', 'aria-label': x.name + ' 쇼핑몰 비교', onclick: () => compare(x) }, '비교'),
+      x.done ? null : h('button', { class: 'cp', type: 'button', 'aria-label': x.name + ' 쿠팡에서 열기', onclick: () => openCp(x.name) }, '쿠팡'),
       h('button', { class: 'icon-btn', type: 'button', 'aria-label': x.name + ' 지우기', onclick: () => S.remove(x.id) }, '✕'));
     const list = $('list'); list.replaceChildren();
     if (!all.length) list.append(h('li', { class: 'empty' }, '위 칸에 살 것을 적고 "담기"를 눌러 보세요.'));
