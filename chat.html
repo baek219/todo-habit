@@ -57,7 +57,7 @@
   <header class="page-head">
     <span class="date" id="today"></span>
     <h1>AI 비서</h1>
-    <p>말하듯 적으면 할 일·가계부·장보기에 대신 적어 드려요. 날씨와 옷차림도 물어보세요.</p>
+    <p>말하듯 적으면 할 일·가계부·장보기부터 습관·집안일·냉장고·물건 위치·기념일·경조사·운동·반려동물·연락·메모까지 대신 적어 드려요. 날씨와 옷차림도 물어보세요.</p>
   </header>
 
   <div class="note" id="gate" hidden></div>
@@ -92,6 +92,18 @@
   const { h, today, won, prettyDate, toast, WD } = Life;
   const $ = id => document.getElementById(id);
   const M = Life.store('money'), S = Life.store('shop');
+  const FR = Life.store('fridge'), CH = Life.store('chores'), TH = Life.store('things'), DD = Life.store('dday'), GI = Life.store('gifts'),
+    WO = Life.store('workout'), PETS = Life.store('pets'), PL = Life.store('petlog'), CO = Life.store('contacts');
+  const NOTES_KEY = 'notes_v1';
+  const norm = v => String(v || '').replace(/\s+/g, '').toLowerCase();
+  // 이름 찾기: 똑같은 것 → 없으면 한쪽이 다른 쪽을 포함하는 것 (하나만 있을 때)
+  function findByName(list, name, key) {
+    const n = norm(name); if (!n) return null;
+    const same = list.find(x => norm(x[key]) === n); if (same) return same;
+    const part = list.filter(x => norm(x[key]) && (norm(x[key]).includes(n) || n.includes(norm(x[key]))));
+    return part.length === 1 ? part[0] : null;
+  }
+  const addDays = (d, n) => { const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() + n); return Life.iso(x); };
   const OUT_CATS = ['식비', '카페·간식', '장보기', '교통', '생활·주거', '쇼핑', '의료·건강', '반려동물', '문화·여가', '경조사', '기타'];
   const IN_CATS = ['월급', '용돈·부수입', '환급·기타'];
   const TASKS_KEY = 'todo_habit_tasks_v3';
@@ -112,7 +124,7 @@
   }
 
   /* ---------- AI에게 보낼 '지금 기록' 요약 ---------- */
-  function context() {
+  function context(message) {
     const t = today(), ym = t.slice(0, 7), now = new Date();
     const money = M.items().filter(x => x.kind === 'out' || x.kind === 'in');
     const month = money.filter(x => (x.date || '').slice(0, 7) === ym);
@@ -126,7 +138,32 @@
       .sort((a, b) => (a.dueDate || '9').localeCompare(b.dueDate || '9'))
       .slice(0, 20).map(x => (x.dueDate || '날짜 없음') + (x.time ? ' ' + x.time : '') + ' ' + x.title + (x.important ? ' (중요)' : ''));
     const budget = Number(M.meta().budget) || 0;
+    // 오늘 습관
+    const allTasks = readTasks(), monIdx = (now.getDay() + 6) % 7, dom = now.getDate();
+    const habits = allTasks.filter(x => x.type === 'habit' && !(x.startDate && t < x.startDate) && (x.frequency === 'daily' || (x.frequency === 'monthly' ? (x.monthDay || 1) === dom : (x.repeatDays || []).includes(monIdx))))
+      .map(x => { const tg = Math.max(1, parseInt(x.target, 10) || 1), c = tg > 1 ? ((x.counts || {})[t] || 0) : ((x.completedDates || []).includes(t) ? 1 : 0); return x.title + ' — ' + (c >= tg ? '오늘 완료' : '아직') + (tg > 1 ? ' (' + c + '/' + tg + ')' : ''); });
+    // 집안일 (다음 할 날)
+    const choreDue = x => { let d = x.start || t; if (x.last) { d = addDays(x.last, Number(x.every || 7)); if (x.start && x.start > d) d = x.start; } return d; };
+    const chores = CH.items().map(x => [choreDue(x), x]).sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([d, x]) => x.name + ' — 다음 ' + d + (d < t ? ' (밀림)' : '') + (x.last ? ', 마지막 ' + x.last : ''));
+    const fridge = FR.items().sort((a, b) => (a.exp || '9').localeCompare(b.exp || '9')).map(x => x.name + (x.qty ? ' ' + x.qty : '') + ' (' + (x.zone || '냉장') + (x.exp ? ', 기한 ' + x.exp : '') + ')');
+    const things = TH.items().map(x => x.name + ' → ' + (x.where || '?'));
+    const ddays = (Life.ddayNext ? DD.items().map(x => [Life.ddayNext(x), x]).filter(([n]) => n.n >= 0 && n.n < 400).sort((a, b) => a[0].n - b[0].n) : [])
+      .map(([n, x]) => x.title + ' (' + (x.label || '기념일') + ') ' + n.date + ' D-' + n.n + (n.milestone ? ' ' + n.milestone : '') + (n.years ? ' ' + n.years + '주년' : ''));
+    const msg = norm(message);
+    const giftsAll = GI.items().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const gifts = giftsAll.filter((x, i) => i < 30 || (x.person && msg.includes(norm(x.person))))
+      .map(x => x.date + ' ' + x.person + (x.dir === 'give' ? '에게 냄 ' : '에게 받음 ') + won(x.amount) + ' ' + (x.ev || '') + (x.rel ? ' (' + x.rel + ')' : ''));
+    const weekStart = addDays(t, -((now.getDay() + 6) % 7));
+    const workouts = WO.items().filter(x => (x.date || '') >= weekStart).sort((a, b) => (a.date || '').localeCompare(b.date || '')).map(x => x.date + ' ' + x.type + ' ' + (x.min || 0) + '분');
+    const petList = PETS.items(), petName = id => (petList.find(p => p.id === id) || {}).name || '?';
+    const pets = petList.map(p => p.name + ' (' + (p.kind || '') + (p.breed ? ' ' + p.breed : '') + ')');
+    const petlogs = PL.items().sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 12)
+      .map(x => x.date + ' ' + petName(x.petId) + ' ' + x.type + (x.memo ? ' ' + x.memo : '') + (x.next ? ' / 다음 일정 ' + x.next : ''));
+    const contacts = CO.items().map(x => [x.last ? addDays(x.last, Number(x.every || 14)) : t, x]).sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([d, x]) => x.name + ' — 마지막 연락 ' + (x.last || '없음') + ', 다음 ' + d + (d < t ? ' (지남)' : ''));
     return {
+      habits, chores, fridge, things, ddays, gifts, workouts, pets, petlogs, contacts,
       today: t, weekday: WD[now.getDay()], now: String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0'),
       monthOut: won(out), monthIn: won(inn), budget: budget ? won(budget) : '',
       byCat: Object.entries(by).sort((a, b) => b[1] - a[1]).map(([c, v]) => c + ' ' + won(v)),
@@ -144,7 +181,7 @@
         const o = Life.outfit ? Life.outfit(w) : null;
         const t = w.days[1];
         const tw = t && Life.outfit ? Life.outfit({ feels: Math.round((t.max + t.min) / 2), max: t.max, min: t.min, rain: t.rain, code: 0, wind: 0, humidity: 0 }) : null;
-        out.push(p.name + (out.length ? '' : '(기본 지역)') + ' 지금: ' + w.label + ' ' + w.temp + '° (체감 ' + w.feels + '°), 오늘 최고 ' + w.max + '° 최저 ' + w.min + '°, 비 올 확률 ' + w.rain + '%, 습도 ' + w.humidity + '%, 바람 ' + w.wind + 'm/s'
+        out.push(p.name + (out.length ? '' : '(기본 지역)') + ' 지금: ' + w.label + ' ' + w.temp + '° (체감 ' + w.feels + '°), 오늘 최고 ' + w.max + '° 최저 ' + w.min + '°, 앞으로 12시간 비 올 확률 최고 ' + (o ? o.rainAhead : w.rain) + '%' + (o && o.rainAt != null ? '(' + o.rainAt + '시쯤부터)' : '') + ', 습도 ' + w.humidity + '%, 바람 ' + w.wind + 'm/s'
           + (w.pm10 != null ? ', 미세먼지 ' + (Life.pmGrade(w.pm10, 'pm10') || [''])[0] : '') + (w.pm25 != null ? ', 초미세먼지 ' + (Life.pmGrade(w.pm25, 'pm25') || [''])[0] : '')
           + (o ? ' / 오늘 옷 추천: ' + o.items.join(', ') + (o.tips.length ? ' / 챙길 것: ' + o.tips.map(x => x.replace(/^\S+\s/, '')).join(' ') : '') : ''));
         if (t) out.push(p.name + ' 내일: ' + t.label + ' 최고 ' + t.max + '° 최저 ' + t.min + '°, 비 올 확률 ' + t.rain + '%' + (tw ? ' / 내일 옷 추천: ' + tw.items.join(', ') : ''));
@@ -179,11 +216,89 @@
       S.setMeta({ freq: Object.fromEntries(Object.entries(f).sort((x, y) => y[1] - x[1]).slice(0, 40)) });
       return { kind: 'shop', id: it.id, label: '장보기', text: a.title + (a.qty ? ' ' + a.qty : ''), href: 'shop.html' };
     }
+    if (a.type === 'habit_done') {
+      const tasks = readTasks(), hb = findByName(tasks.filter(x => x.type === 'habit'), a.title, 'title');
+      if (!hb) return { kind: 'habit', id: null, label: '습관', text: '"' + a.title + '" 습관을 찾지 못했어요', href: 'index.html' };
+      const prev = { completedDates: (hb.completedDates || []).slice(), counts: Object.assign({}, hb.counts || {}) };
+      const tg = Math.max(1, parseInt(hb.target, 10) || 1);
+      hb.completedDates = hb.completedDates || [];
+      if (tg > 1) {
+        hb.counts = hb.counts || {}; const n = Math.min(99, (hb.counts[t] || 0) + 1); hb.counts[t] = n;
+        if (n >= tg && !hb.completedDates.includes(t)) hb.completedDates.push(t);
+      } else if (hb.completedDates.includes(t)) {
+        return { kind: 'habit', id: null, label: '습관', text: hb.title + ' · 오늘 이미 체크돼 있어요', href: 'index.html' };
+      } else hb.completedDates.push(t);
+      writeTasks(tasks);
+      const c = tg > 1 ? hb.counts[t] : 1;
+      return { kind: 'habit', id: hb.id, prevHabit: prev, label: '습관', text: hb.title + ' · 오늘 체크' + (tg > 1 ? ' (' + c + '/' + tg + ')' : ''), href: 'index.html' };
+    }
+    if (a.type === 'chore_done') {
+      const x = findByName(CH.items(), a.title, 'name');
+      if (!x) return { kind: 'chore', id: null, label: '집안일', text: '"' + a.title + '" 집안일을 찾지 못했어요', href: 'chores.html' };
+      const me = (Life.user() || {}).uid || '';
+      CH.put(Object.assign({}, x, { last: t, lastBy: me, log: (x.log || []).concat([{ d: t, by: me }]).slice(-60) }));
+      return { kind: 'chore', id: x.id, store: 'chores', prev: x, label: '집안일', text: x.name + ' · 오늘 했어요', href: 'chores.html' };
+    }
+    if (a.type === 'contacted') {
+      const x = findByName(CO.items(), a.who || a.title, 'name');
+      if (!x) return { kind: 'contact', id: null, label: '연락', text: '"' + (a.who || a.title) + '"을(를) 연락 챙기기에서 찾지 못했어요', href: 'contact.html' };
+      CO.put(Object.assign({}, x, { last: t }));
+      return { kind: 'contact', id: x.id, store: 'contacts', prev: x, label: '연락', text: x.name + ' · 오늘 연락함', href: 'contact.html' };
+    }
+    if (a.type === 'fridge') {
+      const zone = ['냉장', '냉동', '실온'].includes(a.place) ? a.place : '냉장';
+      const it = FR.put({ name: a.title, qty: a.qty || '', zone, exp: a.date || '', added: t });
+      return { kind: 'fridge', id: it.id, store: 'fridge', label: '냉장고', text: a.title + (a.qty ? ' ' + a.qty : '') + ' · ' + zone + (a.date ? ' · 기한 ' + shortDate(a.date) : ''), href: 'fridge.html' };
+    }
+    if (a.type === 'thing') {
+      const old = findByName(TH.items(), a.title, 'name');
+      const row = { name: a.title, where: a.place || '', cat: a.cat || (old && old.cat) || '기타', memo: (old && old.memo) || '', moved: t };
+      const it = TH.put(old ? Object.assign({}, old, row) : row);
+      return { kind: 'thing', id: it.id, store: 'things', prev: old || null, label: '물건 위치', text: a.title + ' → ' + (a.place || '?'), href: 'things.html' };
+    }
+    if (a.type === 'dday') {
+      const kind = a.kind || 'yearly';
+      const it = DD.put({ title: a.title, kind, date: a.date, lunar: kind === 'yearly' && /음력/.test(a.memo || ''), label: a.cat || '기념일', memo: (a.memo || '').replace(/음력/g, '').trim() });
+      return { kind: 'dday', id: it.id, store: 'dday', label: '기념일', text: a.title + ' · ' + a.date + (it.lunar ? ' (음력)' : ''), href: 'dday.html' };
+    }
+    if (a.type === 'gift') {
+      const dir = a.dir === 'get' ? 'get' : 'give', ev = a.cat || '기타';
+      const g = GI.put({ dir, person: a.who, rel: '기타', ev, amount: a.amount, date: a.date || t, memo: a.memo || '' });
+      let moneyId = null, toMoney = true; try { toMoney = localStorage.getItem('gift_to_money_v1') !== '0'; } catch (e) {}
+      if (dir === 'give' && toMoney) moneyId = M.put({ kind: 'out', amount: a.amount, cat: '경조사', memo: a.who + ' ' + ev, date: a.date || t, giftId: g.id }).id;
+      return { kind: 'gift', id: g.id, store: 'gifts', moneyId, label: '경조사', text: a.who + (dir === 'give' ? '님께 낸 ' : '님께 받은 ') + ev + ' ' + won(a.amount) + (moneyId ? ' · 가계부에도 적음' : ''), href: 'gift.html' };
+    }
+    if (a.type === 'workout') {
+      const it = WO.put({ type: a.title || '기타', min: a.minutes || 0, date: a.date || t, memo: a.memo || '' });
+      return { kind: 'workout', id: it.id, store: 'workout', label: '운동', text: (a.title || '운동') + (a.minutes ? ' ' + a.minutes + '분' : '') + ((a.date || t) !== t ? ' · ' + shortDate(a.date) : ''), href: 'workout.html' };
+    }
+    if (a.type === 'petlog') {
+      const pet = findByName(PETS.items(), a.who, 'name');
+      if (!pet) return { kind: 'pet', id: null, label: '반려동물', text: '"' + a.who + '"을(를) 반려동물 수첩에서 찾지 못했어요', href: 'pet.html' };
+      const type = a.title || '기타';
+      const r = PL.put({ petId: pet.id, type, date: a.date || t, memo: a.memo || '', cost: a.amount || 0, weight: null, next: '' });
+      let moneyId = null;
+      if (a.amount) moneyId = M.put({ kind: 'out', amount: a.amount, cat: '반려동물', memo: pet.name + ' ' + type + (a.memo ? ' · ' + a.memo : ''), date: a.date || t }).id;
+      return { kind: 'pet', id: r.id, store: 'petlog', moneyId, label: '반려동물', text: pet.name + ' ' + type + (a.amount ? ' ' + won(a.amount) + ' · 가계부에도 적음' : ''), href: 'pet.html' };
+    }
+    if (a.type === 'note') {
+      let notes = []; try { notes = JSON.parse(localStorage.getItem(NOTES_KEY) || '[]') || []; } catch (e) {}
+      const id = 'n' + Date.now() + Math.random().toString(36).slice(2, 6), now = Date.now();
+      notes.unshift({ id, title: a.title || '', body: a.memo || '', color: '', pinned: false, date: null, createdAt: now, updatedAt: now });
+      try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes)); } catch (e) {}
+      const CS = window.CloudSync; if (CS && CS.schedulePush) CS.schedulePush();
+      return { kind: 'note', id, label: '메모', text: a.title || (a.memo || '').slice(0, 30), href: 'index.html?tab=notes' };
+    }
     return null;
   }
+  const STORES = { chores: CH, contacts: CO, fridge: FR, things: TH, dday: DD, gifts: GI, workout: WO, petlog: PL };
   function undo(r) {
     if (!r.id) return;
+    if (r.moneyId) M.remove(r.moneyId);
     if (r.kind === 'todo') writeTasks(readTasks().filter(x => x.id !== r.id));
+    else if (r.kind === 'habit') { const tasks = readTasks(), hb = tasks.find(x => x.id === r.id); if (hb && r.prevHabit) { hb.completedDates = r.prevHabit.completedDates; hb.counts = r.prevHabit.counts; writeTasks(tasks); } }
+    else if (r.kind === 'note') { let n = []; try { n = JSON.parse(localStorage.getItem(NOTES_KEY) || '[]') || []; } catch (e) {} try { localStorage.setItem(NOTES_KEY, JSON.stringify(n.filter(x => x.id !== r.id))); } catch (e) {} const CS = window.CloudSync; if (CS && CS.schedulePush) CS.schedulePush(); }
+    else if (r.store && STORES[r.store]) { if (r.prev) STORES[r.store].put(r.prev); else STORES[r.store].remove(r.id); }
     else if (r.kind === 'shop') S.remove(r.id);
     else M.remove(r.id);
   }
@@ -216,7 +331,7 @@
     if (log.length || waiting) requestAnimationFrame(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }));
   }
 
-  const EX = ['오늘 날씨 어때? 뭐 입을까?', '점심 김치찌개 9천원', '내일 오후 3시 치과 예약', '우유랑 계란 2판 장보기에 넣어줘', '이번 달 얼마 썼어?'];
+  const EX = ['오늘 날씨 어때? 뭐 입을까?', '점심 김치찌개 9천원', '내일 오후 3시 치과 예약', '우유랑 계란 2판 장보기에 넣어줘', '여권 서랍 둘째 칸에 뒀어', '30분 걷기 했어', '이번 달 얼마 썼어?'];
   $('examples').replaceChildren(...EX.map(t => h('button', { class: 'chip', type: 'button', onclick: () => send(t) }, t)));
 
   /* ---------- 로그인·서버 확인 ---------- */
@@ -243,7 +358,7 @@
     log.push({ role: 'user', text, at: Date.now() }); saveLog();
     $('input').value = ''; grow(); render(true);
     try {
-      const ctx = context();
+      const ctx = context(text);
       if (WX_WORDS.test(text)) ctx.weather = await weatherLines();
       const r = await Life.api('chat', { body: { message: text, history, context: ctx } });
       const results = (r.actions || []).map(a => { try { return apply(a); } catch (e) { console.error(e); return null; } }).filter(Boolean);

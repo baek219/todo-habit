@@ -178,6 +178,15 @@ async function handleMenu(req, env, user) {
 const OUT_CATS = ['식비', '카페·간식', '장보기', '교통', '생활·주거', '쇼핑', '의료·건강', '반려동물', '문화·여가', '경조사', '기타'];
 const IN_CATS = ['월급', '용돈·부수입', '환급·기타'];
 const nullable = t => ({ anyOf: [t, { type: 'null' }] });
+const ACTION_TYPES = ['todo', 'expense', 'income', 'shop', 'habit_done', 'chore_done', 'fridge', 'thing', 'dday', 'gift', 'workout', 'petlog', 'contacted', 'note'];
+const CAT_OF = {
+  expense: OUT_CATS, income: IN_CATS,
+  thing: ['서류', '전자기기', '계절용품', '공구', '약·구급', '추억', '기타'],
+  dday: ['생일', '결혼기념일', '기념일', '제사', '기타'],
+  gift: ['결혼', '장례', '돌잔치', '생일', '개업·집들이', '병문안', '기타'],
+  workout: ['걷기', '달리기', '헬스', '홈트', '자전거', '등산', '수영', '요가·스트레칭', '기타'],
+  petlog: ['병원', '예방접종', '구충·심장사상충', '사료·간식', '체중', '미용·목욕', '약', '기타']
+};
 const CHAT_SCHEMA = {
   type: 'object',
   properties: {
@@ -187,16 +196,22 @@ const CHAT_SCHEMA = {
       items: {
         type: 'object',
         properties: {
-          type: { type: 'string', enum: ['todo', 'expense', 'income', 'shop'] },
+          type: { type: 'string', enum: ACTION_TYPES },
           title: { type: 'string' },
-          date: nullable({ type: 'string', format: 'date' }),
-          time: nullable({ type: 'string' }),
-          amount: nullable({ type: 'integer' }),
-          cat: nullable({ type: 'string', enum: OUT_CATS.concat(IN_CATS) }),
-          qty: nullable({ type: 'string' }),
-          important: { type: 'boolean' }
+          date: { type: 'string' },
+          time: { type: 'string' },
+          amount: { type: 'integer' },
+          cat: { type: 'string' },
+          qty: { type: 'string' },
+          important: { type: 'boolean' },
+          who: { type: 'string' },
+          place: { type: 'string' },
+          minutes: { type: 'integer' },
+          dir: { type: 'string', enum: ['give', 'get', ''] },
+          kind: { type: 'string', enum: ['yearly', 'once', 'count', ''] },
+          memo: { type: 'string' }
         },
-        required: ['type', 'title', 'date', 'time', 'amount', 'cat', 'qty', 'important'],
+        required: ['type', 'title', 'date', 'time', 'amount', 'cat', 'qty', 'important', 'who', 'place', 'minutes', 'dir', 'kind', 'memo'],
         additionalProperties: false
       }
     }
@@ -208,20 +223,32 @@ const CHAT_SYSTEM = [
   '너는 "생활노트" 웹사이트 안의 AI 비서야. 사용자가 한국어로 짧게 말하면, 그걸 사이트 기록으로 바꿔 주거나 기록에 대한 질문에 답해.',
   '',
   '할 수 있는 기록 (actions)',
-  '- todo: 할 일 추가. title=할 일 이름(날짜·시간 말은 빼고 짧게), date=해야 하는 날(말이 없으면 오늘), time=HH:MM 24시간(말이 없으면 null), important=중요하다고 했으면 true.',
+  '- todo: 할 일 추가. title=할 일 이름(날짜·시간 말은 빼고 짧게), date=해야 하는 날(말이 없으면 오늘), time=HH:MM 24시간(말이 없으면 ""), important=중요하다고 했으면 true.',
   '- expense: 지출 기록. title=무엇에 썼는지 짧은 메모, amount=원 단위 정수, cat=지출 분류 중 가장 맞는 것, date=쓴 날(말이 없으면 오늘).',
   '- income: 수입 기록. amount, cat=수입 분류(월급/용돈·부수입/환급·기타), title=메모, date.',
-  '- shop: 장보기 목록에 추가. title=살 물건 하나, qty=수량(말했으면, 아니면 null). 물건이 여러 개면 하나씩 따로 넣어.',
-  '- 쓰지 않는 칸은 null, important는 false로.',
+  '- shop: 장보기 목록에 추가. title=살 물건 하나, qty=수량(말했으면, 아니면 ""). 물건이 여러 개면 하나씩 따로 넣어.',
+  '- habit_done: 오늘 습관을 했다고 하면. title=[오늘 습관]에 있는 이름 그대로.',
+  '- chore_done: 집안일을 했다고 하면. title=[집안일]에 있는 이름 그대로.',
+  '- fridge: 냉장고에 넣기. title=식재료 하나, qty=수량, place=냉장/냉동/실온 중 하나(말이 없으면 냉장), date=유통기한(말했으면).',
+  '- thing: 물건을 어디 뒀는지 적기. title=물건, place=둔 곳(짧게), cat=물건 분류.',
+  '- dday: 기념일 추가. title=이름(예: 엄마 생신), date=날짜, kind=yearly(해마다: 생일·기념일)/once(한 번: 시험·이사)/count(며칠째 세기: 사귄 날), cat=기념일 분류. 음력이면 date에 음력 월·일을 그대로 넣고(예: 음력 9월 3일 → 올해-09-03) memo에 "음력"이라고 적어.',
+  '- gift: 경조사비. who=상대 이름, dir=give(내가 냄)/get(내가 받음), amount=원, cat=경조사 종류, date=날짜(말이 없으면 오늘), title=짧은 설명.',
+  '- workout: 운동 기록. title=운동 분류, minutes=몇 분(시간이면 분으로), date, memo=짧은 메모.',
+  '- petlog: 반려동물 기록. who=[반려동물]에 있는 이름 그대로, title=기록 분류, date, amount=비용(말했으면), memo=짧은 메모.',
+  '- contacted: 누구에게 연락했다고 하면. who=[연락 챙기기]에 있는 이름 그대로.',
+  '- note: 메모해 달라고 하면. title=짧은 제목, memo=내용.',
+  '- 이름을 그대로 써야 하는 것(habit_done, chore_done, petlog, contacted)은 목록에 비슷한 이름이 없으면 기록하지 말고 되물어.',
+  '- 분류(cat)는 아래 목록에서만 골라. 맞는 게 없으면 "기타".',
+  '- 쓰지 않는 칸: 글자 칸은 빈 문자열 "", 숫자 칸(amount, minutes)은 0, important는 false. date는 YYYY-MM-DD, time은 HH:MM(24시간).',
   '',
-  '지출 분류: ' + OUT_CATS.join(', '),
-  '수입 분류: ' + IN_CATS.join(', '),
+  '분류 목록 — 지출: ' + OUT_CATS.join(', ') + ' / 수입: ' + IN_CATS.join(', ') + ' / 물건: ' + CAT_OF.thing.join(', ') + ' / 기념일: ' + CAT_OF.dday.join(', ') + ' / 경조사: ' + CAT_OF.gift.join(', ') + ' / 운동: ' + CAT_OF.workout.join(', ') + ' / 반려동물 기록: ' + CAT_OF.petlog.join(', '),
   '',
   '규칙',
   '- 한 메시지에 여러 개가 있으면 actions에 모두 넣어.',
   '- "만원"=10000, "9천원"=9000, "1.5만"=15000처럼 금액을 정수로 바꿔.',
   '- "내일", "모레", "다음 주 화요일" 같은 날짜는 아래 오늘 날짜 기준으로 YYYY-MM-DD로 바꿔.',
   '- 금액을 모르는 지출, 무엇을 할지 모르는 할 일처럼 정보가 모자라면 기록하지 말고 reply에서 짧게 되물어.',
+  '- "여권 어디 뒀지?", "냉장고에 뭐 있어?", "다음 기념일 언제야?", "철수한테 얼마 냈지?" 같은 질문도 아래 기록으로 답해.',
   '- 질문(예: 이번 달 얼마 썼어?, 장볼 거 뭐 있어?)에는 아래 "지금 기록"만 보고 답하고, 없는 숫자는 지어내지 마. 질문만 했으면 actions는 빈 배열.',
   '- 날씨·옷차림 질문에는 "지금 기록"의 [날씨]만 보고 답해. 지금 날씨와 기온(체감), 비·미세먼지처럼 중요한 것, 옷 추천과 챙길 것을 짧게 알려줘. 내일을 물으면 내일 줄을 써. 질문에 지역이 없으면 기본 지역으로 답해.',
   '- [날씨]에 없는 지역을 물으면 모른다고 하고, 날씨 메뉴에서 그 지역을 추가하면 알려줄 수 있다고 말해. 날씨 숫자를 지어내지 마.',
@@ -249,6 +276,16 @@ async function handleChat(req, env, user) {
     '[최근 지출·수입 (최근 것부터)]', lines(c.recentMoney, 15, 80),
     '[장보기 목록 - 아직 안 산 것]', lines(c.shop, 30, 40),
     '[남은 할 일 (날짜순)]', lines(c.todos, 20, 80),
+    '[오늘 습관]', lines(c.habits, 20, 60),
+    '[집안일 (다음 할 날)]', lines(c.chores, 25, 60),
+    '[냉장고]', lines(c.fridge, 40, 50),
+    '[물건 위치]', lines(c.things, 80, 60),
+    '[다가오는 기념일]', lines(c.ddays, 15, 60),
+    '[경조사 기록]', lines(c.gifts, 40, 70),
+    '[이번 주 운동]', lines(c.workouts, 15, 50),
+    '[반려동물]', lines(c.pets, 6, 40),
+    '[반려동물 최근 기록·다음 일정]', lines(c.petlogs, 15, 70),
+    '[연락 챙기기]', lines(c.contacts, 25, 60),
     ...(Array.isArray(c.weather) ? ['[날씨] (생활노트 날씨 메뉴에 저장된 지역, Open-Meteo 기준)', lines(c.weather, 8, 400)] : [])
   ].join('\n');
 
@@ -295,10 +332,23 @@ async function handleChat(req, env, user) {
     date: okDate(a.date),
     time: okTime(a.time),
     amount: Number.isFinite(a.amount) && a.amount > 0 && a.amount < 1e10 ? Math.round(a.amount) : null,
-    cat: OUT_CATS.concat(IN_CATS).includes(a.cat) ? a.cat : null,
+    cat: CAT_OF[a.type] ? (CAT_OF[a.type].includes(a.cat) ? a.cat : null) : null,
     qty: a.qty ? clip(a.qty, 12) : '',
-    important: !!a.important
-  })).filter(a => ['todo', 'expense', 'income', 'shop'].includes(a.type) && (a.title || a.type === 'expense' || a.type === 'income') && ((a.type !== 'expense' && a.type !== 'income') || a.amount));
+    important: !!a.important,
+    who: a.who ? clip(a.who, 30).trim() : null,
+    place: a.place ? clip(a.place, 40).trim() : null,
+    minutes: Number.isFinite(a.minutes) && a.minutes > 0 && a.minutes < 1440 ? Math.round(a.minutes) : null,
+    dir: a.dir === 'give' || a.dir === 'get' ? a.dir : null,
+    kind: ['yearly', 'once', 'count'].includes(a.kind) ? a.kind : null,
+    memo: a.memo ? clip(a.memo, 300).trim() : ''
+  })).filter(a => {
+    if (!ACTION_TYPES.includes(a.type)) return false;
+    if (['expense', 'income', 'gift'].includes(a.type) && !a.amount) return false;
+    if (['petlog', 'contacted', 'gift'].includes(a.type) && !a.who) return false;
+    if (a.type === 'dday' && !a.date) return false;
+    if (a.type === 'note' && !(a.title || a.memo)) return false;
+    return !!a.title || ['expense', 'income', 'contacted', 'gift', 'note'].includes(a.type);
+  });
   return json(req, env, { reply: clip(out.reply, 400), actions, remaining: q.remaining, limit: q.limit });
 }
 

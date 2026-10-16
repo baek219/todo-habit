@@ -470,6 +470,7 @@
     [-99, '🥶', '아주 추워요', ['패딩', '두꺼운 코트', '목도리', '장갑', '히트텍', '기모 제품']]
   ];
   const outfitStep = t => OUTFIT.find(o => t >= o[0]);
+  const hourText = H => (H < 12 ? '오전 ' : '오후 ') + (H % 12 || 12) + '시';
   function outfit(w) {
     if (!w) return null;
     const base = w.feels, step = outfitStep(base), tips = [];
@@ -479,15 +480,21 @@
       const cold = outfitStep(w.min);
       tips.push('🌙 아침·저녁엔 ' + w.min + '°까지 내려가요' + (cold !== step ? '. ' + cold[3].slice(0, 2).join(', ') + ' 같은 걸 하나 챙기세요.' : '. 일교차가 커요.'));
     }
-    if (w.wet || w.rain >= 60) tips.push('☔ 비가 와요(올 확률 ' + w.rain + '%). 우산 꼭 챙기세요.');
-    else if (w.rain >= 30) tips.push('🌂 비 올 수도 있어요(' + w.rain + '%). 접는 우산 하나 챙기세요.');
+    // 비: 하루 전체 최고값이 아니라 '지금부터 12시간' 시간별 예보로 판단 (지나간 시간·한밤중 비 때문에 우산을 권하지 않게)
+    const next = (w.hours || []).slice(0, 12);
+    const rainAhead = next.length ? Math.max(...next.map(x => x.rain || 0)) : (w.rain || 0);
+    const firstRain = next.find(x => (x.rain || 0) >= 30);
+    const when = firstRain && next.indexOf(firstRain) > 0 ? hourText(firstRain.h) + '쯤 ' : '';
+    if (w.wet) tips.push('☔ 지금 비가 와요. 우산 꼭 챙기세요.');
+    else if (rainAhead >= 60) tips.push('☔ ' + when + '비 소식이 있어요(' + rainAhead + '%). 우산 꼭 챙기세요.');
+    else if (rainAhead >= 30) tips.push('🌂 ' + when + '비 올 수도 있어요(' + rainAhead + '%). 접는 우산 하나 챙기세요.');
     if (w.code >= 71 && w.code <= 86) tips.push('❄️ 눈 소식이 있어요. 미끄럽지 않은 신발이 좋아요.');
     if (w.wind >= 7) tips.push('💨 바람이 강해요(' + w.wind + 'm/s). ' + (base <= 8 ? '목도리·모자로 바람을 막으세요.' : '바람막이가 있으면 좋아요.'));
     const g = pmGrade(w.pm25, 'pm25'), g2 = pmGrade(w.pm10, 'pm10');
     if ((g && /나쁨/.test(g[0])) || (g2 && /나쁨/.test(g2[0]))) tips.push('😷 미세먼지가 나빠요. 마스크를 챙기세요.');
     if (w.max >= 27 && w.code <= 2) tips.push('🧴 햇볕이 강해요. 모자·선크림 챙기세요.');
     if (base >= 25 && w.humidity >= 75) tips.push('💦 습해요. 통풍 잘 되는 옷이 좋아요.');
-    return { icon: step[1], feel: step[2], items: step[3], base, tips };
+    return { icon: step[1], feel: step[2], items: step[3], base, tips, rainAhead, rainAt: firstRain ? firstRain.h : null };
   }
 
   /* ---------- 기념일: 다음에 돌아오는 날 (홈·기념일 페이지 공용) ---------- */

@@ -152,7 +152,7 @@
           h('div', {}, h('b', {}, w.temp + '°'), h('div', { class: 'small muted' }, w.label + ' · 체감 ' + w.feels + '°'))),
         h('div', { class: 'facts' },
           h('span', { class: 'badge' }, '최고 ' + w.max + '° / 최저 ' + w.min + '°'),
-          h('span', { class: 'badge' }, '비 ' + w.rain + '%'),
+          h('span', { class: 'badge', title: '오늘 하루 중 가장 높은 비 올 확률' }, '오늘 비 ' + w.rain + '%'),
           h('span', { class: 'badge' }, '습도 ' + w.humidity + '%'),
           h('span', { class: 'badge' }, '바람 ' + w.wind + 'm/s'),
           g10 ? h('span', { class: 'badge ' + g10[1] }, '미세먼지 ' + g10[0]) : null,
